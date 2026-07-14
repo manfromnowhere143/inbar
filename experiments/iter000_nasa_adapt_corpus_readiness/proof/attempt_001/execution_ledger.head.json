@@ -1,0 +1,8 @@
+{
+  "event_count": 5,
+  "head_hash": "579bce01748fbdce16ae64f8b1614dd92a0f07a292dcf330f5e2916f65117427",
+  "schema_version": "fieldtrue.ledger-head.v1",
+  "signature": "00947129923d529f9b5fa39f4d464c31c0db253b0b3dfe07b7d2fe980022415dd1e8682922f036a4a4f5fe18059e405c845de2a89b78d67e6c7a987ab8466d0d",
+  "signer_public_key": "0d5d5313b054a05978811e3f56195d4e806b50924af05cb9c811dca8c1767646",
+  "trust_level": "local_ed25519_no_external_timestamp"
+}

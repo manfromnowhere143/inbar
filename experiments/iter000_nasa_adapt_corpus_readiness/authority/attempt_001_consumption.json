@@ -1,0 +1,49 @@
+{
+  "amendment": {
+    "amendment_id": "iter000_001",
+    "path": "protocol/amendments/iter000_001.json",
+    "sha256": "c7aff0b2c61f95a396646a7869f8269778b8ef04cdf4e3ccc8e60943a570d8cc"
+  },
+  "attempt_id": "attempt_001",
+  "authority_id": "iter000_001",
+  "authority_specification": {
+    "path": "protocol/attempt_authorities/iter000_001.json",
+    "sha256": "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a"
+  },
+  "consumed_at": "2026-07-14T19:13:27.581417Z",
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "receipt_hash": "0081b1508a3bd95380a5c3d20250be2e14515f282d555beca129745ff9be0c37",
+  "run_id": "iter000-attempt_001-ab20d41be480",
+  "runtime": {
+    "command": [
+      "fieldtrue",
+      "experiment",
+      "iter000-amendment-001"
+    ],
+    "dirty_state_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "git_commit": "ab20d41be48003c443a807c733c4c8ce43445e01",
+    "git_tree": "e3d8a8609e483b37c755b252e4f43b57b4731480",
+    "lockfile_hash": "19fe8aaea2f7af991cc614d8b439aa7101e02ced0147b7e534decb858efbb196",
+    "platform": "macOS-14.4-arm64-arm-64bit",
+    "python_version": "3.12.2",
+    "repository_dirty": false
+  },
+  "same_local_owner_can_delete_or_rollback_local_state": true,
+  "schema_version": "fieldtrue.attempt-authority-consumption.v1",
+  "signature": "2bbf47220a60164652225a3997875a461b2ada873ba430c7b35747b1b2067e5d0972b9496b371a812ddbd722e7040391bbbc646ff97a892535e2300fc80caa0a",
+  "signer_anchor": {
+    "path": "protocol/trust/iter000_signer_anchor.json",
+    "sha256": "7174bedb14de9f6cc7bd178a2b70a71f75baa04d1291004dbfaa6304fb701022"
+  },
+  "signer_public_key": "0d5d5313b054a05978811e3f56195d4e806b50924af05cb9c811dca8c1767646",
+  "tls_runtime": {
+    "bypass_forbidden": true,
+    "ca_bundle_sha256": "bbc7e9c01d7551bb8a159b5dedd989b8ee3ce105aff522b68eb1b01bf854cab0",
+    "certificate_verification": "required",
+    "hostname_verification": "required",
+    "minimum_tls_version": "TLSv1.2",
+    "trust_store": "certifi",
+    "trust_store_version": "2026.6.17"
+  },
+  "trust_level": "local_ed25519_no_external_timestamp"
+}

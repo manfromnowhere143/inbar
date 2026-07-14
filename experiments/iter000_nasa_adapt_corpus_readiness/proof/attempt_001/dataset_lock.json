@@ -1,0 +1,43 @@
+{
+  "schema_version": "fieldtrue.dataset-lock.v1",
+  "dataset_id": "nasa-adapt-public-v1",
+  "source_authority": "NASA Open Data Portal / DASHlink",
+  "landing_page": "https://data.nasa.gov/dataset/adapt-dataset",
+  "license_status": "not_specified_on_landing_page",
+  "redistribution": "forbidden_by_project_policy_until_terms_are_clarified",
+  "resources": [
+    {
+      "id": "dataset_text",
+      "url": "https://c3.ndc.nasa.gov/dashlink/static/media/dataset/dataset_text.zip",
+      "filename": "dataset_text.zip",
+      "sha256": "746f94a7242c02c502126f2e5269e6a72a81f790cd39ce33543ef76c68f7ce78",
+      "bytes": 234841,
+      "media_type": "application/zip"
+    },
+    {
+      "id": "experiment_log",
+      "url": "https://c3.ndc.nasa.gov/dashlink/static/media/dataset/Experiment_Log.xls",
+      "filename": "Experiment_Log.xls",
+      "sha256": "28db2a1ba15d19aa6f6009e3245afd9cfb244e45c07f63fc5c21d7d49461ee84",
+      "bytes": 23040,
+      "media_type": "application/vnd.ms-excel"
+    }
+  ],
+  "expected_experiment_files": 16,
+  "allowed_model_visible_rows": [
+    "AntagonistData",
+    "UserCommand"
+  ],
+  "truth_only_rows": [
+    "ExperimentControl",
+    "FaultInject",
+    "AntagonistCommand"
+  ],
+  "limitations": [
+    "fewer_than_30_experiment_runs",
+    "single_testbed_family",
+    "no_reviewed_safe_discriminating_test_catalog",
+    "license_not_specified"
+  ]
+}
+

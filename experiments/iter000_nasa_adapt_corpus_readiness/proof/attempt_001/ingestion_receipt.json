@@ -1,0 +1,62 @@
+{
+  "coverage_report_sha256": "569e45683e0d0667722d0aa4c6a748d56a6e2faddce376e8bfd6e23191e96c1c",
+  "dataset_id": "nasa-adapt-public-v1",
+  "dataset_lock_content_sha256": "5721cff5c79c34e4933724d607a2a48ed9fa8936ee0c453e5fc76f14bc46082f",
+  "derived_artifact_hashes": [
+    "01f4b984147a113243127b69f74eb27c0717df4582a4f822780397b7409f0f5b",
+    "09e7002e39fe67ec85b832571c8e664a2ed6f821a6442c899aebcb9111f6c8ca",
+    "0ba57325345f10022b0c5969a8eacdbd1ab9f177ff2ca149799ad9e4f29782f9",
+    "118318003addbcb2f6ed818b62a914a43b82460cd9cd56623ece2665619eaa4f",
+    "1c0a85834b9773daea4466bbb75c7872580079bd06ba4ac2350f9b9a26fdb25a",
+    "2e9dd7a70e693595f50e1b81c31b83d0b8820e0e4e74bee7c1a8bbf1830d02db",
+    "3e77e904cc691c27e8cc75aff792da64be363a5755457a9a3f93659ddcb618d8",
+    "4759ed61a10612560e0a14473f5cbc8274f8afc240accc283e2811f0b3f5fce3",
+    "569289c4c3f31e8a6da8cea71fd279c0eb2d6be87d1217c86adeb4c103b8a5ff",
+    "5efed6322312280e15fd479c472104e4856463f6813268f880e4dad1cfa57e8d",
+    "623a07be6ef53a8347eb6c8abe8165228defb38260922d6e3f37bb4410f6667b",
+    "6b11152f44aaafe1d3b775bad14d4560ec63b54d11397190a2fee6bd701eea31",
+    "6cf131e2fbe5f1bc74ca7b616aa4a88185452a10ef0c5b9815b6b63533fab9c5",
+    "6dff525771f25b7aebdb9495a1df35fb33e9c0a51540d8791be41adcb582afbd",
+    "7269e754c34b0ab2b1da9a711f81d328dde81d3e74d0015732b7609eb88fb51d",
+    "75a293e78d8cd02a6e9fe6c6393f21a3a7d9f99dfcc470097fe4531671ba32b2",
+    "75e4b2d3ede3a4fd34f3405484b0121674fd4365e410e00c93b2f3924d781de2",
+    "81728dd83b628eaf345ece7bc5348684efd848e58f9967ceeeee4d39cbcb931c",
+    "83716cfe24fb7dd15aa7b198185fbc85ddb5495db6eceffe065236fb8bb79640",
+    "9624c91e92c70cce2b65f54bbec59826206dcbb60ac4d2892ddc94e144c78296",
+    "99bdf87c718d8cd7e6ce8f8a956a947c52c54240eb7cee42661043e045008ae6",
+    "9befdf357b2a7644fc750aaa745eb17b8b3d28e1764e0d122b4abe42de31529c",
+    "a09973d3ad9324ec9e0c0560bd54e5d9ee95302e851b732715c7b82a8a17e2c3",
+    "a51aaf5dc550eb3243586be4d6a2f2003f6230986830d8feb9f695120e4ee90f",
+    "a5d72eb9602e1c6ea176ee493d212509627e8cd4305a2e3967eab4106a24298c",
+    "a85866bf6c8427a5b5e728da1da439cb4a02f0a784a4cdd2e21a70f27a97515d",
+    "c6efb8d4225f0f37c45105d5f2ca3104f3f0df7a26bb9c26081fd98b70e88f1d",
+    "d9781a5969fe620f06599885e935f88cf77cb705ec3e63b57764251db320eaf5",
+    "edfa8ea028d331f6756b8f1e4684760ab4536d6517fbe09bfd14e1ca31bd1a8f",
+    "f2bb36ef67ce05b15276e0ea5e4a56e337409f1e5fa766bbf4f5fc1639a4fd75",
+    "f52e0fa0930e0a3a7646e1cfc75d1fd45325e00ff30d08109b12a16c446b5b22",
+    "fc65d24a33193ac806747669d725f991de2b50379d80eae8cde6e1e2368674b0"
+  ],
+  "evidence_bundle_count": 16,
+  "evidence_manifest_sha256": "111f068f08d0e09901c10cce35c877fb78a58ec95899911293d9347ecbec2d5c",
+  "experiment_count": 16,
+  "resource_receipts": [
+    {
+      "bytes": 234841,
+      "filename": "dataset_text.zip",
+      "resource_id": "dataset_text",
+      "sha256": "746f94a7242c02c502126f2e5269e6a72a81f790cd39ce33543ef76c68f7ce78",
+      "verified": true
+    },
+    {
+      "bytes": 23040,
+      "filename": "Experiment_Log.xls",
+      "resource_id": "experiment_log",
+      "sha256": "28db2a1ba15d19aa6f6009e3245afd9cfb244e45c07f63fc5c21d7d49461ee84",
+      "verified": true
+    }
+  ],
+  "schema_version": "fieldtrue.adapt-ingestion.v1",
+  "truth_manifest_sha256": "bb9e80e3f72f6a2d54d68c9dcf6daf9aff9a3d7e545389505f625e7af85174fb",
+  "truth_record_count": 16,
+  "truth_separation_passed": true
+}

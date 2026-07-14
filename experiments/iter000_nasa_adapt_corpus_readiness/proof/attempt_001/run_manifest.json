@@ -1,0 +1,41 @@
+{
+  "artifacts": {
+    "AMENDMENT_001.md": "85ef78eab3bd9bff0507f855af1195ebab4753b0c77e1535e3345f7b4ba8536e",
+    "LEARNING.json": "dde7266c8ef44ffbcad20dc67897baf5f3d95b895662ba26eaa404daf976317f",
+    "RESULT.md": "28e6448047902e395c08c0fc51a432e88958a8c06adb34c619b7c304bbdb7df9",
+    "amendment_001.json": "c7aff0b2c61f95a396646a7869f8269778b8ef04cdf4e3ccc8e60943a570d8cc",
+    "artifact_bundle.json": "043e1f4f015378a6626923b36d90b5d56c13396ab3b88275d6a193870318e697",
+    "attempt_authority.json": "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a",
+    "attempt_authority_consumption.json": "8d155b56440a4dfa25cbdfa400344a32b29e8d877cd39fa4f2c0612b4371b8aa",
+    "coverage.json": "569e45683e0d0667722d0aa4c6a748d56a6e2faddce376e8bfd6e23191e96c1c",
+    "dataset_lock.json": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+    "ingestion_receipt.json": "d549282400fae1d18a74f0a54106a9427de5cc8841c8291f16d63c0bb3442c44",
+    "model_evidence_manifest.jsonl": "111f068f08d0e09901c10cce35c877fb78a58ec95899911293d9347ecbec2d5c",
+    "readiness_report.json": "15a680d3c6b8f845277e5a6ade562fa542e37c2e555a3ff1771ad3ec50566b86",
+    "truth_manifest.jsonl": "bb9e80e3f72f6a2d54d68c9dcf6daf9aff9a3d7e545389505f625e7af85174fb"
+  },
+  "ledger_checkpoint": {
+    "event_count": 4,
+    "head_hash": "65880432c4f9f27a0f5284204850dfba0af1141a2dcc27fc0e6c5306370fc5ee",
+    "signer_public_key": "0d5d5313b054a05978811e3f56195d4e806b50924af05cb9c811dca8c1767646",
+    "trust_level": "git_pinned_ed25519_no_external_timestamp"
+  },
+  "manifest_content_hash": "1a0cd0a8558ddd2d6c7f955d1d9209f288b12c8ff6fa876592594f9ef1e92640",
+  "run_id": "iter000-attempt_001-ab20d41be480",
+  "runtime": {
+    "command": [
+      "fieldtrue",
+      "experiment",
+      "iter000-amendment-001"
+    ],
+    "dirty_state_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "git_commit": "ab20d41be48003c443a807c733c4c8ce43445e01",
+    "git_tree": "e3d8a8609e483b37c755b252e4f43b57b4731480",
+    "lockfile_hash": "19fe8aaea2f7af991cc614d8b439aa7101e02ced0147b7e534decb858efbb196",
+    "platform": "macOS-14.4-arm64-arm-64bit",
+    "python_version": "3.12.2",
+    "repository_dirty": false
+  },
+  "schema_version": "fieldtrue.run-manifest.v1",
+  "verdict": "BLOCKED_EVIDENCE"
+}

@@ -1,0 +1,124 @@
+{
+  "authorized_next_action": "Acquire additional independently verified physical incidents and reviewed safe test actions; ADAPT remains parser and evidence-plane validation only.",
+  "dataset_id": "nasa-adapt-public-v1",
+  "forbidden_next_actions": [
+    "GPU or learned-model training",
+    "active-diagnosis performance claim",
+    "recovery or safety claim",
+    "cross-hardware transfer claim",
+    "product or economic-value claim"
+  ],
+  "gates": [
+    {
+      "detail": "The source lock must fail closed on changed bytes.",
+      "evidence_refs": [
+        "protocol/datasets/nasa_adapt_v1.json",
+        "proof/ingestion_receipt.json"
+      ],
+      "gate_id": "source-integrity",
+      "observed": {
+        "failures": [],
+        "locked_resources": 2,
+        "receipt_resources": 2
+      },
+      "requirement": "Every resource matches its frozen SHA-256 and byte count.",
+      "status": "pass"
+    },
+    {
+      "detail": "Silent file, row, or join loss invalidates the run.",
+      "evidence_refs": [
+        "proof/coverage.json"
+      ],
+      "gate_id": "parser-integrity",
+      "observed": {
+        "exact_join": true,
+        "expected": 16,
+        "integrity_failures": [],
+        "parsed": 16
+      },
+      "requirement": "Every discovered experiment is parsed exactly once with an exact evidence/truth join.",
+      "status": "pass"
+    },
+    {
+      "detail": "Truth is represented only by a commitment in the evidence plane.",
+      "evidence_refs": [
+        "proof/coverage.json",
+        "proof/ingestion_receipt.json"
+      ],
+      "gate_id": "truth-separation",
+      "observed": {
+        "leakage_markers": []
+      },
+      "requirement": "Fault metadata and injection-internal rows are absent from model-visible evidence.",
+      "status": "pass"
+    },
+    {
+      "detail": "Counts incidents, not telemetry windows.",
+      "evidence_refs": [
+        "proof/readiness_report.json"
+      ],
+      "gate_id": "minimum-count",
+      "observed": 0,
+      "requirement": "At least 30 incidents have independently identified mechanisms.",
+      "status": "blocked"
+    },
+    {
+      "detail": "A fault label alone does not demonstrate diagnostic ambiguity.",
+      "evidence_refs": [
+        "proof/readiness_report.json"
+      ],
+      "gate_id": "ambiguity",
+      "observed": 0,
+      "requirement": "At least 30 incidents carry two or more pre-outcome plausible hypotheses.",
+      "status": "blocked"
+    },
+    {
+      "detail": "Static telemetry cannot imply unobserved counterfactual test outcomes.",
+      "evidence_refs": [
+        "proof/readiness_report.json"
+      ],
+      "gate_id": "discriminating-action",
+      "observed": 0,
+      "requirement": "At least 30 incidents have an independently reviewed safe discriminating test.",
+      "status": "blocked"
+    },
+    {
+      "detail": "One physical testbed cannot establish cross-hardware transfer.",
+      "evidence_refs": [
+        "proof/readiness_report.json"
+      ],
+      "gate_id": "transfer-support",
+      "observed": {
+        "fault_families": [
+          "abrupt",
+          "discrete",
+          "incipient/abrupt"
+        ],
+        "hardware_families": [
+          "NASA ADAPT electrical power system"
+        ],
+        "hardware_identities": [
+          "NASA Ames ADAPT EPS"
+        ],
+        "leakage_components": 1
+      },
+      "requirement": "At least two hardware families, two hardware identities, and two fault families permit grouped transfer.",
+      "status": "blocked"
+    },
+    {
+      "detail": "Channel count does not itself establish a multimodal benefit.",
+      "evidence_refs": [
+        "proof/readiness_report.json"
+      ],
+      "gate_id": "evidence-usefulness",
+      "observed": {
+        "total_incidents": 16,
+        "useful_incidents": 16
+      },
+      "requirement": "At least 30 incidents have two operational channels with explicit clock domains.",
+      "status": "blocked"
+    }
+  ],
+  "schema_version": "fieldtrue.corpus-readiness.v1",
+  "verdict": "BLOCKED_EVIDENCE"
+}

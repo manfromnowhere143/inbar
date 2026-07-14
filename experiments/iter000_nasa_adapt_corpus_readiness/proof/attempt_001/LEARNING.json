@@ -1,0 +1,16 @@
+{
+  "engine_construction_authorized": false,
+  "engine_extraction_candidates": [
+    "content-addressed source acquisition",
+    "typed evidence/truth separation",
+    "proof-first result rendering"
+  ],
+  "grounded_lessons": [
+    "Public data usefulness and scientific sufficiency are separate gates.",
+    "Fault-injection metadata must be physically separated from model evidence.",
+    "Static fault runs do not supply counterfactual safe-test outcomes."
+  ],
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "schema_version": "fieldtrue.iteration-learning.v1",
+  "verdict": "BLOCKED_EVIDENCE"
+}

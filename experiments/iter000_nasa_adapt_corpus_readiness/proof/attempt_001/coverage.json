@@ -1,0 +1,317 @@
+{
+  "discovered_files": 16,
+  "exact_file_coverage": true,
+  "expected_files": 16,
+  "files": [
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-304",
+      "fault_injection_rows": 1,
+      "filename": "Exp_304_comp3_pb.txt",
+      "nonempty_rows": 227,
+      "raw_sha256": "55f212aabc05ea501e4b2c57fb4fe91243997bb241bebd5bdea59d7697a503a4",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 213,
+        "ExperimentControl": 1,
+        "FaultInject": 1,
+        "SensorData": 1,
+        "UserCommand": 5
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 213,
+      "user_command_rows": 5
+    },
+    {
+      "antagonist_command_rows": 4,
+      "experiment_id": "adapt-305",
+      "fault_injection_rows": 1,
+      "filename": "Exp_305_comp3_pb.txt",
+      "nonempty_rows": 147,
+      "raw_sha256": "c43899f6486da141b25d8c2417bc994ebed5699c3c5d97e55497d2de2e782c3d",
+      "row_counts": {
+        "AntagonistCommand": 4,
+        "AntagonistData": 136,
+        "ExperimentControl": 1,
+        "FaultInject": 1,
+        "SensorData": 1,
+        "UserCommand": 4
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 136,
+      "user_command_rows": 4
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-306",
+      "fault_injection_rows": 1,
+      "filename": "Exp_306_comp3_pb.txt",
+      "nonempty_rows": 344,
+      "raw_sha256": "294b20582501b357122d3ddb9ffe696b89eee8f77109a6660e2b5acff731e0ba",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 329,
+        "ExperimentControl": 1,
+        "FaultInject": 1,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 329,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-308",
+      "fault_injection_rows": 1,
+      "filename": "Exp_308_comp3_pb.txt",
+      "nonempty_rows": 172,
+      "raw_sha256": "9f4c0946e5db39c8742819b669b51b6394b01f6151c7ba37ad51b07eec56c51a",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 157,
+        "ExperimentControl": 1,
+        "FaultInject": 1,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 157,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 7,
+      "experiment_id": "adapt-309",
+      "fault_injection_rows": 1,
+      "filename": "Exp_309_comp3_pb.txt",
+      "nonempty_rows": 367,
+      "raw_sha256": "b49cfc4f5997fa9acc70a9e80a388820a1ede20847324911ae644735c721ec82",
+      "row_counts": {
+        "AntagonistCommand": 7,
+        "AntagonistData": 351,
+        "ExperimentControl": 1,
+        "FaultInject": 1,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 351,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-310",
+      "fault_injection_rows": 1,
+      "filename": "Exp_310_comp3_pb.txt",
+      "nonempty_rows": 185,
+      "raw_sha256": "d948cf8fbfed7cd7871887f78e731c40ca15a8a5404dabaf720d72f3f6d2861f",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 170,
+        "ExperimentControl": 1,
+        "FaultInject": 1,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 170,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-311",
+      "fault_injection_rows": 1,
+      "filename": "Exp_311_comp3_pb.txt",
+      "nonempty_rows": 161,
+      "raw_sha256": "5e4cbb267409c65ea7eeb9caf1131f6989a1c0a9bc2a0819555ebbe3d295e599",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 146,
+        "ExperimentControl": 1,
+        "FaultInject": 1,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 146,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 7,
+      "experiment_id": "adapt-441",
+      "fault_injection_rows": 2,
+      "filename": "Exp_441_comp3_pb.txt",
+      "nonempty_rows": 199,
+      "raw_sha256": "d7a5d90bab1d505e8d709f48be1a3829ca372068a090580a26e6b2b58b134926",
+      "row_counts": {
+        "AntagonistCommand": 7,
+        "AntagonistData": 182,
+        "ExperimentControl": 1,
+        "FaultInject": 2,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 182,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-442",
+      "fault_injection_rows": 3,
+      "filename": "Exp_442_comp3_pb.txt",
+      "nonempty_rows": 178,
+      "raw_sha256": "1e2e196db97ad9863a5189fd6197d6d8e37fcbeeef925b74acaf64098a5e7fbc",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 161,
+        "ExperimentControl": 1,
+        "FaultInject": 3,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 161,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 7,
+      "experiment_id": "adapt-443",
+      "fault_injection_rows": 3,
+      "filename": "Exp_443_comp3_pb.txt",
+      "nonempty_rows": 183,
+      "raw_sha256": "397752a2204b20aeb5539ba355d8ffd3f11d4cb9ce983ab518a323a97e049b9b",
+      "row_counts": {
+        "AntagonistCommand": 7,
+        "AntagonistData": 165,
+        "ExperimentControl": 1,
+        "FaultInject": 3,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 165,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-445",
+      "fault_injection_rows": 3,
+      "filename": "Exp_445_comp3_pb.txt",
+      "nonempty_rows": 179,
+      "raw_sha256": "add07b70f76adfb73614a6e03c028614b17e76e2a5ba061114165d368e88d2e1",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 162,
+        "ExperimentControl": 1,
+        "FaultInject": 3,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 162,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 8,
+      "experiment_id": "adapt-447",
+      "fault_injection_rows": 2,
+      "filename": "Exp_447_comp3_pb.txt",
+      "nonempty_rows": 183,
+      "raw_sha256": "7c458010d39fc18abcd5249714acc96bbc9161cf682951b533ee4464b2eab5fb",
+      "row_counts": {
+        "AntagonistCommand": 8,
+        "AntagonistData": 163,
+        "ExperimentControl": 1,
+        "FaultInject": 2,
+        "SensorData": 1,
+        "UserCommand": 8
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 163,
+      "user_command_rows": 8
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-449",
+      "fault_injection_rows": 2,
+      "filename": "Exp_449_comp3_pb.txt",
+      "nonempty_rows": 140,
+      "raw_sha256": "584a49f42e66564bdecae93be56955a768bdf907e0fc2e821414dcae67053304",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 124,
+        "ExperimentControl": 1,
+        "FaultInject": 2,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 124,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-450",
+      "fault_injection_rows": 2,
+      "filename": "Exp_450_comp3_pb.txt",
+      "nonempty_rows": 164,
+      "raw_sha256": "2cbd039f631452bcd1a1d5479e80cd30bba27100e5392a3a0759187ae2987bc0",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 148,
+        "ExperimentControl": 1,
+        "FaultInject": 2,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 148,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 7,
+      "experiment_id": "adapt-451",
+      "fault_injection_rows": 2,
+      "filename": "Exp_451_comp3_pb.txt",
+      "nonempty_rows": 140,
+      "raw_sha256": "028ba41d76aa2db6a3f9afe318d556608e3ce50a1e2667fb6548b43ddc81e6f8",
+      "row_counts": {
+        "AntagonistCommand": 7,
+        "AntagonistData": 123,
+        "ExperimentControl": 1,
+        "FaultInject": 2,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 123,
+      "user_command_rows": 6
+    },
+    {
+      "antagonist_command_rows": 6,
+      "experiment_id": "adapt-452",
+      "fault_injection_rows": 2,
+      "filename": "Exp_452_comp3_pb.txt",
+      "nonempty_rows": 170,
+      "raw_sha256": "13dce6d7089a8cfe338a7f4e147d6a16c4de41cb3d09d54d859c25681cd727de",
+      "row_counts": {
+        "AntagonistCommand": 6,
+        "AntagonistData": 154,
+        "ExperimentControl": 1,
+        "FaultInject": 2,
+        "SensorData": 1,
+        "UserCommand": 6
+      },
+      "sensor_count": 81,
+      "telemetry_rows": 154,
+      "user_command_rows": 6
+    }
+  ],
+  "leakage_markers_found": [],
+  "parsed_files": 16,
+  "schema_version": "fieldtrue.adapt-coverage.v1",
+  "total_fault_injection_rows": 28,
+  "total_telemetry_rows": 2884,
+  "total_user_command_rows": 95
+}
