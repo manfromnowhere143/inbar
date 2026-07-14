@@ -80,6 +80,10 @@ def test_trust_ledger_and_memory_prefix_commands(
     assert main(["--repo", str(repo), "trust", "init-iter000"]) == 0
     anchor_data = json.loads(capsys.readouterr().out)
     assert len(anchor_data["signer_public_key"]) == 64
+    assert main(["--repo", str(repo), "trust", "init-iter000-verification"]) == 0
+    verification_anchor = json.loads(capsys.readouterr().out)
+    assert verification_anchor["anchor_id"] == "iter000-verification-correction-001"
+    assert verification_anchor["signer_public_key"] != anchor_data["signer_public_key"]
 
     key_data = (repo / ".local" / "keys" / "iter000.ed25519").read_bytes()
     key = SigningKey(key_data)
@@ -190,6 +194,56 @@ def test_dataset_mission_and_experiment_commands(
     assert json.loads(capsys.readouterr().out)["verdict"] == "BLOCKED_EVIDENCE"
     assert main(["--repo", str(repo), "experiment", "verify-iter000-amendment-001"]) == 0
     assert json.loads(capsys.readouterr().out)["verdict"] == "BLOCKED_EVIDENCE"
+
+    corrected_commands: list[tuple[str, ...]] = []
+
+    def corrected_verification(
+        _repo: Path,
+        *,
+        command: tuple[str, ...],
+    ) -> _Verification:
+        corrected_commands.append(command)
+        return _Verification()
+
+    monkeypatch.setattr(
+        cli_module,
+        "verify_iter000_proof_bundle_correction_001",
+        corrected_verification,
+    )
+    monkeypatch.setattr(cli_module, "validate_mission", lambda _repo: mission)
+    with pytest.raises(SystemExit, match="1"):
+        main(
+            [
+                "--repo",
+                str(repo),
+                "experiment",
+                "verify-iter000-amendment-001-correction-001",
+            ]
+        )
+    assert corrected_commands == []
+    capsys.readouterr()
+
+    passed_mission = MissionValidation(passed=True, checks=())
+    monkeypatch.setattr(cli_module, "validate_mission", lambda _repo: passed_mission)
+    assert (
+        main(
+            [
+                "--repo",
+                str(repo),
+                "experiment",
+                "verify-iter000-amendment-001-correction-001",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["verdict"] == "BLOCKED_EVIDENCE"
+    assert corrected_commands == [
+        (
+            "fieldtrue",
+            "experiment",
+            "verify-iter000-amendment-001-correction-001",
+        )
+    ]
 
 
 def test_repo_discovery_fails_outside_a_mission(

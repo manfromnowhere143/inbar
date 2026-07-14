@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import shutil
 import ssl
@@ -12,6 +13,7 @@ import sys
 import tomllib
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
+from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
@@ -29,6 +31,7 @@ from fieldtrue.memory import load_memory_records, verify_memory
 from fieldtrue.receipts import (
     LedgerEvent,
     LedgerVerificationError,
+    SignerAnchor,
     load_signer_anchor,
     verify_ledger,
 )
@@ -68,7 +71,38 @@ _ITER000_ATTEMPT_001_AUTHORITY_PATH = "protocol/attempt_authorities/iter000_001.
 _ITER000_ATTEMPT_001_RECEIPT_PATH = (
     f"experiments/{_ITER000_ID}/authority/attempt_001_consumption.json"
 )
+_ITER000_ATTEMPT_001_PROOF_PATH = f"experiments/{_ITER000_ID}/proof/attempt_001"
 _ITER000_TRIGGER_COMMIT = "2fb078a1cac5f76f251ab49e0368ae0ea3e8da2e"
+_ITER000_ATTEMPT_001_EXECUTION_COMMIT = "ab20d41be48003c443a807c733c4c8ce43445e01"
+_ITER000_ATTEMPT_001_EXECUTION_TREE = "e3d8a8609e483b37c755b252e4f43b57b4731480"
+_ITER000_ATTEMPT_001_EXECUTION_SOURCE_TREE = "48a5e6a2c0af64baacfe5928d66eaa227439b11a"
+_ITER000_PROOF_COMMIT = "15cd75dd761a1c3f1d75994445a9ce702c58810a"
+_ITER000_PROOF_COMMIT_TREE = "388a78ef4afe4187dc0d2389feb28899571589fb"
+_ITER000_ATTEMPT_001_PROOF_TREE = "5ad82ba61c522fc3e292ab7ceed9f7085b556673"
+_ITER000_VERIFICATION_CONTRACT_COMMIT = "f9983e26e0e9d48c14016dfc4d897962767f8da8"
+_ITER000_VERIFICATION_CONTRACT_TREE = "552755b74e49ab7810df2e965519f556796ba604"
+_ITER000_VERIFICATION_CORRECTION_COMMIT = "10925e603f4dc24e1e3f990266c80300cc60ca3b"
+_ITER000_VERIFICATION_CORRECTION_TREE = "30d19a093c1704144f4dc1e43f5009d26313cdf8"
+_ITER000_VERIFICATION_CONTRACT_PATH = "protocol/amendments/iter000_verification_001.json"
+_ITER000_VERIFICATION_CONTRACT_SHA256 = (
+    "919df0feab263c52889964b728ddd296c8d585019a66fe3c01bd997fc893bfa9"
+)
+_ITER000_VERIFICATION_CORRECTION_PATH = "protocol/amendments/iter000_verification_002.json"
+_ITER000_VERIFICATION_CORRECTION_SHA256 = (
+    "45d5d90c63bfda2b84bf962c9d7bf4c76db58fb241b7eb6d1b146a5535c7382c"
+)
+_ITER000_ATTEMPT_001_AUTHORITY_SHA256 = (
+    "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a"
+)
+_ITER000_ATTEMPT_001_CONSUMPTION_SHA256 = (
+    "8d155b56440a4dfa25cbdfa400344a32b29e8d877cd39fa4f2c0612b4371b8aa"
+)
+_ITER000_ATTEMPT_001_LEDGER_SHA256 = (
+    "cb4aaf5d1cdabc42db25883d9e0db448cd41df56dcc8ebfd12eb73143151b728"
+)
+_ITER000_ATTEMPT_001_HEAD_SHA256 = (
+    "d89901abec03c460bdcdaa2985dc65d6d9a3b076c16100f56c1f3a4f1dc0665e"
+)
 _ITER000_ATTEMPT_000_HEAD = "acf079ecb5b989d3b5615d01bed4141fbd1d9c95436baabc65cfff707ff914d9"
 _ITER000_ATTEMPT_000_RUN_ID = "iter000-2fb078a1cac5"
 _ITER000_ATTEMPT_000_FAILURE = (
@@ -415,6 +449,10 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
     )
 
 
+def _git_environment() -> dict[str, str]:
+    return {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
+
+
 def _root_commit(repo_root: Path) -> str:
     git = shutil.which("git")
     if git is None:
@@ -424,6 +462,7 @@ def _root_commit(repo_root: Path) -> str:
         cwd=repo_root,
         check=True,
         capture_output=True,
+        env=_git_environment(),
         text=True,
     ).stdout.strip()
     if re.fullmatch(r"[0-9a-f]{40}", root_commit) is None:
@@ -441,6 +480,7 @@ def _first_commit_files(repo_root: Path) -> list[str]:
         cwd=repo_root,
         check=True,
         capture_output=True,
+        env=_git_environment(),
         text=True,
     ).stdout
     return sorted(line for line in output.splitlines() if line)
@@ -455,6 +495,7 @@ def _root_preregistration_bytes(repo_root: Path, relative_path: str) -> bytes:
         cwd=repo_root,
         check=True,
         capture_output=True,
+        env=_git_environment(),
     ).stdout
 
 
@@ -465,6 +506,7 @@ def _git_commit_resolves(repo_root: Path, git: str, object_id: str) -> bool:
         [git, "cat-file", "-e", f"{object_id}^{{commit}}"],
         cwd=repo_root,
         check=False,
+        env=_git_environment(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -487,6 +529,7 @@ def _git_blob_at_path(
         cwd=repo_root,
         check=False,
         capture_output=True,
+        env=_git_environment(),
     )
     entries = [entry for entry in tree_result.stdout.split(b"\0") if entry]
     if tree_result.returncode != 0 or len(entries) != 1:
@@ -507,6 +550,7 @@ def _git_blob_at_path(
         cwd=repo_root,
         check=False,
         capture_output=True,
+        env=_git_environment(),
     )
     return blob_result.stdout if blob_result.returncode == 0 else None
 
@@ -566,10 +610,176 @@ def _git_is_ancestor(repo_root: Path, git: str, ancestor: str, descendant: str) 
         [git, "merge-base", "--is-ancestor", ancestor, descendant],
         cwd=repo_root,
         check=False,
+        env=_git_environment(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     return result.returncode == 0
+
+
+def _git_object_type(repo_root: Path, git: str, object_id: str) -> str | None:
+    if _GIT_OBJECT_ID_PATTERN.fullmatch(object_id) is None:
+        return None
+    result = subprocess.run(  # noqa: S603 - validated Git object ID
+        [git, "cat-file", "-t", object_id],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=_git_environment(),
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def _git_tree_id(repo_root: Path, git: str, commit: str) -> str | None:
+    if _GIT_OBJECT_ID_PATTERN.fullmatch(commit) is None:
+        return None
+    result = subprocess.run(  # noqa: S603 - validated Git commit ID
+        [git, "rev-parse", f"{commit}^{{tree}}"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=_git_environment(),
+        text=True,
+    )
+    tree = result.stdout.strip()
+    return tree if result.returncode == 0 and _GIT_OBJECT_ID_PATTERN.fullmatch(tree) else None
+
+
+def _git_path_object_id(
+    repo_root: Path,
+    git: str,
+    commit: str,
+    relative_path: str,
+) -> str | None:
+    if (
+        _GIT_OBJECT_ID_PATTERN.fullmatch(commit) is None
+        or _safe_relative_path(relative_path) is None
+    ):
+        return None
+    result = subprocess.run(  # noqa: S603 - validated commit and literal repository path
+        [git, "rev-parse", f"{commit}:{relative_path}"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=_git_environment(),
+        text=True,
+    )
+    object_id = result.stdout.strip()
+    return (
+        object_id
+        if result.returncode == 0 and _GIT_OBJECT_ID_PATTERN.fullmatch(object_id)
+        else None
+    )
+
+
+def _verify_iter000_history(repo_root: Path, git: str, head: str) -> tuple[bool, str]:
+    replacements = subprocess.run(  # noqa: S603 - fixed read-only Git command
+        [git, "replace", "--list"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=_git_environment(),
+        text=True,
+    )
+    if replacements.returncode != 0 or replacements.stdout.strip():
+        return False, "Iteration history rejects configured Git replacement objects."
+    history = (
+        (_ITER000_TRIGGER_COMMIT, None),
+        (_ITER000_ATTEMPT_001_EXECUTION_COMMIT, _ITER000_ATTEMPT_001_EXECUTION_TREE),
+        (_ITER000_PROOF_COMMIT, _ITER000_PROOF_COMMIT_TREE),
+        (_ITER000_VERIFICATION_CONTRACT_COMMIT, _ITER000_VERIFICATION_CONTRACT_TREE),
+        (_ITER000_VERIFICATION_CORRECTION_COMMIT, _ITER000_VERIFICATION_CORRECTION_TREE),
+    )
+    for commit, expected_tree in history:
+        if _git_object_type(repo_root, git, commit) != "commit":
+            return False, f"Required historical commit is unavailable: {commit}."
+        if expected_tree is not None and _git_tree_id(repo_root, git, commit) != expected_tree:
+            return False, f"Historical commit tree differs: {commit}."
+    for (parent, _), (child, _) in pairwise(history):
+        if not _git_is_ancestor(repo_root, git, parent, child):
+            return False, "Iteration history does not preserve the required ancestry chain."
+    if not _git_is_ancestor(repo_root, git, history[-1][0], head):
+        return False, "Verification amendment correction is not an ancestor of HEAD."
+    if (
+        _git_path_object_id(
+            repo_root,
+            git,
+            _ITER000_ATTEMPT_001_EXECUTION_COMMIT,
+            "src/fieldtrue",
+        )
+        != _ITER000_ATTEMPT_001_EXECUTION_SOURCE_TREE
+    ):
+        return False, "Historical execution source tree differs."
+    return True, "Exact execution, proof, and amendment Git history is available."
+
+
+def _verify_attempt_001_proof_preserved(
+    repo_root: Path,
+    git: str,
+    head: str,
+) -> tuple[bool, str]:
+    if (
+        _git_path_object_id(repo_root, git, _ITER000_PROOF_COMMIT, _ITER000_ATTEMPT_001_PROOF_PATH)
+        != _ITER000_ATTEMPT_001_PROOF_TREE
+        or _git_path_object_id(repo_root, git, head, _ITER000_ATTEMPT_001_PROOF_PATH)
+        != _ITER000_ATTEMPT_001_PROOF_TREE
+    ):
+        return False, "Attempt 001 proof subtree differs from its preservation commit."
+    critical_hashes = {
+        _ITER000_ATTEMPT_001_AUTHORITY_PATH: _ITER000_ATTEMPT_001_AUTHORITY_SHA256,
+        _ITER000_ATTEMPT_001_RECEIPT_PATH: _ITER000_ATTEMPT_001_CONSUMPTION_SHA256,
+        f"{_ITER000_ATTEMPT_001_PROOF_PATH}/attempt_authority_consumption.json": (
+            _ITER000_ATTEMPT_001_CONSUMPTION_SHA256
+        ),
+        f"{_ITER000_ATTEMPT_001_PROOF_PATH}/execution_ledger.jsonl": (
+            _ITER000_ATTEMPT_001_LEDGER_SHA256
+        ),
+        f"{_ITER000_ATTEMPT_001_PROOF_PATH}/execution_ledger.head.json": (
+            _ITER000_ATTEMPT_001_HEAD_SHA256
+        ),
+    }
+    for relative, expected_hash in critical_hashes.items():
+        path = repo_root / relative
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or sha256_bytes(path.read_bytes()) != expected_hash
+        ):
+            return False, f"Attempt 001 preserved evidence differs: {relative}."
+        if _git_blob_at_path(repo_root, git, head, relative) != path.read_bytes():
+            return False, f"Attempt 001 evidence is not committed at HEAD: {relative}."
+    proof_root = repo_root / _ITER000_ATTEMPT_001_PROOF_PATH
+    if proof_root.is_symlink() or not proof_root.is_dir():
+        return False, "Attempt 001 proof root must be a regular directory."
+    try:
+        proof_entries = tuple(proof_root.iterdir())
+    except OSError:
+        return False, "Attempt 001 proof root is unreadable."
+    if len(proof_entries) != 16 or any(
+        path.is_symlink() or not path.is_file() for path in proof_entries
+    ):
+        return False, "Attempt 001 proof root must contain exactly sixteen regular files."
+    status = subprocess.run(  # noqa: S603 - fixed read-only Git status
+        [
+            git,
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+            "--",
+            _ITER000_ATTEMPT_001_PROOF_PATH,
+            _ITER000_ATTEMPT_001_RECEIPT_PATH,
+            _ITER000_ATTEMPT_001_AUTHORITY_PATH,
+        ],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=_git_environment(),
+    )
+    if status.returncode != 0 or status.stdout:
+        return False, "Attempt 001 proof or consumed authority has uncommitted changes."
+    return True, "Attempt 001 proof and consumed execution authority remain byte-exact."
 
 
 def _expected_iteration_amendment_001(document_sha256: str) -> dict[str, Any]:
@@ -815,6 +1025,7 @@ def _git_tree_paths(repo_root: Path, git: str, commit: str, prefix: str) -> set[
         cwd=repo_root,
         check=False,
         capture_output=True,
+        env=_git_environment(),
     )
     if result.returncode != 0:
         return None
@@ -903,13 +1114,27 @@ def _verify_attempt_001_scientific_surface(
     *,
     git: str,
     head: str,
+    surface_commit: str | None = None,
 ) -> tuple[bool, str]:
+    selected_commit = surface_commit or head
+    historical = selected_commit != head
     authority_path = repo_root / _ITER000_ATTEMPT_001_AUTHORITY_PATH
     try:
-        authority = _json(authority_path)
-        authority_bytes = authority_path.read_bytes()
+        authority_bytes = (
+            _git_blob_at_path(
+                repo_root,
+                git,
+                selected_commit,
+                _ITER000_ATTEMPT_001_AUTHORITY_PATH,
+            )
+            if historical
+            else authority_path.read_bytes()
+        )
+        authority = json.loads(authority_bytes) if authority_bytes is not None else None
     except (OSError, ValueError, json.JSONDecodeError) as error:
         return False, f"Attempt 001 authority is unreadable: {type(error).__name__}."
+    if not isinstance(authority, dict) or authority_bytes is None:
+        return False, "Attempt 001 authority must contain a JSON object."
     if authority_path.is_symlink() or not authority_path.is_file():
         return False, "Attempt 001 authority must be a regular file."
     if canonical_json_pretty(authority) != authority_bytes:
@@ -937,54 +1162,76 @@ def _verify_attempt_001_scientific_surface(
             or expected_hash == "0" * 64
         ):
             return False, f"Attempt 001 authority has an invalid hash binding: {relative}."
-        path = repo_root / relative
-        if path.is_symlink() or not path.is_file():
-            return False, f"Attempt 001 protocol input is not a regular file: {relative}."
-        if sha256_bytes(path.read_bytes()) != expected_hash:
+        if not historical:
+            path = repo_root / relative
+            if path.is_symlink() or not path.is_file():
+                return False, f"Attempt 001 protocol input is not a regular file: {relative}."
+        selected_bytes = (
+            _git_blob_at_path(repo_root, git, selected_commit, relative)
+            if historical
+            else (repo_root / relative).read_bytes()
+        )
+        if selected_bytes is None or sha256_bytes(selected_bytes) != expected_hash:
             return False, f"Attempt 001 protocol hash mismatch: {relative}."
-        if _git_blob_at_path(repo_root, git, head, relative) != path.read_bytes():
+        if not historical and _git_blob_at_path(repo_root, git, head, relative) != selected_bytes:
             return False, f"Attempt 001 protocol input is not committed at HEAD: {relative}."
     if (
-        _git_blob_at_path(repo_root, git, head, _ITER000_ATTEMPT_001_AUTHORITY_PATH)
+        _git_blob_at_path(repo_root, git, selected_commit, _ITER000_ATTEMPT_001_AUTHORITY_PATH)
         != authority_bytes
     ):
-        return False, "Attempt 001 authority is not committed at HEAD."
+        return False, "Attempt 001 authority is not committed at its execution commit."
 
     try:
-        anchor = load_signer_anchor(repo_root / _ITER000_ANCHOR_PATH)
+        if historical:
+            anchor_bytes = _git_blob_at_path(repo_root, git, selected_commit, _ITER000_ANCHOR_PATH)
+            anchor = (
+                SignerAnchor.model_validate_json(anchor_bytes) if anchor_bytes is not None else None
+            )
+        else:
+            anchor = load_signer_anchor(repo_root / _ITER000_ANCHOR_PATH)
     except (OSError, ValueError):
         return False, "Attempt 001 authority signer anchor is invalid."
-    if anchor.signer_public_key != _ITER000_SIGNER_PUBLIC_KEY:
+    if anchor is None or anchor.signer_public_key != _ITER000_SIGNER_PUBLIC_KEY:
         return False, "Attempt 001 authority signer key differs from its frozen anchor."
 
     trigger_source_paths = _git_tree_paths(repo_root, git, _ITER000_TRIGGER_COMMIT, "src/fieldtrue")
-    working_source_paths = _working_source_paths(repo_root)
-    if trigger_source_paths is None or working_source_paths is None:
+    selected_source_paths = _git_tree_paths(repo_root, git, selected_commit, "src/fieldtrue")
+    if trigger_source_paths is None or selected_source_paths is None:
         return False, "Attempt 001 cannot resolve the complete source surface."
-    if working_source_paths != trigger_source_paths:
+    if not historical:
+        working_source_paths = _working_source_paths(repo_root)
+        if working_source_paths is None:
+            return False, "Attempt 001 cannot resolve the complete source surface."
+        selected_source_paths = working_source_paths
+    if selected_source_paths != trigger_source_paths:
         return False, "Attempt 001 added, removed, or linked a source-surface file."
 
     for relative in sorted(trigger_source_paths):
-        path = repo_root / relative
         trigger_blob = _git_blob_at_path(repo_root, git, _ITER000_TRIGGER_COMMIT, relative)
         if trigger_blob is None:
             return False, f"Attempt 001 triggering source is unavailable: {relative}."
-        current_bytes = path.read_bytes()
+        selected_bytes = (
+            _git_blob_at_path(repo_root, git, selected_commit, relative)
+            if historical
+            else (repo_root / relative).read_bytes()
+        )
+        if selected_bytes is None:
+            return False, f"Attempt 001 execution source is unavailable: {relative}."
         if relative in _ITER000_ATTEMPT_001_AUTHORIZED_SOURCE_HASHES:
             before_hash, after_hash = _ITER000_ATTEMPT_001_AUTHORIZED_SOURCE_HASHES[relative]
             if (
                 after_hash == "0" * 64
                 or sha256_bytes(trigger_blob) != before_hash
-                or sha256_bytes(current_bytes) != after_hash
+                or sha256_bytes(selected_bytes) != after_hash
                 or protocol_hashes.get(relative) != after_hash
             ):
                 return False, f"Attempt 001 authorized source binding differs: {relative}."
             continue
         if relative in _ITER000_ATTEMPT_001_RECOVERY_PATHS:
-            if protocol_hashes.get(relative) != sha256_bytes(current_bytes):
+            if protocol_hashes.get(relative) != sha256_bytes(selected_bytes):
                 return False, f"Attempt 001 recovery control is not authority-bound: {relative}."
             continue
-        if current_bytes != trigger_blob:
+        if selected_bytes != trigger_blob:
             return False, f"Attempt 001 changed an unauthorized source file: {relative}."
 
     gate_control_blob = _git_blob_at_path(
@@ -994,11 +1241,25 @@ def _verify_attempt_001_scientific_surface(
         trigger_gate_control = (
             json.loads(gate_control_blob) if gate_control_blob is not None else None
         )
-        current_gate_control = _json(repo_root / _ITER000_GATE_CONTROL_PATH)
+        selected_gate_blob = (
+            _git_blob_at_path(
+                repo_root,
+                git,
+                selected_commit,
+                _ITER000_GATE_CONTROL_PATH,
+            )
+            if historical
+            else (repo_root / _ITER000_GATE_CONTROL_PATH).read_bytes()
+        )
+        current_gate_control = (
+            json.loads(selected_gate_blob) if selected_gate_blob is not None else None
+        )
     except (OSError, ValueError, json.JSONDecodeError):
         return False, "Attempt 001 gate-control registry is unreadable."
     if not isinstance(trigger_gate_control, dict):
         return False, "Attempt 001 triggering gate-control registry is unavailable."
+    if not isinstance(current_gate_control, dict):
+        return False, "Attempt 001 execution gate-control registry is unavailable."
     trigger_gate_control.pop("execution_seal", None)
     current_gate_control.pop("execution_seal", None)
     if current_gate_control != trigger_gate_control:
@@ -1009,7 +1270,12 @@ def _verify_attempt_001_scientific_surface(
     )
     for relative in sorted(unchanged_protocol_paths):
         trigger_blob = _git_blob_at_path(repo_root, git, _ITER000_TRIGGER_COMMIT, relative)
-        if trigger_blob != (repo_root / relative).read_bytes():
+        selected_bytes = (
+            _git_blob_at_path(repo_root, git, selected_commit, relative)
+            if historical
+            else (repo_root / relative).read_bytes()
+        )
+        if trigger_blob != selected_bytes:
             return False, f"Attempt 001 changed a trigger-commit protocol input: {relative}."
 
     receipt_path = repo_root / _ITER000_ATTEMPT_001_RECEIPT_PATH
@@ -1022,8 +1288,8 @@ def _verify_attempt_001_scientific_surface(
         return False, "Attempt 001 authority consumption path is not a regular file."
     return (
         True,
-        "Attempt 001 authority binds the complete protocol and source surface; only the exact "
-        "TLS and attempt-control changes are admitted.",
+        "Historical attempt 001 authority binds the complete execution protocol and source "
+        "surface; only the exact TLS and attempt-control changes are admitted.",
     )
 
 
@@ -1133,6 +1399,7 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
             cwd=repo_root,
             check=True,
             capture_output=True,
+            env=_git_environment(),
             text=True,
         ).stdout.strip()
     except subprocess.CalledProcessError:
@@ -1143,10 +1410,19 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
         or not _git_is_ancestor(repo_root, git, _ITER000_TRIGGER_COMMIT, head)
     ):
         return False, "Amendment 001 triggering commit is not an ancestor of HEAD."
+    correction_history = (repo_root / _ITER000_VERIFICATION_CONTRACT_PATH).is_file()
+    if correction_history:
+        history_valid, history_detail = _verify_iter000_history(repo_root, git, head)
+        if not history_valid:
+            return False, history_detail
+        proof_valid, proof_detail = _verify_attempt_001_proof_preserved(repo_root, git, head)
+        if not proof_valid:
+            return False, proof_detail
     surface_valid, surface_detail = _verify_attempt_001_scientific_surface(
         repo_root,
         git=git,
         head=head,
+        surface_commit=(_ITER000_ATTEMPT_001_EXECUTION_COMMIT if correction_history else None),
     )
     if not surface_valid:
         return False, surface_detail
@@ -1162,10 +1438,7 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
         "pyproject.toml",
         "uv.lock",
         "src/fieldtrue/adapters/adapt.py",
-        "src/fieldtrue/cli.py",
         "src/fieldtrue/experiment.py",
-        "src/fieldtrue/mission.py",
-        "src/fieldtrue/verification.py",
     )
     for relative in trust_inputs:
         path = repo_root / relative
@@ -1184,6 +1457,12 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
     ):
         return False, "Amendment 001 changed the root-preregistered hypothesis."
 
+    if correction_history:
+        return (
+            True,
+            "Historical attempt 001 execution and its immutable proof verify against exact Git "
+            "objects; current verifier code is evaluated under a separate authority.",
+        )
     if not _certifi_dependency_is_locked(repo_root):
         return False, "Amendment 001 requires a locked direct certifi dependency."
     if not _adapt_tls_source_is_verified(repo_root / "src" / "fieldtrue" / "adapters" / "adapt.py"):
@@ -1492,6 +1771,19 @@ def validate_mission(repo_root: Path) -> MissionValidation:
             amendment_detail,
         )
     )
+    if (repo_root / _ITER000_VERIFICATION_CONTRACT_PATH).is_file():
+        from fieldtrue.verification import validate_iter000_verification_correction_surface
+
+        correction_valid, correction_detail = validate_iter000_verification_correction_surface(
+            repo_root
+        )
+        checks.append(
+            _check(
+                "verification-correction-001",
+                correction_valid,
+                correction_detail,
+            )
+        )
     claims = _claims(repo_root / "claims" / "registry.jsonl")
     claim_ids = [claim.claim_id for claim in claims]
     checks.append(

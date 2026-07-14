@@ -22,7 +22,11 @@ from fieldtrue.receipts import (
     write_signer_anchor,
 )
 from fieldtrue.schemas import export_schemas, verify_schemas
-from fieldtrue.verification import verify_iter000_proof_bundle
+from fieldtrue.verification import (
+    initialize_iter000_verification_signer,
+    verify_iter000_proof_bundle,
+    verify_iter000_proof_bundle_correction_001,
+)
 
 
 def _repo_root(raw: str | None) -> Path:
@@ -66,7 +70,9 @@ def _parser() -> argparse.ArgumentParser:
     ledger_verify.add_argument("--anchor-path", default="protocol/trust/iter000_signer_anchor.json")
 
     trust = groups.add_parser("trust")
-    trust.add_subparsers(dest="action", required=True).add_parser("init-iter000")
+    trust_actions = trust.add_subparsers(dest="action", required=True)
+    trust_actions.add_parser("init-iter000")
+    trust_actions.add_parser("init-iter000-verification")
 
     datasets = groups.add_parser("datasets")
     fetch = datasets.add_subparsers(dest="action", required=True).add_parser("fetch-adapt")
@@ -78,6 +84,7 @@ def _parser() -> argparse.ArgumentParser:
     experiment_actions.add_parser("iter000-amendment-001")
     experiment_actions.add_parser("verify-iter000")
     experiment_actions.add_parser("verify-iter000-amendment-001")
+    experiment_actions.add_parser("verify-iter000-amendment-001-correction-001")
     return parser
 
 
@@ -133,6 +140,10 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps(anchor.model_dump(mode="json"), indent=2, sort_keys=True))
         return 0
+    if arguments.group == "trust" and arguments.action == "init-iter000-verification":
+        anchor = initialize_iter000_verification_signer(repo)
+        print(json.dumps(anchor.model_dump(mode="json"), indent=2, sort_keys=True))
+        return 0
     if arguments.group == "datasets" and arguments.action == "fetch-adapt":
         lock = load_adapt_lock(repo / "protocol" / "datasets" / "nasa_adapt_v1.json")
         raw_root = repo / "data" / "raw" / lock.dataset_id
@@ -174,6 +185,24 @@ def main(argv: list[str] | None = None) -> int:
             ),
         )
         print(json.dumps(verification.model_dump(mode="json"), indent=2, sort_keys=True))
+        return 0
+    if (
+        arguments.group == "experiment"
+        and arguments.action == "verify-iter000-amendment-001-correction-001"
+    ):
+        mission_report = validate_mission(repo)
+        if not mission_report.passed:
+            failures = [check.check_id for check in mission_report.checks if not check.passed]
+            _fail(f"mission preflight failed: {', '.join(failures)}")
+        corrected_verification = verify_iter000_proof_bundle_correction_001(
+            repo,
+            command=(
+                "fieldtrue",
+                "experiment",
+                "verify-iter000-amendment-001-correction-001",
+            ),
+        )
+        print(json.dumps(corrected_verification.model_dump(mode="json"), indent=2, sort_keys=True))
         return 0
     _fail("unsupported command")
 

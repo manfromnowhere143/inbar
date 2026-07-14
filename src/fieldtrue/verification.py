@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import stat
+import subprocess
 from collections.abc import Mapping
-from datetime import datetime
+from copy import deepcopy
+from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Literal, NoReturn, TypeVar, cast
 
 from nacl.exceptions import BadSignatureError
-from nacl.signing import VerifyKey
+from nacl.signing import SigningKey, VerifyKey
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from fieldtrue.adapters.adapt import (
@@ -18,22 +24,33 @@ from fieldtrue.adapters.adapt import (
     AdaptIngestionReceipt,
 )
 from fieldtrue.canonical import (
+    atomic_write,
     canonical_json,
     canonical_json_pretty,
     sha256_bytes,
     sha256_file,
     sha256_value,
 )
-from fieldtrue.domain import GateStatus, Identifier, ReadinessReport, Sha256
+from fieldtrue.domain import (
+    Ed25519PublicKey,
+    GateStatus,
+    HexSignature,
+    Identifier,
+    ReadinessReport,
+    Sha256,
+)
 from fieldtrue.readiness import audit_adapt_proof_readiness, render_readiness_result
 from fieldtrue.receipts import (
     LedgerEvent,
     LedgerVerification,
     LedgerVerificationError,
     SignerAnchor,
+    load_or_create_signing_key,
+    load_signer_anchor,
     verify_ledger,
+    write_signer_anchor,
 )
-from fieldtrue.runtime import RuntimeIdentity
+from fieldtrue.runtime import RuntimeIdentity, collect_runtime_identity
 
 _ITERATION_ID = "iter000_nasa_adapt_corpus_readiness"
 _ANCHOR_ID = "iter000-execution-ledger"
@@ -48,6 +65,11 @@ _AUTHORITY_ARTIFACT = "attempt_authority.json"
 _AUTHORITY_CONSUMPTION_ARTIFACT = "attempt_authority_consumption.json"
 _AUTHORITY_RECEIPT_PATH = f"experiments/{_ITERATION_ID}/authority/attempt_001_consumption.json"
 _AUTHORIZED_COMMAND = ("fieldtrue", "experiment", "iter000-amendment-001")
+_CORRECTED_VERIFICATION_COMMAND = (
+    "fieldtrue",
+    "experiment",
+    "verify-iter000-amendment-001-correction-001",
+)
 _CLEAN_STATE_HASH = sha256_bytes(b"")
 _ATTEMPT_000_LEDGER_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_000/execution_ledger.jsonl"
 _ATTEMPT_000_HEAD_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_000/execution_ledger.head.json"
@@ -61,6 +83,50 @@ _ATTEMPT_000_FAILURE = (
 )
 _ATTEMPT_001_CERTIFI_VERSION = "2026.6.17"
 _ATTEMPT_001_CA_BUNDLE_SHA256 = "bbc7e9c01d7551bb8a159b5dedd989b8ee3ce105aff522b68eb1b01bf854cab0"
+_ATTEMPT_001_EXECUTION_COMMIT = "ab20d41be48003c443a807c733c4c8ce43445e01"
+_ATTEMPT_001_EXECUTION_TREE = "e3d8a8609e483b37c755b252e4f43b57b4731480"
+_ATTEMPT_001_PROOF_COMMIT = "15cd75dd761a1c3f1d75994445a9ce702c58810a"
+_ATTEMPT_001_PROOF_COMMIT_TREE = "388a78ef4afe4187dc0d2389feb28899571589fb"
+_ATTEMPT_001_PROOF_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_001"
+_ATTEMPT_001_PROOF_SUBTREE = "5ad82ba61c522fc3e292ab7ceed9f7085b556673"
+_VERIFICATION_AMENDMENT_COMMIT = "f9983e26e0e9d48c14016dfc4d897962767f8da8"
+_VERIFICATION_AMENDMENT_COMMIT_TREE = "552755b74e49ab7810df2e965519f556796ba604"
+_VERIFICATION_AMENDMENT_DOCUMENT_PATH = f"experiments/{_ITERATION_ID}/VERIFICATION_AMENDMENT_001.md"
+_VERIFICATION_AMENDMENT_DOCUMENT_SHA256 = (
+    "d472b8b594b2a278f095de50435df2dfed1e4b72a9b4b9bb53502283545c9048"
+)
+_VERIFICATION_AMENDMENT_PATH = "protocol/amendments/iter000_verification_001.json"
+_VERIFICATION_AMENDMENT_SHA256 = "919df0feab263c52889964b728ddd296c8d585019a66fe3c01bd997fc893bfa9"
+_VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_PATH = (
+    f"experiments/{_ITERATION_ID}/VERIFICATION_AMENDMENT_002.md"
+)
+_VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_SHA256 = (
+    "394815237a85354a4b8b93054dd57fe5c3fe537dd593a55464c887a92cba37ba"
+)
+_VERIFICATION_AMENDMENT_CORRECTION_PATH = "protocol/amendments/iter000_verification_002.json"
+_VERIFICATION_AMENDMENT_CORRECTION_SHA256 = (
+    "45d5d90c63bfda2b84bf962c9d7bf4c76db58fb241b7eb6d1b146a5535c7382c"
+)
+_VERIFICATION_AMENDMENT_CORRECTION_COMMIT = "10925e603f4dc24e1e3f990266c80300cc60ca3b"
+_VERIFICATION_AMENDMENT_CORRECTION_COMMIT_TREE = "30d19a093c1704144f4dc1e43f5009d26313cdf8"
+_VERIFICATION_AUTHORITY_PATH = "protocol/verification_authorities/iter000_verification_001.json"
+_VERIFICATION_SIGNER_ANCHOR_PATH = "protocol/trust/iter000_verification_signer_anchor.json"
+_VERIFICATION_SIGNING_KEY_PATH = ".local/keys/iter000-verification.ed25519"
+_VERIFICATION_RECEIPT_PATH = (
+    f"experiments/{_ITERATION_ID}/verification/attempt_001_correction_001.json"
+)
+_VERIFICATION_ANCHOR_ID = "iter000-verification-correction-001"
+_VERIFICATION_LEDGER_SCOPE = f"{_ITERATION_ID}/attempt_001/correction_001"
+_ORIGINAL_VERIFIER_SHA256 = "36a9b5fef440fc60fd8d70252db6454563f07ca9ed08887d18bc0255cf38d7e5"
+_DATASET_LOCK_CORRECTION = {
+    "canonical_pretty_sha256": "5dd5875185f5a96e90dc31548d24318f8182e92fe34378dce05a2c5840a4fe88",
+    "path": "dataset_lock.json",
+    "protocol_path": _DATASET_PROTOCOL_PATH,
+    "raw_sha256": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+    "semantic_canonical_sha256": (
+        "5721cff5c79c34e4933724d607a2a48ed9fa8936ee0c453e5fc76f14bc46082f"
+    ),
+}
 _ATTEMPT_001_TLS_CONSTRAINTS: dict[str, object] = {
     "bypass_forbidden": True,
     "ca_bundle_sha256": _ATTEMPT_001_CA_BUNDLE_SHA256,
@@ -158,6 +224,30 @@ class Iter000ProofVerification(BaseModel):
     ledger_verification: LedgerVerification
 
 
+class Iter000CorrectedProofVerification(BaseModel):
+    """Signed receipt for the single authorized verification correction."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["fieldtrue.iter000-corrected-proof-verification.v1"] = (
+        "fieldtrue.iter000-corrected-proof-verification.v1"
+    )
+    authority_id: Identifier
+    amendment_sha256: Sha256
+    authority_sha256: Sha256
+    proof_commit: Identifier
+    proof_subtree: Identifier
+    correction_applied: dict[str, str]
+    consumption: dict[str, Any]
+    consumption_sha256: Sha256
+    verification: Iter000ProofVerification
+    verification_sha256: Sha256
+    resource_usage: dict[str, int | bool]
+    receipt_hash: Sha256
+    signer_public_key: Ed25519PublicKey
+    signature: HexSignature
+
+
 def _fail(message: str) -> NoReturn:
     raise ProofBundleVerificationError(message)
 
@@ -223,6 +313,16 @@ def _hash(value: Any, label: str) -> str:
     return value
 
 
+def _git_object_id(value: Any, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 40
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        _fail(f"{label} must be a lowercase 40-character Git object ID")
+    return value
+
+
 def _canonical(value: Any, data: bytes, label: str) -> None:
     if canonical_json_pretty(value) != data:
         _fail(f"{label} is not canonical pretty JSON")
@@ -233,6 +333,512 @@ def _model(model: type[_ModelT], value: Any, label: str) -> _ModelT:
         return model.model_validate(value)
     except ValidationError as error:
         raise ProofBundleVerificationError(f"{label} violates its typed schema") from error
+
+
+def _git_text(repo_root: Path, *arguments: str) -> str:
+    git = shutil.which("git")
+    if git is None:
+        _fail("Git is required to verify the correction authority")
+    try:
+        completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed internally
+            [git, *arguments],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
+            text=True,
+        )
+    except subprocess.CalledProcessError as error:
+        raise ProofBundleVerificationError(
+            f"Git correction-authority check failed: {' '.join(arguments)}"
+        ) from error
+    return completed.stdout.strip()
+
+
+def _git_blob(repo_root: Path, commit: str, relative: str) -> bytes:
+    git = shutil.which("git")
+    if git is None:
+        _fail("Git is required to verify the correction authority")
+    try:
+        completed = subprocess.run(  # noqa: S603 - fixed Git object read
+            [git, "show", f"{commit}:{relative}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
+        )
+    except subprocess.CalledProcessError as error:
+        raise ProofBundleVerificationError(
+            f"committed correction input is unavailable: {relative}"
+        ) from error
+    return completed.stdout
+
+
+def _selected_repo_path(repo_root: Path, requested: Path, relative: str, label: str) -> Path:
+    expected = repo_root / relative
+    if requested.resolve() != expected.resolve():
+        _fail(f"{label} must be selected from its fixed repository path")
+    return expected
+
+
+def _proof_file_hashes(proof_root: Path) -> dict[str, str]:
+    if proof_root.is_symlink() or not proof_root.is_dir():
+        _fail("correction proof root must be a regular directory")
+    try:
+        entries = tuple(proof_root.iterdir())
+    except OSError as error:
+        raise ProofBundleVerificationError("correction proof root is unreadable") from error
+    hashes: dict[str, str] = {}
+    for path in entries:
+        if path.is_symlink() or not path.is_file():
+            _fail(f"correction proof entry must be a regular file: {path.name}")
+        hashes[path.name] = sha256_file(path)
+    return dict(sorted(hashes.items()))
+
+
+def _load_verification_amendments(
+    repo_root: Path,
+) -> tuple[dict[str, Any], bytes, bytes]:
+    path = repo_root / _VERIFICATION_AMENDMENT_PATH
+    value, data = _read_json_object(path, "verification amendment")
+    _canonical(value, data, "verification amendment")
+    if sha256_bytes(data) != _VERIFICATION_AMENDMENT_SHA256:
+        _fail("verification amendment differs from the prospectively committed contract")
+    document_path = repo_root / _VERIFICATION_AMENDMENT_DOCUMENT_PATH
+    document_data = _read_regular_file(document_path, "verification amendment document")
+    if (
+        value.get("schema_version") != "fieldtrue.iter000-verification-amendment.v1"
+        or value.get("amendment_id") != "iter000_verification_001"
+        or value.get("iteration_id") != _ITERATION_ID
+        or value.get("status") != "authorized"
+        or value.get("amendment_document")
+        != {
+            "path": _VERIFICATION_AMENDMENT_DOCUMENT_PATH,
+            "sha256": _VERIFICATION_AMENDMENT_DOCUMENT_SHA256,
+        }
+        or sha256_bytes(document_data) != _VERIFICATION_AMENDMENT_DOCUMENT_SHA256
+    ):
+        _fail("verification amendment identity or document binding differs")
+    correction = _object(value.get("authorized_correction"), "authorized correction")
+    if (
+        correction.get("correction_type") != "verification_only"
+        or correction.get("maximum_corrected_verifications") != 1
+        or correction.get("artifact_exception") != _DATASET_LOCK_CORRECTION
+    ):
+        _fail("verification amendment authorizes a different correction")
+    blindness = _object(value.get("outcome_blindness"), "outcome-blindness declaration")
+    if any(
+        blindness.get(name) is not False
+        for name in (
+            "adjudication_payload_inspected",
+            "learning_inspected",
+            "readiness_report_inspected",
+            "result_inspected",
+            "verdict_inspected",
+        )
+    ):
+        _fail("verification amendment is not outcome-blind")
+    if "network_access" not in value.get("forbidden_actions", []):
+        _fail("verification amendment does not forbid network access")
+
+    proof_binding = _object(value.get("proof_binding"), "verification proof binding")
+    file_hashes = _object(proof_binding.get("file_sha256"), "verification proof file map")
+    if (
+        proof_binding.get("artifact_count") != len(file_hashes)
+        or proof_binding.get("artifact_count") != 16
+        or proof_binding.get("git_commit") != _ATTEMPT_001_PROOF_COMMIT
+        or proof_binding.get("git_subtree") != _ATTEMPT_001_PROOF_SUBTREE
+        or proof_binding.get("path") != _ATTEMPT_001_PROOF_PATH
+        or proof_binding.get("content_map_sha256") != sha256_value(file_hashes)
+    ):
+        _fail("verification amendment proof binding is inconsistent")
+    if any(
+        _hash(digest, f"verification proof hash for {name}") != digest
+        for name, digest in file_hashes.items()
+    ):
+        _fail("verification amendment proof hash is invalid")
+    committed_subtree = _git_text(
+        repo_root,
+        "rev-parse",
+        f"{_ATTEMPT_001_PROOF_COMMIT}:{_ATTEMPT_001_PROOF_PATH}",
+    )
+    if committed_subtree != _ATTEMPT_001_PROOF_SUBTREE:
+        _fail("committed attempt 001 proof subtree differs from the amendment")
+    proof_root = repo_root / _ATTEMPT_001_PROOF_PATH
+    if _proof_file_hashes(proof_root) != file_hashes:
+        _fail("working attempt 001 proof differs from the immutable correction binding")
+    correction_path = repo_root / _VERIFICATION_AMENDMENT_CORRECTION_PATH
+    correction, correction_data = _read_json_object(
+        correction_path, "verification amendment correction"
+    )
+    _canonical(correction, correction_data, "verification amendment correction")
+    correction_document = _read_regular_file(
+        repo_root / _VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_PATH,
+        "verification amendment correction document",
+    )
+    if (
+        sha256_bytes(correction_data) != _VERIFICATION_AMENDMENT_CORRECTION_SHA256
+        or sha256_bytes(correction_document) != _VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_SHA256
+        or correction.get("schema_version")
+        != "fieldtrue.iter000-verification-amendment-correction.v1"
+        or correction.get("amendment_id") != "iter000_verification_002"
+        or correction.get("iteration_id") != _ITERATION_ID
+        or correction.get("status") != "authorized"
+        or correction.get("amendment_document")
+        != {
+            "path": _VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_PATH,
+            "sha256": _VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_SHA256,
+        }
+        or correction.get("prior_amendment", {}).get("path") != _VERIFICATION_AMENDMENT_PATH
+        or correction.get("prior_amendment", {}).get("sha256") != _VERIFICATION_AMENDMENT_SHA256
+        or correction.get("authorized_correction")
+        != {
+            "corrected_value": _ATTEMPT_001_EXECUTION_COMMIT,
+            "field": "trigger.execution_commit.git_commit",
+            "preserved_execution_tree": "e3d8a8609e483b37c755b252e4f43b57b4731480",
+            "prior_value": "ab20d41e77aba35f01352ca5cc379505205d32c8",
+            "scope": "clerical_git_object_identity_only",
+        }
+    ):
+        _fail("verification amendment clerical correction differs")
+    history = (
+        (_ATTEMPT_000_COMMIT, None),
+        (_ATTEMPT_001_EXECUTION_COMMIT, _ATTEMPT_001_EXECUTION_TREE),
+        (_ATTEMPT_001_PROOF_COMMIT, _ATTEMPT_001_PROOF_COMMIT_TREE),
+        (_VERIFICATION_AMENDMENT_COMMIT, _VERIFICATION_AMENDMENT_COMMIT_TREE),
+        (
+            _VERIFICATION_AMENDMENT_CORRECTION_COMMIT,
+            _VERIFICATION_AMENDMENT_CORRECTION_COMMIT_TREE,
+        ),
+    )
+    for commit, expected_tree in history:
+        if _git_text(repo_root, "cat-file", "-t", commit) != "commit":
+            _fail("verification amendment history contains a non-commit object")
+        if (
+            expected_tree is not None
+            and _git_text(repo_root, "rev-parse", f"{commit}^{{tree}}") != expected_tree
+        ):
+            _fail("verification amendment history contains a changed commit tree")
+    for (parent, _), (child, _) in pairwise(history):
+        _git_text(repo_root, "merge-base", "--is-ancestor", parent, child)
+    _git_text(
+        repo_root,
+        "merge-base",
+        "--is-ancestor",
+        _VERIFICATION_AMENDMENT_CORRECTION_COMMIT,
+        "HEAD",
+    )
+    if (
+        _git_blob(repo_root, _VERIFICATION_AMENDMENT_COMMIT, _VERIFICATION_AMENDMENT_PATH) != data
+        or _git_blob(
+            repo_root,
+            _VERIFICATION_AMENDMENT_COMMIT,
+            _VERIFICATION_AMENDMENT_DOCUMENT_PATH,
+        )
+        != document_data
+        or _git_blob(
+            repo_root,
+            _VERIFICATION_AMENDMENT_CORRECTION_COMMIT,
+            _VERIFICATION_AMENDMENT_CORRECTION_PATH,
+        )
+        != correction_data
+        or _git_blob(
+            repo_root,
+            _VERIFICATION_AMENDMENT_CORRECTION_COMMIT,
+            _VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_PATH,
+        )
+        != correction_document
+    ):
+        _fail("verification amendment files differ from their committed chronology")
+    trigger = _object(value.get("trigger"), "verification amendment trigger")
+    original_verifier = _object(
+        trigger.get("original_verifier"),
+        "verification amendment original verifier binding",
+    )
+    if (
+        original_verifier
+        != {
+            "path": "src/fieldtrue/verification.py",
+            "sha256": _ORIGINAL_VERIFIER_SHA256,
+        }
+        or sha256_bytes(
+            _git_blob(
+                repo_root,
+                _ATTEMPT_001_EXECUTION_COMMIT,
+                "src/fieldtrue/verification.py",
+            )
+        )
+        != _ORIGINAL_VERIFIER_SHA256
+    ):
+        _fail("verification amendment original verifier binding differs")
+    effective = deepcopy(value)
+    effective["trigger"]["execution_commit"]["git_commit"] = _ATTEMPT_001_EXECUTION_COMMIT
+    return effective, data, correction_data
+
+
+def _verify_dataset_lock_correction(
+    value: Mapping[str, Any],
+    data: bytes,
+    correction: Mapping[str, Any],
+) -> None:
+    if dict(correction) != _DATASET_LOCK_CORRECTION:
+        _fail("dataset-lock canonicality correction is not the exact authorized singleton")
+    if sha256_bytes(data) != correction["raw_sha256"]:
+        _fail("dataset-lock correction raw hash differs from its authority")
+    if sha256_bytes(canonical_json_pretty(value)) != correction["canonical_pretty_sha256"]:
+        _fail("dataset-lock correction canonical representation differs from its authority")
+    if sha256_bytes(canonical_json(value)) != correction["semantic_canonical_sha256"]:
+        _fail("dataset-lock correction semantic digest differs from its authority")
+    if canonical_json_pretty(value) == data:
+        _fail("dataset-lock correction was selected for an already canonical artifact")
+
+
+def _authority_hash_map(value: Any, label: str) -> dict[str, str]:
+    raw = _object(value, label)
+    result: dict[str, str] = {}
+    for relative, digest in raw.items():
+        if (
+            not isinstance(relative, str)
+            or Path(relative).is_absolute()
+            or ".." in Path(relative).parts
+        ):
+            _fail(f"{label} contains an unsafe path")
+        result[relative] = _hash(digest, f"{label} hash for {relative}")
+    return result
+
+
+def _git_file_set(repo_root: Path, commit: str, prefix: str) -> set[str]:
+    output = _git_text(repo_root, "ls-tree", "-r", "--name-only", commit, "--", prefix)
+    return {line for line in output.splitlines() if line}
+
+
+def _verify_implementation_hashes(
+    repo_root: Path,
+    *,
+    commit: str,
+    hashes: Mapping[str, str],
+    label: str,
+) -> None:
+    for relative, expected_hash in hashes.items():
+        path = repo_root / relative
+        data = _read_regular_file(path, f"{label} file {relative}")
+        if sha256_bytes(data) != expected_hash:
+            _fail(f"{label} working hash differs: {relative}")
+        if _git_blob(repo_root, commit, relative) != data:
+            _fail(f"{label} file differs from the selected implementation commit: {relative}")
+
+
+def _load_verification_authority(
+    repo_root: Path,
+    path: Path,
+    *,
+    amendment: Mapping[str, Any],
+    strict_selection_head: bool = True,
+) -> tuple[dict[str, Any], bytes, SignerAnchor, bytes]:
+    selected_path = _selected_repo_path(
+        repo_root,
+        path,
+        _VERIFICATION_AUTHORITY_PATH,
+        "verification authority",
+    )
+    authority, authority_data = _read_json_object(selected_path, "verification authority")
+    _canonical(authority, authority_data, "verification authority")
+    _exact_keys(
+        authority,
+        frozenset(
+            {
+                "schema_version",
+                "authority_id",
+                "iteration_id",
+                "authorized_command",
+                "amendments",
+                "proof_binding",
+                "trigger",
+                "correction",
+                "implementation",
+                "signer_anchor",
+                "consumption",
+                "resource_constraints",
+                "trust_model",
+            }
+        ),
+        "verification authority",
+    )
+    if (
+        authority["schema_version"] != "fieldtrue.iter000-verification-authority.v1"
+        or authority["authority_id"] != "iter000_verification_001"
+        or authority["iteration_id"] != _ITERATION_ID
+        or authority["authorized_command"] != list(_CORRECTED_VERIFICATION_COMMAND)
+        or authority["amendments"]
+        != [
+            {"path": _VERIFICATION_AMENDMENT_PATH, "sha256": _VERIFICATION_AMENDMENT_SHA256},
+            {
+                "path": _VERIFICATION_AMENDMENT_CORRECTION_PATH,
+                "sha256": _VERIFICATION_AMENDMENT_CORRECTION_SHA256,
+            },
+        ]
+        or authority["proof_binding"] != amendment["proof_binding"]
+        or authority["trigger"] != amendment["trigger"]
+        or authority["correction"] != _DATASET_LOCK_CORRECTION
+    ):
+        _fail("verification authority identity or frozen bindings differ")
+    if authority["consumption"] != {
+        "consumption_timing": "before_outcome_artifact_interpretation",
+        "failure_mode": "fail_closed",
+        "maximum_consumptions": 1,
+        "proof_deletion_restores_authority": False,
+        "receipt_path": _VERIFICATION_RECEIPT_PATH,
+        "receipt_presence_consumes_authority": True,
+    }:
+        _fail("verification authority does not enforce one fail-closed consumption")
+    if authority["resource_constraints"] != {
+        "cloud_jobs": 0,
+        "gpu_hours": 0,
+        "network_access": False,
+        "paid_calls": 0,
+    }:
+        _fail("verification authority permits unapproved resources")
+    if authority["trust_model"] != {
+        "blocks": [
+            "ordinary_receipt_deletion",
+            "concurrent_local_replay",
+            "proof_local_authority_substitution",
+        ],
+        "does_not_block": [
+            "same_local_owner_deletes_receipt",
+            "same_local_owner_rolls_back_repository",
+            "same_local_owner_controls_local_git",
+            "verification_key_compromise",
+        ],
+        "external_timestamp": False,
+        "signature": "git_pinned_separate_local_ed25519",
+    }:
+        _fail("verification authority misstates its local trust boundary")
+
+    anchor_spec = _object(authority["signer_anchor"], "verification signer binding")
+    anchor_path = repo_root / _VERIFICATION_SIGNER_ANCHOR_PATH
+    anchor_value, anchor_data = _read_json_object(anchor_path, "verification signer anchor")
+    anchor = _model(SignerAnchor, anchor_value, "verification signer anchor")
+    _canonical(anchor, anchor_data, "verification signer anchor")
+    execution_anchor_value, execution_anchor_data = _read_json_object(
+        repo_root / _ANCHOR_PROTOCOL_PATH,
+        "execution signer anchor",
+    )
+    execution_anchor = _model(SignerAnchor, execution_anchor_value, "execution signer anchor")
+    _canonical(execution_anchor, execution_anchor_data, "execution signer anchor")
+    if (
+        anchor.anchor_id != _VERIFICATION_ANCHOR_ID
+        or anchor.ledger_scope != _VERIFICATION_LEDGER_SCOPE
+        or anchor.signer_public_key == execution_anchor.signer_public_key
+        or anchor_spec
+        != {
+            "path": _VERIFICATION_SIGNER_ANCHOR_PATH,
+            "sha256": sha256_bytes(anchor_data),
+            "signer_public_key": anchor.signer_public_key,
+        }
+    ):
+        _fail("verification authority does not bind the separately selected signer")
+
+    implementation = _object(authority["implementation"], "verification implementation")
+    _exact_keys(
+        implementation,
+        frozenset(
+            {
+                "git_commit",
+                "git_tree",
+                "protocol_hashes",
+                "pyproject_sha256",
+                "source_hashes",
+                "test_hashes",
+                "uv_lock_sha256",
+            }
+        ),
+        "verification implementation",
+    )
+    commit = _git_object_id(implementation["git_commit"], "verification implementation commit")
+    tree = _git_object_id(implementation["git_tree"], "verification implementation tree")
+    if _git_text(repo_root, "rev-parse", f"{commit}^{{tree}}") != tree:
+        _fail("verification implementation tree differs from its selected commit")
+    _git_text(repo_root, "merge-base", "--is-ancestor", commit, "HEAD")
+
+    source_hashes = _authority_hash_map(implementation["source_hashes"], "source map")
+    test_hashes = _authority_hash_map(implementation["test_hashes"], "test map")
+    if set(source_hashes) != _git_file_set(repo_root, commit, "src/fieldtrue"):
+        _fail("verification authority does not bind the complete implementation source tree")
+    if set(test_hashes) != _git_file_set(repo_root, commit, "tests"):
+        _fail("verification authority does not bind the complete test tree")
+    _verify_implementation_hashes(
+        repo_root, commit=commit, hashes=source_hashes, label="verification source"
+    )
+    _verify_implementation_hashes(
+        repo_root, commit=commit, hashes=test_hashes, label="verification test"
+    )
+    for relative, field in (
+        ("pyproject.toml", "pyproject_sha256"),
+        (_LOCKFILE_PROTOCOL_PATH, "uv_lock_sha256"),
+    ):
+        expected_hash = _hash(implementation[field], f"verification {relative} hash")
+        data = _read_regular_file(repo_root / relative, f"verification {relative}")
+        if sha256_bytes(data) != expected_hash or _git_blob(repo_root, commit, relative) != data:
+            _fail(f"verification implementation differs for {relative}")
+
+    protocol_hashes = _authority_hash_map(
+        implementation["protocol_hashes"], "verification protocol map"
+    )
+    required_protocol_hashes = {
+        _VERIFICATION_AMENDMENT_DOCUMENT_PATH,
+        _VERIFICATION_AMENDMENT_PATH,
+        _VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_PATH,
+        _VERIFICATION_AMENDMENT_CORRECTION_PATH,
+        _AUTHORITY_PROTOCOL_PATH,
+        _AUTHORITY_RECEIPT_PATH,
+        _ANCHOR_PROTOCOL_PATH,
+        _DATASET_PROTOCOL_PATH,
+        _HYPOTHESIS_PATH,
+    }
+    if set(protocol_hashes) != required_protocol_hashes:
+        _fail("verification authority does not bind the exact correction protocol surface")
+    _verify_implementation_hashes(
+        repo_root,
+        commit=commit,
+        hashes=protocol_hashes,
+        label="verification protocol",
+    )
+
+    head = _git_text(repo_root, "rev-parse", "HEAD")
+    if _git_blob(repo_root, head, _VERIFICATION_AUTHORITY_PATH) != authority_data:
+        _fail("verification authority is not committed at HEAD")
+    if _git_blob(repo_root, head, _VERIFICATION_SIGNER_ANCHOR_PATH) != anchor_data:
+        _fail("verification signer anchor is not committed at HEAD")
+    changed = {
+        line
+        for line in _git_text(repo_root, "diff", "--name-only", f"{commit}..HEAD").splitlines()
+        if line
+    }
+    expected_selection_changes = {
+        _VERIFICATION_AUTHORITY_PATH,
+        _VERIFICATION_SIGNER_ANCHOR_PATH,
+    }
+    post_verification_paths = {
+        "CONTINUITY.md",
+        "HANDOFF.md",
+        _VERIFICATION_RECEIPT_PATH,
+        "memory/research_engine_extraction.jsonl",
+    }
+    changes_valid = (
+        changed == expected_selection_changes
+        if strict_selection_head
+        else expected_selection_changes.issubset(changed)
+        and changed.issubset(expected_selection_changes | post_verification_paths)
+    )
+    if not changes_valid:
+        _fail("tracked files changed after correction implementation selection")
+    if (
+        _proof_file_hashes(repo_root / _ATTEMPT_001_PROOF_PATH)
+        != amendment["proof_binding"]["file_sha256"]
+    ):
+        _fail("verification authority proof binding no longer matches the working proof")
+    return authority, authority_data, anchor, anchor_data
 
 
 def _parse_events(data: bytes) -> list[LedgerEvent]:
@@ -774,6 +1380,23 @@ def verify_iter000_proof_bundle(
     signer_anchor_path: Path,
     authority_specification_path: Path | None = None,
 ) -> Iter000ProofVerification:
+    """Run the original strict verifier without any canonicality exception."""
+
+    return _verify_iter000_proof_bundle(
+        proof_root,
+        signer_anchor_path=signer_anchor_path,
+        authority_specification_path=authority_specification_path,
+        dataset_lock_correction=None,
+    )
+
+
+def _verify_iter000_proof_bundle(
+    proof_root: Path,
+    *,
+    signer_anchor_path: Path,
+    authority_specification_path: Path | None = None,
+    dataset_lock_correction: Mapping[str, Any] | None,
+) -> Iter000ProofVerification:
     """Fail closed unless the complete iter000 result follows from pinned evidence.
 
     Every result artifact is read from ``proof_root``. Trust inputs are the explicitly selected,
@@ -1026,9 +1649,18 @@ def verify_iter000_proof_bundle(
         proof_root / "dataset_lock.json", "dataset lock"
     )
     dataset_lock = _model(AdaptDatasetLock, dataset_lock_value, "dataset lock")
-    _canonical(dataset_lock, dataset_lock_data, "dataset lock")
-    if actual_hashes["dataset_lock.json"] != protocol_files[_DATASET_PROTOCOL_PATH]:
-        _fail("proof-local dataset lock differs from the signed protocol bundle")
+    if dataset_lock_correction is None:
+        _canonical(dataset_lock, dataset_lock_data, "dataset lock")
+        if actual_hashes["dataset_lock.json"] != protocol_files[_DATASET_PROTOCOL_PATH]:
+            _fail("proof-local dataset lock differs from the signed protocol bundle")
+    else:
+        if actual_hashes["dataset_lock.json"] != protocol_files[_DATASET_PROTOCOL_PATH]:
+            _fail("proof-local dataset lock differs from the signed protocol bundle")
+        _verify_dataset_lock_correction(
+            dataset_lock_value,
+            dataset_lock_data,
+            dataset_lock_correction,
+        )
     if actual_hashes["AMENDMENT_001.md"] != protocol_files[_AMENDMENT_DOCUMENT_PATH]:
         _fail("proof-local Amendment 001 document differs from the signed protocol bundle")
     if actual_hashes["amendment_001.json"] != protocol_files[_AMENDMENT_CONTRACT_PATH]:
@@ -1183,3 +1815,402 @@ def verify_iter000_proof_bundle(
         ledger_checkpoint=checkpoint,
         ledger_verification=ledger_verification,
     )
+
+
+def initialize_iter000_verification_signer(repo_root: Path) -> SignerAnchor:
+    """Create the correction signer separately from the scientific execution signer."""
+
+    key = load_or_create_signing_key(repo_root / _VERIFICATION_SIGNING_KEY_PATH)
+    execution_anchor = load_signer_anchor(repo_root / _ANCHOR_PROTOCOL_PATH)
+    if key.verify_key.encode().hex() == execution_anchor.signer_public_key:
+        _fail("verification signer must differ from the scientific execution signer")
+    return write_signer_anchor(
+        repo_root / _VERIFICATION_SIGNER_ANCHOR_PATH,
+        key,
+        anchor_id=_VERIFICATION_ANCHOR_ID,
+        ledger_scope=_VERIFICATION_LEDGER_SCOPE,
+    )
+
+
+def _signed_record(
+    body: Mapping[str, Any],
+    *,
+    signing_key: SigningKey,
+    hash_field: str,
+) -> dict[str, Any]:
+    digest = sha256_value(body)
+    signature = signing_key.sign(bytes.fromhex(digest)).signature.hex()
+    return {**body, hash_field: digest, "signature": signature}
+
+
+def _verify_signed_record(
+    value: Mapping[str, Any],
+    *,
+    anchor: SignerAnchor,
+    hash_field: str,
+    label: str,
+) -> str:
+    body = dict(value)
+    signature = body.pop("signature", None)
+    digest = body.pop(hash_field, None)
+    digest = _hash(digest, f"{label} hash")
+    if not isinstance(signature, str) or sha256_value(body) != digest:
+        _fail(f"{label} content hash differs")
+    try:
+        VerifyKey(bytes.fromhex(anchor.signer_public_key)).verify(
+            bytes.fromhex(digest), bytes.fromhex(signature)
+        )
+    except (BadSignatureError, ValueError) as error:
+        raise ProofBundleVerificationError(f"{label} signature is invalid") from error
+    return digest
+
+
+def _exclusive_receipt_write(path: Path, data: bytes) -> None:
+    directory = path.parent
+    if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+        _fail("verification receipt directory must not be linked")
+    directory.mkdir(parents=True, exist_ok=True)
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | no_follow
+    directory_descriptor = os.open(directory, directory_flags)
+    descriptor: int | None = None
+    try:
+        try:
+            descriptor = os.open(
+                path.name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | no_follow,
+                0o444,
+                dir_fd=directory_descriptor,
+            )
+        except FileExistsError as error:
+            raise ProofBundleVerificationError(
+                "verification correction authority is already consumed"
+            ) from error
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = None
+            metadata = os.fstat(handle.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                _fail("verification consumption receipt must be a regular file")
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.fsync(directory_descriptor)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        os.close(directory_descriptor)
+
+
+def _consumption_record(
+    *,
+    authority: Mapping[str, Any],
+    authority_data: bytes,
+    amendment: Mapping[str, Any],
+    runtime: RuntimeIdentity,
+    signer_public_key: str,
+    signing_key: SigningKey,
+) -> dict[str, Any]:
+    body = {
+        "schema_version": "fieldtrue.iter000-verification-authority-consumption.v1",
+        "authority_id": authority["authority_id"],
+        "iteration_id": _ITERATION_ID,
+        "attempt_id": "attempt_001",
+        "correction_id": "correction_001",
+        "consumed_at": datetime.now(UTC),
+        "amendments": authority["amendments"],
+        "authority": {
+            "path": _VERIFICATION_AUTHORITY_PATH,
+            "sha256": sha256_bytes(authority_data),
+        },
+        "proof_binding": {
+            "content_map_sha256": amendment["proof_binding"]["content_map_sha256"],
+            "git_commit": _ATTEMPT_001_PROOF_COMMIT,
+            "git_subtree": _ATTEMPT_001_PROOF_SUBTREE,
+        },
+        "runtime": runtime.model_dump(mode="json"),
+        "signer_public_key": signer_public_key,
+        "trust_level": "git_pinned_separate_local_ed25519_no_external_timestamp",
+        "same_local_owner_can_delete_or_rollback_local_state": True,
+    }
+    return _signed_record(body, signing_key=signing_key, hash_field="consumption_hash")
+
+
+def _verify_consumption_record(
+    value: Mapping[str, Any],
+    *,
+    authority: Mapping[str, Any],
+    authority_data: bytes,
+    amendment: Mapping[str, Any],
+    anchor: SignerAnchor,
+) -> str:
+    _exact_keys(
+        value,
+        frozenset(
+            {
+                "schema_version",
+                "authority_id",
+                "iteration_id",
+                "attempt_id",
+                "correction_id",
+                "consumed_at",
+                "amendments",
+                "authority",
+                "proof_binding",
+                "runtime",
+                "signer_public_key",
+                "trust_level",
+                "same_local_owner_can_delete_or_rollback_local_state",
+                "consumption_hash",
+                "signature",
+            }
+        ),
+        "verification consumption receipt",
+    )
+    runtime = _model(RuntimeIdentity, value["runtime"], "verification consumption runtime")
+    consumed_at = value["consumed_at"]
+    if not isinstance(consumed_at, str):
+        _fail("verification consumption timestamp must be an RFC 3339 string")
+    try:
+        parsed_time = datetime.fromisoformat(consumed_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ProofBundleVerificationError(
+            "verification consumption timestamp is invalid"
+        ) from error
+    if (
+        parsed_time.tzinfo is None
+        or parsed_time.utcoffset() is None
+        or value["schema_version"] != "fieldtrue.iter000-verification-authority-consumption.v1"
+        or value["authority_id"] != authority["authority_id"]
+        or value["iteration_id"] != _ITERATION_ID
+        or value["attempt_id"] != "attempt_001"
+        or value["correction_id"] != "correction_001"
+        or value["amendments"] != authority["amendments"]
+        or value["authority"]
+        != {
+            "path": _VERIFICATION_AUTHORITY_PATH,
+            "sha256": sha256_bytes(authority_data),
+        }
+        or value["proof_binding"]
+        != {
+            "content_map_sha256": amendment["proof_binding"]["content_map_sha256"],
+            "git_commit": _ATTEMPT_001_PROOF_COMMIT,
+            "git_subtree": _ATTEMPT_001_PROOF_SUBTREE,
+        }
+        or runtime.command != _CORRECTED_VERIFICATION_COMMAND
+        or runtime.repository_dirty is not False
+        or runtime.dirty_state_hash != _CLEAN_STATE_HASH
+        or value["signer_public_key"] != anchor.signer_public_key
+        or value["trust_level"] != "git_pinned_separate_local_ed25519_no_external_timestamp"
+        or value["same_local_owner_can_delete_or_rollback_local_state"] is not True
+    ):
+        _fail("verification consumption receipt differs from its authority")
+    return _verify_signed_record(
+        value,
+        anchor=anchor,
+        hash_field="consumption_hash",
+        label="verification consumption receipt",
+    )
+
+
+def verify_iter000_proof_bundle_correction_001(
+    repo_root: Path,
+    *,
+    command: tuple[str, ...],
+) -> Iter000CorrectedProofVerification:
+    """Consume and execute the sole authorized correction against the immutable proof."""
+
+    if command != _CORRECTED_VERIFICATION_COMMAND:
+        _fail("corrected verification command differs from its authority")
+    amendment, amendment_001_data, amendment_002_data = _load_verification_amendments(repo_root)
+    authority, authority_data, verification_anchor, verification_anchor_data = (
+        _load_verification_authority(
+            repo_root,
+            repo_root / _VERIFICATION_AUTHORITY_PATH,
+            amendment=amendment,
+        )
+    )
+    receipt_path = repo_root / _VERIFICATION_RECEIPT_PATH
+    if receipt_path.is_symlink() or receipt_path.exists():
+        _fail("verification correction authority is already consumed")
+    runtime = collect_runtime_identity(repo_root, command=command, require_clean=True)
+    if runtime.git_commit != _git_text(
+        repo_root, "rev-parse", "HEAD"
+    ) or runtime.git_tree != _git_text(repo_root, "rev-parse", "HEAD^{tree}"):
+        _fail("verification runtime differs from the replacement-disabled selected HEAD")
+    signing_key = load_or_create_signing_key(repo_root / _VERIFICATION_SIGNING_KEY_PATH)
+    if signing_key.verify_key.encode().hex() != verification_anchor.signer_public_key:
+        _fail("local verification key does not match the selected signer anchor")
+    consumption = _consumption_record(
+        authority=authority,
+        authority_data=authority_data,
+        amendment=amendment,
+        runtime=runtime,
+        signer_public_key=verification_anchor.signer_public_key,
+        signing_key=signing_key,
+    )
+    consumption_data = canonical_json_pretty(consumption)
+    _exclusive_receipt_write(receipt_path, consumption_data)
+
+    verification = _verify_iter000_proof_bundle(
+        repo_root / _ATTEMPT_001_PROOF_PATH,
+        signer_anchor_path=repo_root / _ANCHOR_PROTOCOL_PATH,
+        authority_specification_path=repo_root / _AUTHORITY_PROTOCOL_PATH,
+        dataset_lock_correction=_DATASET_LOCK_CORRECTION,
+    )
+
+    amendment_after, amendment_001_after, amendment_002_after = _load_verification_amendments(
+        repo_root
+    )
+    authority_after, authority_data_after, anchor_after, anchor_data_after = (
+        _load_verification_authority(
+            repo_root,
+            repo_root / _VERIFICATION_AUTHORITY_PATH,
+            amendment=amendment_after,
+        )
+    )
+    if (
+        amendment_after != amendment
+        or amendment_001_after != amendment_001_data
+        or amendment_002_after != amendment_002_data
+        or authority_after != authority
+        or authority_data_after != authority_data
+        or anchor_after != verification_anchor
+        or anchor_data_after != verification_anchor_data
+        or _read_regular_file(receipt_path, "verification consumption receipt") != consumption_data
+        or _proof_file_hashes(repo_root / _ATTEMPT_001_PROOF_PATH)
+        != amendment["proof_binding"]["file_sha256"]
+    ):
+        _fail("verification trust input changed during corrected verification")
+
+    verification_value = verification.model_dump(mode="json")
+    receipt_body = {
+        "schema_version": "fieldtrue.iter000-corrected-proof-verification.v1",
+        "authority_id": authority["authority_id"],
+        "amendment_sha256": _VERIFICATION_AMENDMENT_CORRECTION_SHA256,
+        "authority_sha256": sha256_bytes(authority_data),
+        "proof_commit": _ATTEMPT_001_PROOF_COMMIT,
+        "proof_subtree": _ATTEMPT_001_PROOF_SUBTREE,
+        "correction_applied": _DATASET_LOCK_CORRECTION,
+        "consumption": consumption,
+        "consumption_sha256": sha256_bytes(consumption_data),
+        "verification": verification_value,
+        "verification_sha256": sha256_value(verification_value),
+        "resource_usage": {
+            "cloud_jobs": 0,
+            "gpu_hours": 0,
+            "network_access": False,
+            "paid_calls": 0,
+        },
+        "signer_public_key": verification_anchor.signer_public_key,
+    }
+    final_value = _signed_record(
+        receipt_body,
+        signing_key=signing_key,
+        hash_field="receipt_hash",
+    )
+    final_receipt = Iter000CorrectedProofVerification.model_validate(final_value)
+    atomic_write(receipt_path, canonical_json_pretty(final_receipt), mode=0o444)
+    return final_receipt
+
+
+def _verify_final_correction_receipt(
+    value: Mapping[str, Any],
+    data: bytes,
+    *,
+    authority: Mapping[str, Any],
+    authority_data: bytes,
+    amendment: Mapping[str, Any],
+    anchor: SignerAnchor,
+) -> Iter000CorrectedProofVerification:
+    receipt = _model(
+        Iter000CorrectedProofVerification,
+        value,
+        "corrected verification receipt",
+    )
+    _canonical(receipt, data, "corrected verification receipt")
+    consumption = _object(value["consumption"], "corrected verification consumption")
+    _verify_consumption_record(
+        consumption,
+        authority=authority,
+        authority_data=authority_data,
+        amendment=amendment,
+        anchor=anchor,
+    )
+    verification_value = _object(value["verification"], "corrected proof verification")
+    if (
+        receipt.authority_id != authority["authority_id"]
+        or receipt.amendment_sha256 != _VERIFICATION_AMENDMENT_CORRECTION_SHA256
+        or receipt.authority_sha256 != sha256_bytes(authority_data)
+        or receipt.proof_commit != _ATTEMPT_001_PROOF_COMMIT
+        or receipt.proof_subtree != _ATTEMPT_001_PROOF_SUBTREE
+        or receipt.correction_applied != _DATASET_LOCK_CORRECTION
+        or receipt.consumption_sha256 != sha256_bytes(canonical_json_pretty(consumption))
+        or receipt.verification_sha256 != sha256_value(verification_value)
+        or receipt.resource_usage
+        != {
+            "cloud_jobs": 0,
+            "gpu_hours": 0,
+            "network_access": False,
+            "paid_calls": 0,
+        }
+        or receipt.signer_public_key != anchor.signer_public_key
+        or receipt.verification.authority_specification_sha256
+        != authority["trigger"]["execution_authority"]["sha256"]
+        or receipt.verification.authority_consumption_sha256
+        != authority["trigger"]["authority_consumption"]["sha256"]
+    ):
+        _fail("corrected verification receipt differs from its frozen authority")
+    _verify_signed_record(
+        value,
+        anchor=anchor,
+        hash_field="receipt_hash",
+        label="corrected verification receipt",
+    )
+    return receipt
+
+
+def validate_iter000_verification_correction_surface(repo_root: Path) -> tuple[bool, str]:
+    """Validate correction chronology and authority without reading scientific outcomes."""
+
+    try:
+        amendment, _, _ = _load_verification_amendments(repo_root)
+        authority, authority_data, anchor, _ = _load_verification_authority(
+            repo_root,
+            repo_root / _VERIFICATION_AUTHORITY_PATH,
+            amendment=amendment,
+            strict_selection_head=False,
+        )
+        receipt_path = repo_root / _VERIFICATION_RECEIPT_PATH
+        if not receipt_path.exists():
+            return (
+                True,
+                "Verification correction authority is committed, exact, and unconsumed.",
+            )
+        value, data = _read_json_object(receipt_path, "verification correction receipt")
+        schema_version = value.get("schema_version")
+        if schema_version == "fieldtrue.iter000-verification-authority-consumption.v1":
+            _canonical(value, data, "verification consumption receipt")
+            _verify_consumption_record(
+                value,
+                authority=authority,
+                authority_data=authority_data,
+                amendment=amendment,
+                anchor=anchor,
+            )
+            return (
+                False,
+                "Verification correction authority was consumed without a completed receipt.",
+            )
+        if schema_version != "fieldtrue.iter000-corrected-proof-verification.v1":
+            _fail("verification correction receipt has an unsupported schema")
+        _verify_final_correction_receipt(
+            value,
+            data,
+            authority=authority,
+            authority_data=authority_data,
+            amendment=amendment,
+            anchor=anchor,
+        )
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        return False, f"Verification correction surface is invalid: {type(error).__name__}: {error}"
+    return True, "Verification correction receipt is signed, complete, and proof-bound."

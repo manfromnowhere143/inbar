@@ -12,6 +12,7 @@ from nacl.signing import SigningKey
 import fieldtrue.verification as verification_module
 from fieldtrue.adapters.adapt import ingest_adapt_dataset
 from fieldtrue.canonical import (
+    canonical_json,
     canonical_json_pretty,
     sha256_bytes,
     sha256_file,
@@ -100,6 +101,7 @@ def _fixture_bundle(
     manifest_overrides: dict[str, object] | None = None,
     terminal_overrides: dict[str, object] | None = None,
     report_override: ReadinessReport | None = None,
+    noncanonical_dataset_lock: bool = False,
 ) -> tuple[Path, Path, SigningKey]:
     experiment = tmp_path / "experiments" / _ITERATION_ID
     proof = experiment / "proof"
@@ -121,7 +123,10 @@ def _fixture_bundle(
     )
     raw_root = tmp_path / "source"
     lock, resource_receipts = create_adapt_source(raw_root)
-    _write_json(proof / "dataset_lock.json", lock)
+    dataset_lock_data = canonical_json_pretty(lock)
+    if noncanonical_dataset_lock:
+        dataset_lock_data += b"\n"
+    (proof / "dataset_lock.json").write_bytes(dataset_lock_data)
     dataset_lock_hash = sha256_file(proof / "dataset_lock.json")
 
     runtime = runtime_identity()
@@ -391,6 +396,598 @@ def test_normal_bundle_verifies_from_proof_only(tmp_path: Path) -> None:
     assert verification.ledger_verification.event_count == 5
     assert render_iter000_result_from_proof(proof) == (proof / "RESULT.md").read_text()
     assert (proof / "truth_manifest.jsonl").is_file()
+
+
+def test_dataset_lock_correction_is_exact_and_strict_verifier_stays_strict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proof, anchor, _ = _fixture_bundle(tmp_path, noncanonical_dataset_lock=True)
+    raw_data = (proof / "dataset_lock.json").read_bytes()
+    value = json.loads(raw_data)
+    correction = {
+        "canonical_pretty_sha256": sha256_bytes(canonical_json_pretty(value)),
+        "path": "dataset_lock.json",
+        "protocol_path": "protocol/datasets/nasa_adapt_v1.json",
+        "raw_sha256": sha256_bytes(raw_data),
+        "semantic_canonical_sha256": sha256_bytes(canonical_json(value)),
+    }
+
+    with pytest.raises(ProofBundleVerificationError, match="canonical pretty JSON"):
+        verify_iter000_proof_bundle(proof, signer_anchor_path=anchor)
+
+    monkeypatch.setattr(verification_module, "_DATASET_LOCK_CORRECTION", correction)
+    verification = verification_module._verify_iter000_proof_bundle(
+        proof,
+        signer_anchor_path=anchor,
+        dataset_lock_correction=correction,
+    )
+    assert verification.verdict == "BLOCKED_EVIDENCE"
+
+    (proof / "dataset_lock.json").write_bytes(raw_data + b"\n")
+    with pytest.raises(ProofBundleVerificationError, match="artifact hash mismatch"):
+        verification_module._verify_iter000_proof_bundle(
+            proof,
+            signer_anchor_path=anchor,
+            dataset_lock_correction=correction,
+        )
+
+
+def test_frozen_dataset_lock_exercises_the_authorized_serialization_defect() -> None:
+    repository = Path(__file__).resolve().parents[2]
+    data = (repository / "protocol" / "datasets" / "nasa_adapt_v1.json").read_bytes()
+    value = verification_module._json_object(data, "frozen dataset lock")
+    verification_module._model(
+        verification_module.AdaptDatasetLock,
+        value,
+        "frozen dataset lock",
+    )
+
+    assert sha256_bytes(data) == verification_module._DATASET_LOCK_CORRECTION["raw_sha256"]
+    assert data != canonical_json_pretty(value)
+    assert (
+        sha256_bytes(canonical_json_pretty(value))
+        == verification_module._DATASET_LOCK_CORRECTION["canonical_pretty_sha256"]
+    )
+    assert (
+        sha256_bytes(canonical_json(value))
+        == verification_module._DATASET_LOCK_CORRECTION["semantic_canonical_sha256"]
+    )
+
+
+def test_verification_amendments_bind_the_original_verifier(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = Path(__file__).resolve().parents[2]
+    amendment, _, _ = verification_module._load_verification_amendments(repository)
+
+    assert (
+        amendment["trigger"]["execution_commit"]["git_commit"]
+        == verification_module._ATTEMPT_001_EXECUTION_COMMIT
+    )
+    assert amendment["trigger"]["original_verifier"] == {
+        "path": "src/fieldtrue/verification.py",
+        "sha256": verification_module._ORIGINAL_VERIFIER_SHA256,
+    }
+
+    monkeypatch.setattr(verification_module, "_ORIGINAL_VERIFIER_SHA256", "0" * 64)
+    with pytest.raises(ProofBundleVerificationError, match="original verifier binding"):
+        verification_module._load_verification_amendments(repository)
+
+
+def test_verification_signer_must_differ_from_execution_signer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    key = SigningKey.generate()
+    execution_anchor_path = tmp_path / verification_module._ANCHOR_PROTOCOL_PATH
+    write_signer_anchor(
+        execution_anchor_path,
+        key,
+        anchor_id="iter000-execution-ledger",
+        ledger_scope=_ITERATION_ID,
+    )
+    monkeypatch.setattr(
+        verification_module,
+        "load_or_create_signing_key",
+        lambda _path: key,
+    )
+
+    with pytest.raises(ProofBundleVerificationError, match="must differ"):
+        verification_module.initialize_iter000_verification_signer(tmp_path)
+    assert not (tmp_path / verification_module._VERIFICATION_SIGNER_ANCHOR_PATH).exists()
+
+
+def test_verification_authority_binds_external_signer_code_tests_and_protocol(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commit = "d" * 40
+    tree = "e" * 40
+    head = "f" * 40
+    source_path = "src/fieldtrue/sample.py"
+    test_path = "tests/test_sample.py"
+    protocol_paths = {
+        verification_module._VERIFICATION_AMENDMENT_DOCUMENT_PATH,
+        verification_module._VERIFICATION_AMENDMENT_PATH,
+        verification_module._VERIFICATION_AMENDMENT_CORRECTION_DOCUMENT_PATH,
+        verification_module._VERIFICATION_AMENDMENT_CORRECTION_PATH,
+        verification_module._AUTHORITY_PROTOCOL_PATH,
+        verification_module._AUTHORITY_RECEIPT_PATH,
+        verification_module._ANCHOR_PROTOCOL_PATH,
+        verification_module._DATASET_PROTOCOL_PATH,
+        verification_module._HYPOTHESIS_PATH,
+    }
+    for relative in {source_path, test_path, *protocol_paths, "pyproject.toml", "uv.lock"}:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"fixture:{relative}\n")
+    execution_key = SigningKey.generate()
+    execution_anchor_path = tmp_path / verification_module._ANCHOR_PROTOCOL_PATH
+    execution_anchor_path.unlink()
+    write_signer_anchor(
+        execution_anchor_path,
+        execution_key,
+        anchor_id="iter000-execution-ledger",
+        ledger_scope=_ITERATION_ID,
+    )
+    correction_key = SigningKey.generate()
+    anchor_path = tmp_path / verification_module._VERIFICATION_SIGNER_ANCHOR_PATH
+    write_signer_anchor(
+        anchor_path,
+        correction_key,
+        anchor_id=verification_module._VERIFICATION_ANCHOR_ID,
+        ledger_scope=verification_module._VERIFICATION_LEDGER_SCOPE,
+    )
+    anchor = load_signer_anchor(anchor_path)
+    proof_binding = {
+        "artifact_count": 1,
+        "content_map_sha256": "1" * 64,
+        "file_sha256": {"synthetic": "2" * 64},
+        "git_commit": "3" * 40,
+        "git_subtree": "4" * 40,
+        "path": "proof",
+    }
+    amendment = {"proof_binding": proof_binding, "trigger": {"fixture": True}}
+    authority = {
+        "schema_version": "fieldtrue.iter000-verification-authority.v1",
+        "authority_id": "iter000_verification_001",
+        "iteration_id": _ITERATION_ID,
+        "authorized_command": list(verification_module._CORRECTED_VERIFICATION_COMMAND),
+        "amendments": [
+            {
+                "path": verification_module._VERIFICATION_AMENDMENT_PATH,
+                "sha256": verification_module._VERIFICATION_AMENDMENT_SHA256,
+            },
+            {
+                "path": verification_module._VERIFICATION_AMENDMENT_CORRECTION_PATH,
+                "sha256": verification_module._VERIFICATION_AMENDMENT_CORRECTION_SHA256,
+            },
+        ],
+        "proof_binding": proof_binding,
+        "trigger": amendment["trigger"],
+        "correction": verification_module._DATASET_LOCK_CORRECTION,
+        "implementation": {
+            "git_commit": commit,
+            "git_tree": tree,
+            "protocol_hashes": {
+                relative: sha256_file(tmp_path / relative) for relative in protocol_paths
+            },
+            "pyproject_sha256": sha256_file(tmp_path / "pyproject.toml"),
+            "source_hashes": {source_path: sha256_file(tmp_path / source_path)},
+            "test_hashes": {test_path: sha256_file(tmp_path / test_path)},
+            "uv_lock_sha256": sha256_file(tmp_path / "uv.lock"),
+        },
+        "signer_anchor": {
+            "path": verification_module._VERIFICATION_SIGNER_ANCHOR_PATH,
+            "sha256": sha256_file(anchor_path),
+            "signer_public_key": anchor.signer_public_key,
+        },
+        "consumption": {
+            "consumption_timing": "before_outcome_artifact_interpretation",
+            "failure_mode": "fail_closed",
+            "maximum_consumptions": 1,
+            "proof_deletion_restores_authority": False,
+            "receipt_path": verification_module._VERIFICATION_RECEIPT_PATH,
+            "receipt_presence_consumes_authority": True,
+        },
+        "resource_constraints": {
+            "cloud_jobs": 0,
+            "gpu_hours": 0,
+            "network_access": False,
+            "paid_calls": 0,
+        },
+        "trust_model": {
+            "blocks": [
+                "ordinary_receipt_deletion",
+                "concurrent_local_replay",
+                "proof_local_authority_substitution",
+            ],
+            "does_not_block": [
+                "same_local_owner_deletes_receipt",
+                "same_local_owner_rolls_back_repository",
+                "same_local_owner_controls_local_git",
+                "verification_key_compromise",
+            ],
+            "external_timestamp": False,
+            "signature": "git_pinned_separate_local_ed25519",
+        },
+    }
+    authority_path = tmp_path / verification_module._VERIFICATION_AUTHORITY_PATH
+    _write_json(authority_path, authority)
+    expected_selection_changes = "\n".join(
+        (
+            verification_module._VERIFICATION_AUTHORITY_PATH,
+            verification_module._VERIFICATION_SIGNER_ANCHOR_PATH,
+        )
+    )
+    git_state = {"selection_changes": expected_selection_changes}
+    proof_state = {"hashes": proof_binding["file_sha256"]}
+
+    def git_text(_repo: Path, *arguments: str) -> str:
+        if arguments == ("rev-parse", f"{commit}^{{tree}}"):
+            return tree
+        if arguments == ("rev-parse", "HEAD"):
+            return head
+        if arguments[:2] == ("merge-base", "--is-ancestor"):
+            return ""
+        if arguments[:2] == ("diff", "--name-only"):
+            return git_state["selection_changes"]
+        raise AssertionError(arguments)
+
+    monkeypatch.setattr(verification_module, "_git_text", git_text)
+    monkeypatch.setattr(
+        verification_module,
+        "_git_blob",
+        lambda repo, _commit, relative: (repo / relative).read_bytes(),
+    )
+    monkeypatch.setattr(
+        verification_module,
+        "_git_file_set",
+        lambda _repo, _commit, prefix: {source_path} if prefix == "src/fieldtrue" else {test_path},
+    )
+    monkeypatch.setattr(
+        verification_module,
+        "_proof_file_hashes",
+        lambda _proof: proof_state["hashes"],
+    )
+
+    loaded, loaded_data, loaded_anchor, _ = verification_module._load_verification_authority(
+        tmp_path,
+        authority_path,
+        amendment=amendment,
+    )
+    assert loaded == authority
+    assert loaded_data == authority_path.read_bytes()
+    assert loaded_anchor == anchor
+
+    def assert_authority_rejected(
+        candidate: dict[str, Any],
+        match: str,
+        *,
+        selection_changes: str = expected_selection_changes,
+        observed_proof_hashes: dict[str, str] | None = None,
+    ) -> None:
+        git_state["selection_changes"] = selection_changes
+        proof_state["hashes"] = observed_proof_hashes or proof_binding["file_sha256"]
+        _write_json(authority_path, candidate)
+        with pytest.raises(ProofBundleVerificationError, match=match):
+            verification_module._load_verification_authority(
+                tmp_path,
+                authority_path,
+                amendment=amendment,
+            )
+
+    execution_anchor_data = execution_anchor_path.read_bytes()
+    execution_anchor_path.write_bytes(anchor_path.read_bytes())
+    assert_authority_rejected(deepcopy(authority), "separately selected signer")
+    execution_anchor_path.write_bytes(execution_anchor_data)
+
+    candidate = deepcopy(authority)
+    candidate["authority_id"] = "rebound_authority"
+    assert_authority_rejected(candidate, "identity or frozen bindings")
+
+    candidate = deepcopy(authority)
+    candidate["consumption"]["maximum_consumptions"] = 2
+    assert_authority_rejected(candidate, "one fail-closed consumption")
+
+    candidate = deepcopy(authority)
+    candidate["resource_constraints"]["network_access"] = True
+    assert_authority_rejected(candidate, "unapproved resources")
+
+    candidate = deepcopy(authority)
+    candidate["trust_model"]["external_timestamp"] = True
+    assert_authority_rejected(candidate, "misstates its local trust boundary")
+
+    candidate = deepcopy(authority)
+    candidate["signer_anchor"]["signer_public_key"] = "0" * 64
+    assert_authority_rejected(candidate, "separately selected signer")
+
+    candidate = deepcopy(authority)
+    candidate["implementation"]["git_commit"] = "--help"
+    assert_authority_rejected(candidate, "lowercase 40-character Git object ID")
+
+    candidate = deepcopy(authority)
+    candidate["implementation"]["git_tree"] = "0" * 40
+    assert_authority_rejected(candidate, "tree differs")
+
+    candidate = deepcopy(authority)
+    candidate["implementation"]["source_hashes"] = {}
+    assert_authority_rejected(candidate, "complete implementation source tree")
+
+    candidate = deepcopy(authority)
+    candidate["implementation"]["test_hashes"] = {}
+    assert_authority_rejected(candidate, "complete test tree")
+
+    candidate = deepcopy(authority)
+    candidate["implementation"]["pyproject_sha256"] = "0" * 64
+    assert_authority_rejected(candidate, "implementation differs for pyproject")
+
+    candidate = deepcopy(authority)
+    candidate["implementation"]["protocol_hashes"].pop(verification_module._HYPOTHESIS_PATH)
+    assert_authority_rejected(candidate, "exact correction protocol surface")
+
+    assert_authority_rejected(
+        deepcopy(authority),
+        "tracked files changed",
+        selection_changes=expected_selection_changes + "\nREADME.md",
+    )
+    assert_authority_rejected(
+        deepcopy(authority),
+        "proof binding no longer matches",
+        observed_proof_hashes={"synthetic": "0" * 64},
+    )
+
+    with pytest.raises(ProofBundleVerificationError, match="fixed repository path"):
+        verification_module._load_verification_authority(
+            tmp_path,
+            tmp_path / "proof" / "attempt_authority.json",
+            amendment=amendment,
+        )
+
+
+def test_corrected_verification_consumes_before_reading_and_replay_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proof, execution_anchor, _ = _fixture_bundle(tmp_path / "fixture")
+    base_verification = verify_iter000_proof_bundle(
+        proof,
+        signer_anchor_path=execution_anchor,
+    )
+    correction_key = SigningKey.generate()
+    correction_anchor_path = tmp_path / "correction-anchor.json"
+    write_signer_anchor(
+        correction_anchor_path,
+        correction_key,
+        anchor_id="iter000-verification-correction-001",
+        ledger_scope=f"{_ITERATION_ID}/attempt_001/correction_001",
+    )
+    correction_anchor = load_signer_anchor(correction_anchor_path)
+    correction_anchor_data = correction_anchor_path.read_bytes()
+    proof_hashes = {"synthetic": "a" * 64}
+    execution_authority_sha256 = "d" * 64
+    authority_consumption_sha256 = "e" * 64
+    base_verification = base_verification.model_copy(
+        update={
+            "authority_specification_sha256": execution_authority_sha256,
+            "authority_consumption_sha256": authority_consumption_sha256,
+        }
+    )
+    amendment = {
+        "proof_binding": {
+            "content_map_sha256": sha256_value(proof_hashes),
+            "file_sha256": proof_hashes,
+        }
+    }
+    authority = {
+        "authority_id": "iter000_verification_001",
+        "amendments": [
+            {"path": "amendment-001", "sha256": "b" * 64},
+            {"path": "amendment-002", "sha256": "c" * 64},
+        ],
+        "trigger": {
+            "execution_authority": {"sha256": execution_authority_sha256},
+            "authority_consumption": {"sha256": authority_consumption_sha256},
+        },
+    }
+    authority_data = canonical_json_pretty(authority)
+    receipt_relative = "verification/receipt.json"
+    command = verification_module._CORRECTED_VERIFICATION_COMMAND
+    runtime = runtime_identity().model_copy(
+        update={
+            "command": command,
+            "repository_dirty": False,
+            "dirty_state_hash": sha256_bytes(b""),
+        }
+    )
+    calls = 0
+
+    def corrected_core(*_args: object, **_kwargs: object) -> object:
+        nonlocal calls
+        calls += 1
+        consumed = json.loads((tmp_path / receipt_relative).read_text())
+        assert (
+            consumed["schema_version"] == "fieldtrue.iter000-verification-authority-consumption.v1"
+        )
+        verification_module._verify_consumption_record(
+            consumed,
+            authority=authority,
+            authority_data=authority_data,
+            amendment=amendment,
+            anchor=correction_anchor,
+        )
+        valid, detail = verification_module.validate_iter000_verification_correction_surface(
+            tmp_path
+        )
+        assert valid is False
+        assert "consumed without a completed receipt" in detail
+        return base_verification
+
+    monkeypatch.setattr(
+        verification_module,
+        "_load_verification_amendments",
+        lambda _repo: (amendment, b"amendment-001", b"amendment-002"),
+    )
+    monkeypatch.setattr(
+        verification_module,
+        "_load_verification_authority",
+        lambda *_args, **_kwargs: (
+            authority,
+            authority_data,
+            correction_anchor,
+            correction_anchor_data,
+        ),
+    )
+    monkeypatch.setattr(verification_module, "collect_runtime_identity", lambda *_a, **_k: runtime)
+    monkeypatch.setattr(
+        verification_module,
+        "_git_text",
+        lambda _repo, *arguments: (
+            runtime.git_commit if arguments == ("rev-parse", "HEAD") else runtime.git_tree
+        ),
+    )
+    monkeypatch.setattr(
+        verification_module,
+        "load_or_create_signing_key",
+        lambda _path: correction_key,
+    )
+    monkeypatch.setattr(verification_module, "_proof_file_hashes", lambda _path: proof_hashes)
+    monkeypatch.setattr(verification_module, "_verify_iter000_proof_bundle", corrected_core)
+    monkeypatch.setattr(verification_module, "_VERIFICATION_RECEIPT_PATH", receipt_relative)
+
+    valid, detail = verification_module.validate_iter000_verification_correction_surface(tmp_path)
+    assert valid is True
+    assert "unconsumed" in detail
+
+    mismatched_runtime = runtime.model_copy(update={"git_tree": "3" * 40})
+    monkeypatch.setattr(
+        verification_module,
+        "collect_runtime_identity",
+        lambda *_a, **_k: mismatched_runtime,
+    )
+    with pytest.raises(ProofBundleVerificationError, match="selected HEAD"):
+        verification_module.verify_iter000_proof_bundle_correction_001(
+            tmp_path,
+            command=command,
+        )
+    assert not (tmp_path / receipt_relative).exists()
+    monkeypatch.setattr(
+        verification_module,
+        "collect_runtime_identity",
+        lambda *_a, **_k: runtime,
+    )
+
+    receipt = verification_module.verify_iter000_proof_bundle_correction_001(
+        tmp_path,
+        command=command,
+    )
+    assert calls == 1
+    assert receipt.correction_applied == verification_module._DATASET_LOCK_CORRECTION
+    assert receipt.resource_usage["network_access"] is False
+    receipt_value, receipt_data = verification_module._read_json_object(
+        tmp_path / receipt_relative,
+        "corrected verification receipt",
+    )
+    loaded_receipt = verification_module._verify_final_correction_receipt(
+        receipt_value,
+        receipt_data,
+        authority=authority,
+        authority_data=authority_data,
+        amendment=amendment,
+        anchor=correction_anchor,
+    )
+    assert loaded_receipt.model_dump(mode="json") == receipt.model_dump(mode="json")
+    valid, detail = verification_module.validate_iter000_verification_correction_surface(tmp_path)
+    assert valid is True
+    assert "signed, complete, and proof-bound" in detail
+
+    rebound_receipt = deepcopy(receipt_value)
+    rebound_receipt["resource_usage"]["network_access"] = True
+    with pytest.raises(ProofBundleVerificationError, match="frozen authority"):
+        verification_module._verify_final_correction_receipt(
+            rebound_receipt,
+            canonical_json_pretty(rebound_receipt),
+            authority=authority,
+            authority_data=authority_data,
+            amendment=amendment,
+            anchor=correction_anchor,
+        )
+
+    invalid_hash_receipt = deepcopy(receipt_value)
+    invalid_hash_receipt["receipt_hash"] = "0" * 64
+    with pytest.raises(ProofBundleVerificationError, match="content hash differs"):
+        verification_module._verify_final_correction_receipt(
+            invalid_hash_receipt,
+            canonical_json_pretty(invalid_hash_receipt),
+            authority=authority,
+            authority_data=authority_data,
+            amendment=amendment,
+            anchor=correction_anchor,
+        )
+
+    invalid_receipt = deepcopy(receipt_value)
+    invalid_receipt["signature"] = "00" * 64
+    with pytest.raises(ProofBundleVerificationError, match="signature is invalid"):
+        verification_module._verify_final_correction_receipt(
+            invalid_receipt,
+            canonical_json_pretty(invalid_receipt),
+            authority=authority,
+            authority_data=authority_data,
+            amendment=amendment,
+            anchor=correction_anchor,
+        )
+    with pytest.raises(ProofBundleVerificationError, match="already consumed"):
+        verification_module.verify_iter000_proof_bundle_correction_001(
+            tmp_path,
+            command=command,
+        )
+    assert calls == 1
+
+    (tmp_path / receipt_relative).chmod(0o644)
+    _write_json(tmp_path / receipt_relative, {"schema_version": "unsupported"})
+    valid, detail = verification_module.validate_iter000_verification_correction_surface(tmp_path)
+    assert valid is False
+    assert "unsupported schema" in detail
+
+    failed_receipt_relative = "verification/failed-receipt.json"
+    monkeypatch.setattr(
+        verification_module,
+        "_VERIFICATION_RECEIPT_PATH",
+        failed_receipt_relative,
+    )
+    failed_calls = 0
+
+    def failing_core(*_args: object, **_kwargs: object) -> object:
+        nonlocal failed_calls
+        failed_calls += 1
+        assert (tmp_path / failed_receipt_relative).is_file()
+        raise ProofBundleVerificationError("synthetic corrected verifier failure")
+
+    monkeypatch.setattr(verification_module, "_verify_iter000_proof_bundle", failing_core)
+    with pytest.raises(ProofBundleVerificationError, match="synthetic corrected verifier failure"):
+        verification_module.verify_iter000_proof_bundle_correction_001(
+            tmp_path,
+            command=command,
+        )
+    failed_value, failed_data = verification_module._read_json_object(
+        tmp_path / failed_receipt_relative,
+        "failed verification consumption receipt",
+    )
+    assert canonical_json_pretty(failed_value) == failed_data
+    verification_module._verify_consumption_record(
+        failed_value,
+        authority=authority,
+        authority_data=authority_data,
+        amendment=amendment,
+        anchor=correction_anchor,
+    )
+    with pytest.raises(ProofBundleVerificationError, match="already consumed"):
+        verification_module.verify_iter000_proof_bundle_correction_001(
+            tmp_path,
+            command=command,
+        )
+    assert failed_calls == 1
 
 
 def test_amended_runtime_must_match_the_external_authority() -> None:

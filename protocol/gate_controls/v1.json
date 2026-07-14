@@ -63,7 +63,7 @@
       "tests/helpers.py",
       "tests/unit/test_readiness.py"
     ],
-    "control_set_sha256": "d1f608b72f7561f44774a1c34d65e538229cb0fe7fcee223358d4419d0db3647",
-    "passing_result_sha256": "8d4a7d2f1d735d246e21a0efafaf5e16cdaf795f601d7da549c53825527b217f"
+    "control_set_sha256": "57318f175b08bcc3638b2c9525c4ca0b36ba80ac62245e34effb4e62419600de",
+    "passing_result_sha256": "0c16b20343028e23dcb39bc530fe46950ba8249850f4cb31614a066d6ec9d063"
   }
 }

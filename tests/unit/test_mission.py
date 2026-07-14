@@ -105,6 +105,20 @@ def _committed_amendment_repo(tmp_path: Path) -> Path:
     _git(source, "clone", "--quiet", "--no-hardlinks", source.as_posix(), repo.as_posix())
     _git(repo, "config", "user.name", "Amendment Test")
     _git(repo, "config", "user.email", "amendment@example.invalid")
+    proof_attempt = (
+        repo / "experiments" / "iter000_nasa_adapt_corpus_readiness" / "proof" / "attempt_001"
+    )
+    if proof_attempt.exists():
+        shutil.rmtree(proof_attempt)
+    correction_paths = (
+        "experiments/iter000_nasa_adapt_corpus_readiness/authority/attempt_001_consumption.json",
+        "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_001.md",
+        "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_002.md",
+        "protocol/amendments/iter000_verification_001.json",
+        "protocol/amendments/iter000_verification_002.json",
+    )
+    for relative in correction_paths:
+        (repo / relative).unlink(missing_ok=True)
     changed_paths = (
         "experiments/iter000_nasa_adapt_corpus_readiness/AMENDMENT_001.md",
         "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_000/execution_ledger.jsonl",
@@ -134,9 +148,18 @@ def _committed_amendment_repo(tmp_path: Path) -> Path:
         for relative in sorted(protocol_paths)
     }
     authority_path.write_bytes(canonical_json_pretty(authority))
-    _git(repo, "add", *changed_paths)
+    _git(repo, "add", "--all")
     if _git(repo, "status", "--porcelain"):
         _git(repo, "commit", "--quiet", "-m", "authorize amendment fixture")
+    return repo
+
+
+def _historical_attempt_repo(tmp_path: Path) -> Path:
+    source = _repo()
+    repo = tmp_path / "historical-attempt-repo"
+    _git(source, "clone", "--quiet", "--no-hardlinks", source.as_posix(), repo.as_posix())
+    _git(repo, "config", "user.name", "Historical Test")
+    _git(repo, "config", "user.email", "historical@example.invalid")
     return repo
 
 
@@ -156,6 +179,65 @@ def test_real_mission_invariants_are_individually_reported() -> None:
     assert checks["signer-anchor"].passed
     assert checks["provider-independence"].passed
     assert validation.passed == all(check.passed for check in validation.checks)
+
+
+def test_historical_attempt_validation_is_outcome_blind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    protected = {
+        "LEARNING.json",
+        "RESULT.md",
+        "artifact_bundle.json",
+        "coverage.json",
+        "ingestion_receipt.json",
+        "model_evidence_manifest.jsonl",
+        "readiness_report.json",
+        "run_manifest.json",
+        "truth_manifest.jsonl",
+    }
+    original_read_bytes = Path.read_bytes
+
+    def guarded_read_bytes(path: Path) -> bytes:
+        if path.name in protected and "proof/attempt_001" in path.as_posix():
+            raise AssertionError(f"outcome artifact was read: {path.name}")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read_bytes)
+    monkeypatch.setattr(mission_module, "_verified_tls_runtime_active", lambda: False)
+    monkeypatch.setattr(mission_module, "_certifi_dependency_is_locked", lambda _repo: False)
+
+    passed, detail = _verify_iteration_amendment_001(_repo())
+
+    assert passed
+    assert "Historical attempt 001 execution" in detail
+
+
+def test_historical_attempt_rejects_proof_mutation_and_git_replacement(tmp_path: Path) -> None:
+    repo = _historical_attempt_repo(tmp_path)
+    result = (
+        repo
+        / "experiments"
+        / "iter000_nasa_adapt_corpus_readiness"
+        / "proof"
+        / "attempt_001"
+        / "RESULT.md"
+    )
+    original = result.read_bytes()
+    result.write_bytes(original + b"tamper\n")
+    passed, detail = _verify_iteration_amendment_001(repo)
+    assert not passed
+    assert "proof or consumed authority has uncommitted changes" in detail
+    result.write_bytes(original)
+
+    _git(
+        repo,
+        "replace",
+        mission_module._ITER000_ATTEMPT_001_EXECUTION_COMMIT,
+        mission_module._ITER000_PROOF_COMMIT,
+    )
+    passed, detail = _verify_iteration_amendment_001(repo)
+    assert not passed
+    assert "replacement objects" in detail
 
 
 def test_amendment_001_authorizes_only_the_committed_predata_failure(
@@ -443,6 +525,23 @@ def test_amendment_001_rejects_weakened_or_placeholder_authority(tmp_path: Path)
     passed, detail = _verify_iteration_amendment_001(repo)
     assert not passed
     assert "invalid hash binding" in detail
+
+    bound_path = repo / "mission" / "name.json"
+    changed_bytes = bound_path.read_bytes() + b"\n"
+    bound_path.write_bytes(changed_bytes)
+    authority = json.loads(original)
+    authority["protocol_hashes"]["mission/name.json"] = sha256_bytes(changed_bytes)
+    authority_path.write_bytes(canonical_json_pretty(authority))
+    git = shutil.which("git")
+    assert git is not None
+    head = _git(repo, "rev-parse", "HEAD")
+    passed, detail = mission_module._verify_attempt_001_scientific_surface(
+        repo,
+        git=git,
+        head=head,
+    )
+    assert not passed
+    assert "not committed at HEAD" in detail
 
 
 def test_attempt_001_surface_fails_closed_on_missing_or_linked_inputs(
