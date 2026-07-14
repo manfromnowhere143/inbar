@@ -173,6 +173,13 @@ def test_dataset_mission_and_experiment_commands(
     )
     assert main(["--repo", str(repo), "experiment", "iter000"]) == 2
     capsys.readouterr()
+    monkeypatch.setattr(
+        cli_module,
+        "run_iter000_amendment_001",
+        lambda *_args, **_kwargs: _report(),
+    )
+    assert main(["--repo", str(repo), "experiment", "iter000-amendment-001"]) == 0
+    capsys.readouterr()
 
     monkeypatch.setattr(
         cli_module,
@@ -180,6 +187,8 @@ def test_dataset_mission_and_experiment_commands(
         lambda *_args, **_kwargs: _Verification(),
     )
     assert main(["--repo", str(repo), "experiment", "verify-iter000"]) == 0
+    assert json.loads(capsys.readouterr().out)["verdict"] == "BLOCKED_EVIDENCE"
+    assert main(["--repo", str(repo), "experiment", "verify-iter000-amendment-001"]) == 0
     assert json.loads(capsys.readouterr().out)["verdict"] == "BLOCKED_EVIDENCE"
 
 

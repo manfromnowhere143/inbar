@@ -511,6 +511,76 @@ wheels = [
 ]
 
 [[package]]
+name = "fieldtrue"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "certifi" },
+    { name = "networkx" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pydantic" },
+    { name = "pynacl" },
+    { name = "scikit-learn" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+
+[package.optional-dependencies]
+data = [
+    { name = "pyarrow" },
+]
+gpu = [
+    { name = "torch" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+release = [
+    { name = "build" },
+    { name = "check-wheel-contents" },
+    { name = "twine" },
+]
+security = [
+    { name = "pip-audit" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "certifi", specifier = ">=2026.6.17,<2027" },
+    { name = "networkx", specifier = ">=3.4,<4" },
+    { name = "numpy", specifier = ">=2.0,<3" },
+    { name = "pyarrow", marker = "extra == 'data'", specifier = ">=19,<24" },
+    { name = "pydantic", specifier = ">=2.10,<3" },
+    { name = "pynacl", specifier = ">=1.5,<2" },
+    { name = "scikit-learn", specifier = ">=1.6,<2" },
+    { name = "scipy", specifier = ">=1.14,<2" },
+    { name = "torch", marker = "extra == 'gpu'", specifier = ">=2.7,<3" },
+]
+provides-extras = ["data", "gpu"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.120,<7" },
+    { name = "mypy", specifier = ">=1.14,<2" },
+    { name = "pytest", specifier = ">=8.3,<10" },
+    { name = "pytest-cov", specifier = ">=6,<8" },
+    { name = "ruff", specifier = ">=0.9,<1" },
+]
+release = [
+    { name = "build", specifier = ">=1.3,<2" },
+    { name = "check-wheel-contents", specifier = ">=0.6,<1" },
+    { name = "twine", specifier = ">=6.2,<7" },
+]
+security = [{ name = "pip-audit", specifier = ">=2.9,<3" }]
+
+[[package]]
 name = "filelock"
 version = "3.29.7"
 source = { registry = "https://pypi.org/simple" }
@@ -1476,74 +1546,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
 ]
-
-[[package]]
-name = "fieldtrue"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "networkx" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "pydantic" },
-    { name = "pynacl" },
-    { name = "scikit-learn" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-]
-
-[package.optional-dependencies]
-data = [
-    { name = "pyarrow" },
-]
-gpu = [
-    { name = "torch" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "hypothesis" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-release = [
-    { name = "build" },
-    { name = "check-wheel-contents" },
-    { name = "twine" },
-]
-security = [
-    { name = "pip-audit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "networkx", specifier = ">=3.4,<4" },
-    { name = "numpy", specifier = ">=2.0,<3" },
-    { name = "pyarrow", marker = "extra == 'data'", specifier = ">=19,<24" },
-    { name = "pydantic", specifier = ">=2.10,<3" },
-    { name = "pynacl", specifier = ">=1.5,<2" },
-    { name = "scikit-learn", specifier = ">=1.6,<2" },
-    { name = "scipy", specifier = ">=1.14,<2" },
-    { name = "torch", marker = "extra == 'gpu'", specifier = ">=2.7,<3" },
-]
-provides-extras = ["data", "gpu"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "hypothesis", specifier = ">=6.120,<7" },
-    { name = "mypy", specifier = ">=1.14,<2" },
-    { name = "pytest", specifier = ">=8.3,<10" },
-    { name = "pytest-cov", specifier = ">=6,<8" },
-    { name = "ruff", specifier = ">=0.9,<1" },
-]
-release = [
-    { name = "build", specifier = ">=1.3,<2" },
-    { name = "check-wheel-contents", specifier = ">=0.6,<1" },
-    { name = "twine", specifier = ">=6.2,<7" },
-]
-security = [{ name = "pip-audit", specifier = ">=2.9,<3" }]
 
 [[package]]
 name = "py-serializable"

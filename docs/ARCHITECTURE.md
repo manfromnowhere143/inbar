@@ -88,6 +88,30 @@ evidence usefulness from proof-local material. A signed report that differs from
 is rejected. `proof/RESULT.md` and `proof/LEARNING.json` are the only authoritative rendered
 outputs; unauthenticated duplicates are not produced.
 
+Execution attempts use distinct proof roots. A failed attempt is never overwritten or completed
+in place. A retry requires a prospective machine-readable amendment that binds the triggering
+evidence, freezes scientific inputs, enumerates the permitted implementation change, forbids wider
+changes, and sets an exact retry count. Mission validation rejects uncommitted trust inputs,
+modified failure evidence, insecure transport, symbolic-link attempt roots, and unregistered
+attempt identifiers.
+
+An amended attempt also requires a separately selected execution-authority specification. Before
+the proof root is created, the producer exclusively creates, signs, flushes, and directory-syncs a
+single-use consumption receipt. The authority binds every source file, every protocol schema, the
+gate-control execution seal, the lockfile, the validator, and the independent verifier. Proof-local
+copies cannot replace the selected authority because verification compares them byte-for-byte.
+
+The current durability boundary is local Git plus a pinned Ed25519 signer. It blocks concurrent
+local execution and ordinary replay after deleting proof output. It cannot block the same local
+owner from deleting the receipt, rolling back the checkout, or compromising the signing key. An
+external timestamp, append-only transparency log, monotonic hardware counter, or write-once store
+is required before making a stronger anti-rollback claim.
+
+The TLS recovery path binds both the normalized `certifi` distribution version and the SHA-256 of
+the installed CA bundle. Mission validation rebuilds the verified context, confirms certificate and
+hostname enforcement, requires TLS 1.2 or newer, compares the loaded authorities to a separately
+built context, and rejects a byte-modified trust store even when the modified PEM remains parseable.
+
 ## Cloud boundary
 
 The core emits immutable `JobSpec` JSON. A valid spec binds an exact Git SHA, immutable OCI digest,

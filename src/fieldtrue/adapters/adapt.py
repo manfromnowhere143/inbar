@@ -9,6 +9,7 @@ import os
 import re
 import secrets
 import shutil
+import ssl
 import stat
 import tempfile
 import urllib.request
@@ -20,6 +21,7 @@ from pathlib import Path, PurePosixPath
 from typing import Literal, Self, TypeVar
 from urllib.parse import urlsplit
 
+import certifi
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fieldtrue.canonical import (
@@ -60,6 +62,12 @@ _FORBIDDEN_EVIDENCE_MARKERS = (
 _MAX_ARCHIVE_MEMBERS = 1_000
 _MAX_ARCHIVE_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 _MAX_MEMBER_COMPRESSION_RATIO = 1_000
+
+
+def _verified_tls_context() -> ssl.SSLContext:
+    context = ssl.create_default_context(cafile=certifi.where())
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
 
 
 class AdaptResourceLock(BaseModel):
@@ -230,7 +238,9 @@ def _download_resource(resource: AdaptResourceLock, destination: Path) -> Resour
             with (
                 os.fdopen(descriptor, "wb") as output,
                 urllib.request.urlopen(  # noqa: S310
-                    request, timeout=60
+                    request,
+                    timeout=60,
+                    context=_verified_tls_context(),
                 ) as response,
             ):
                 final_url = urlsplit(response.geturl())

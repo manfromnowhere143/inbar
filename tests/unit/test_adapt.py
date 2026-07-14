@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import ssl
 import zipfile
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from fieldtrue.adapters.adapt import (
     _one,
     _parse_adapt_file,
     _safe_extract_zip,
+    _verified_tls_context,
     extract_adapt_text_archive,
     fetch_adapt_dataset,
     ingest_adapt_dataset,
@@ -28,6 +30,13 @@ from fieldtrue.adapters.adapt import (
 from fieldtrue.canonical import sha256_file, sha256_value
 from fieldtrue.domain import EvidenceBundle, TruthRecord
 from tests.helpers import HASH_A, adapt_text, create_adapt_source
+
+
+def test_download_tls_context_requires_certificate_and_hostname_verification() -> None:
+    context = _verified_tls_context()
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+    assert context.minimum_version >= ssl.TLSVersion.TLSv1_2
 
 
 def test_adapt_ingestion_separates_truth_and_binds_every_artifact(tmp_path: Path) -> None:

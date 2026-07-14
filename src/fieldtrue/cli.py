@@ -12,7 +12,7 @@ from fieldtrue.adapters.adapt import (
     fetch_adapt_dataset,
     load_adapt_lock,
 )
-from fieldtrue.experiment import run_iter000
+from fieldtrue.experiment import run_iter000, run_iter000_amendment_001
 from fieldtrue.memory import verify_memory, verify_memory_prefix
 from fieldtrue.mission import validate_mission
 from fieldtrue.receipts import (
@@ -75,7 +75,9 @@ def _parser() -> argparse.ArgumentParser:
     experiment = groups.add_parser("experiment")
     experiment_actions = experiment.add_subparsers(dest="action", required=True)
     experiment_actions.add_parser("iter000")
+    experiment_actions.add_parser("iter000-amendment-001")
     experiment_actions.add_parser("verify-iter000")
+    experiment_actions.add_parser("verify-iter000-amendment-001")
     return parser
 
 
@@ -147,10 +149,29 @@ def main(argv: list[str] | None = None) -> int:
         experiment_report = run_iter000(repo, command=command)
         print(json.dumps(experiment_report.model_dump(mode="json"), indent=2, sort_keys=True))
         return 2 if experiment_report.verdict == "INVALID" else 0
+    if arguments.group == "experiment" and arguments.action == "iter000-amendment-001":
+        command = tuple(
+            ["fieldtrue", "experiment", "iter000-amendment-001"]
+            if argv is None
+            else ["fieldtrue", *argv]
+        )
+        experiment_report = run_iter000_amendment_001(repo, command=command)
+        print(json.dumps(experiment_report.model_dump(mode="json"), indent=2, sort_keys=True))
+        return 2 if experiment_report.verdict == "INVALID" else 0
     if arguments.group == "experiment" and arguments.action == "verify-iter000":
         verification = verify_iter000_proof_bundle(
-            repo / "experiments" / "iter000_nasa_adapt_corpus_readiness" / "proof",
+            repo / "experiments" / "iter000_nasa_adapt_corpus_readiness" / "proof" / "attempt_000",
             signer_anchor_path=(repo / "protocol" / "trust" / "iter000_signer_anchor.json"),
+        )
+        print(json.dumps(verification.model_dump(mode="json"), indent=2, sort_keys=True))
+        return 0
+    if arguments.group == "experiment" and arguments.action == "verify-iter000-amendment-001":
+        verification = verify_iter000_proof_bundle(
+            repo / "experiments" / "iter000_nasa_adapt_corpus_readiness" / "proof" / "attempt_001",
+            signer_anchor_path=(repo / "protocol" / "trust" / "iter000_signer_anchor.json"),
+            authority_specification_path=(
+                repo / "protocol" / "attempt_authorities" / "iter000_001.json"
+            ),
         )
         print(json.dumps(verification.model_dump(mode="json"), indent=2, sort_keys=True))
         return 0

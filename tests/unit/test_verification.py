@@ -4,7 +4,7 @@ import json
 import shutil
 from copy import deepcopy
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
 from nacl.signing import SigningKey
@@ -13,6 +13,7 @@ import fieldtrue.verification as verification_module
 from fieldtrue.adapters.adapt import ingest_adapt_dataset
 from fieldtrue.canonical import (
     canonical_json_pretty,
+    sha256_bytes,
     sha256_file,
     sha256_value,
 )
@@ -22,7 +23,7 @@ from fieldtrue.readiness import (
     invalid_readiness_report,
     render_readiness_result,
 )
-from fieldtrue.receipts import SignedLedger, verify_ledger, write_signer_anchor
+from fieldtrue.receipts import SignedLedger, load_signer_anchor, verify_ledger, write_signer_anchor
 from fieldtrue.verification import (
     ProofBundleVerificationError,
     render_iter000_result_from_proof,
@@ -87,6 +88,15 @@ def _fixture_bundle(
     *,
     flow: FixtureFlow = "normal",
     corrupt_bundle_self_hash: bool = False,
+    protocol_overrides: dict[str, object] | None = None,
+    source_overrides: dict[str, object] | None = None,
+    receipt_overrides: dict[str, object] | None = None,
+    ingested_overrides: dict[str, object] | None = None,
+    result_override: str | None = None,
+    learning_overrides: dict[str, object] | None = None,
+    adjudicated_overrides: dict[str, object] | None = None,
+    bundle_overrides: dict[str, object] | None = None,
+    bundled_artifact_overrides: dict[str, object] | None = None,
     manifest_overrides: dict[str, object] | None = None,
     terminal_overrides: dict[str, object] | None = None,
     report_override: ReadinessReport | None = None,
@@ -102,6 +112,13 @@ def _fixture_bundle(
         anchor_id="iter000-execution-ledger",
         ledger_scope=_ITERATION_ID,
     )
+    repository = Path(__file__).resolve().parents[2]
+    (proof / "AMENDMENT_001.md").write_bytes(
+        (repository / "experiments" / _ITERATION_ID / "AMENDMENT_001.md").read_bytes()
+    )
+    (proof / "amendment_001.json").write_bytes(
+        (repository / "protocol" / "amendments" / "iter000_001.json").read_bytes()
+    )
     raw_root = tmp_path / "source"
     lock, resource_receipts = create_adapt_source(raw_root)
     _write_json(proof / "dataset_lock.json", lock)
@@ -116,9 +133,25 @@ def _fixture_bundle(
     )
     protocol_files = {
         f"experiments/{_ITERATION_ID}/HYPOTHESIS.md": "c" * 64,
+        f"experiments/{_ITERATION_ID}/AMENDMENT_001.md": sha256_file(proof / "AMENDMENT_001.md"),
         "protocol/trust/iter000_signer_anchor.json": sha256_file(anchor_path),
         "protocol/datasets/nasa_adapt_v1.json": dataset_lock_hash,
     }
+    amendment = json.loads((proof / "amendment_001.json").read_text())
+    amendment["amendment_document"]["sha256"] = protocol_files[
+        f"experiments/{_ITERATION_ID}/AMENDMENT_001.md"
+    ]
+    amendment["frozen_inputs"]["hypothesis"]["sha256"] = protocol_files[
+        f"experiments/{_ITERATION_ID}/HYPOTHESIS.md"
+    ]
+    amendment["frozen_inputs"]["dataset_lock"]["sha256"] = dataset_lock_hash
+    amendment["trigger_attempt"]["artifacts"]["signer_anchor"]["sha256"] = sha256_file(anchor_path)
+    _write_json(proof / "amendment_001.json", amendment)
+    protocol_files["protocol/amendments/iter000_001.json"] = sha256_file(
+        proof / "amendment_001.json"
+    )
+    if protocol_overrides:
+        protocol_files.update(protocol_overrides)
     ledger.append(
         run_id=run_id,
         event_type="run-started",
@@ -143,6 +176,8 @@ def _fixture_bundle(
         "network_source_only": True,
         "cost_usd": "0",
     }
+    if source_overrides:
+        sources_payload.update(source_overrides)
     evidence_paths: dict[str, Path]
     if flow == "source-invalid":
         invalidity = {
@@ -218,26 +253,27 @@ def _fixture_bundle(
             tmp_path / "derived",
             resource_receipts,
         )
-        receipt = ingestion.receipt
+        receipt = ingestion.receipt.model_copy(update=receipt_overrides or {})
         (proof / "model_evidence_manifest.jsonl").write_bytes(
             ingestion.evidence_manifest_path.read_bytes()
         )
         (proof / "truth_manifest.jsonl").write_bytes(ingestion.truth_manifest_path.read_bytes())
         (proof / "coverage.json").write_bytes(ingestion.coverage_path.read_bytes())
-        (proof / "ingestion_receipt.json").write_bytes(ingestion.receipt_path.read_bytes())
+        _write_json(proof / "ingestion_receipt.json", receipt)
+        ingested_payload = {
+            "ingestion_receipt_hash": sha256_file(proof / "ingestion_receipt.json"),
+            "coverage_hash": sha256_file(proof / "coverage.json"),
+            "model_evidence_manifest_hash": sha256_file(proof / "model_evidence_manifest.jsonl"),
+            "evidence_manifest_hash": receipt.evidence_manifest_sha256,
+            "truth_manifest_hash": receipt.truth_manifest_sha256,
+            "truth_separation_passed": receipt.truth_separation_passed,
+        }
+        if ingested_overrides:
+            ingested_payload.update(ingested_overrides)
         ledger.append(
             run_id=run_id,
             event_type="dataset-ingested",
-            payload={
-                "ingestion_receipt_hash": sha256_file(proof / "ingestion_receipt.json"),
-                "coverage_hash": sha256_file(proof / "coverage.json"),
-                "model_evidence_manifest_hash": sha256_file(
-                    proof / "model_evidence_manifest.jsonl"
-                ),
-                "evidence_manifest_hash": receipt.evidence_manifest_sha256,
-                "truth_manifest_hash": receipt.truth_manifest_sha256,
-                "truth_separation_passed": receipt.truth_separation_passed,
-            },
+            payload=ingested_payload,
             runtime=runtime,
         )
         report = report_override or audit_adapt_readiness(lock, ingestion)
@@ -249,22 +285,30 @@ def _fixture_bundle(
         }
 
     _write_json(proof / "readiness_report.json", report)
-    (proof / "RESULT.md").write_text(render_readiness_result(report))
-    _write_json(proof / "LEARNING.json", _iteration_learning(report))
+    (proof / "RESULT.md").write_text(result_override or render_readiness_result(report))
+    learning = _iteration_learning(report)
+    if learning_overrides:
+        learning.update(learning_overrides)
+    _write_json(proof / "LEARNING.json", learning)
+    adjudicated_payload = {
+        "verdict": report.verdict,
+        "readiness_report_hash": sha256_file(proof / "readiness_report.json"),
+        "result_hash": sha256_file(proof / "RESULT.md"),
+        "learning_hash": sha256_file(proof / "LEARNING.json"),
+        "gate_statuses": {gate.gate_id: gate.status.value for gate in report.gates},
+    }
+    if adjudicated_overrides:
+        adjudicated_payload.update(adjudicated_overrides)
     ledger.append(
         run_id=run_id,
         event_type="readiness-adjudicated",
-        payload={
-            "verdict": report.verdict,
-            "readiness_report_hash": sha256_file(proof / "readiness_report.json"),
-            "result_hash": sha256_file(proof / "RESULT.md"),
-            "learning_hash": sha256_file(proof / "LEARNING.json"),
-            "gate_statuses": {gate.gate_id: gate.status.value for gate in report.gates},
-        },
+        payload=adjudicated_payload,
         runtime=runtime,
     )
 
     artifact_paths = {
+        "AMENDMENT_001.md": proof / "AMENDMENT_001.md",
+        "amendment_001.json": proof / "amendment_001.json",
         "dataset_lock.json": proof / "dataset_lock.json",
         **evidence_paths,
         "readiness_report.json": proof / "readiness_report.json",
@@ -272,11 +316,16 @@ def _fixture_bundle(
         "LEARNING.json": proof / "LEARNING.json",
     }
     artifact_hashes = {name: sha256_file(path) for name, path in sorted(artifact_paths.items())}
-    artifact_bundle_body = {
+    bundled_artifacts: dict[str, object] = dict(artifact_hashes)
+    if bundled_artifact_overrides:
+        bundled_artifacts.update(bundled_artifact_overrides)
+    artifact_bundle_body: dict[str, object] = {
         "schema_version": "fieldtrue.artifact-bundle.v1",
         "run_id": run_id,
-        "artifacts": artifact_hashes,
+        "artifacts": bundled_artifacts,
     }
+    if bundle_overrides:
+        artifact_bundle_body.update(bundle_overrides)
     artifact_bundle = {
         **artifact_bundle_body,
         "bundle_sha256": (
@@ -344,6 +393,232 @@ def test_normal_bundle_verifies_from_proof_only(tmp_path: Path) -> None:
     assert (proof / "truth_manifest.jsonl").is_file()
 
 
+def test_amended_runtime_must_match_the_external_authority() -> None:
+    runtime = runtime_identity().model_copy(
+        update={
+            "repository_dirty": False,
+            "dirty_state_hash": sha256_bytes(b""),
+            "lockfile_hash": "b" * 64,
+            "command": ("fieldtrue", "experiment", "iter000-amendment-001"),
+        }
+    )
+    authority = {"authorized_command": ["fieldtrue", "experiment", "iter000-amendment-001"]}
+    protocol_hashes = {"uv.lock": "b" * 64}
+    run_id = f"iter000-attempt_001-{runtime.git_commit[:12]}"
+
+    verification_module._verify_authorized_runtime(
+        run_id=run_id,
+        runtime=runtime,
+        authority=authority,
+        protocol_hashes=protocol_hashes,
+    )
+
+    invalid_cases = (
+        ("iter000-fixture", runtime),
+        (run_id, runtime.model_copy(update={"repository_dirty": True})),
+        (run_id, runtime.model_copy(update={"dirty_state_hash": "a" * 64})),
+        (run_id, runtime.model_copy(update={"lockfile_hash": "a" * 64})),
+        (run_id, runtime.model_copy(update={"command": ("fieldtrue", "experiment", "iter000")})),
+    )
+    for candidate_run_id, candidate_runtime in invalid_cases:
+        with pytest.raises(ProofBundleVerificationError):
+            verification_module._verify_authorized_runtime(
+                run_id=candidate_run_id,
+                runtime=candidate_runtime,
+                authority=authority,
+                protocol_hashes=protocol_hashes,
+            )
+
+
+def test_external_attempt_authority_rejects_rebound_contracts(tmp_path: Path) -> None:
+    repository = Path(__file__).resolve().parents[2]
+    source = repository / "protocol" / "attempt_authorities" / "iter000_001.json"
+    anchor_path = repository / "protocol" / "trust" / "iter000_signer_anchor.json"
+    anchor = load_signer_anchor(anchor_path)
+    anchor_data = anchor_path.read_bytes()
+    original = json.loads(source.read_text())
+    candidate_path = tmp_path / "authority.json"
+
+    candidate_path.write_bytes(source.read_bytes())
+    _, authority_data, protocol_hashes = verification_module._trusted_attempt_authority(
+        candidate_path,
+        anchor=anchor,
+        anchor_data=anchor_data,
+    )
+    assert authority_data == source.read_bytes()
+    assert protocol_hashes[verification_module._ANCHOR_PROTOCOL_PATH] == sha256_bytes(anchor_data)
+
+    mutations = (
+        (("authority_id",), "iter000_002", "wrong identity or command"),
+        (("amendment", "binding"), "mutable", "wrong amendment binding"),
+        (("signer_anchor", "signer_public_key"), "a" * 64, "selected signer"),
+        (("consumption", "maximum_consumptions"), 2, "one fail-closed consumption"),
+        (("runtime_constraints", "tls", "trust_store_version"), "other", "TLS runtime"),
+        (("trust_model", "external_timestamp"), True, "local trust boundary"),
+    )
+    for keys, replacement, message in mutations:
+        candidate = deepcopy(original)
+        target = candidate
+        for key in keys[:-1]:
+            target = target[key]
+        target[keys[-1]] = replacement
+        _write_json(candidate_path, candidate)
+        with pytest.raises(ProofBundleVerificationError, match=message):
+            verification_module._trusted_attempt_authority(
+                candidate_path,
+                anchor=anchor,
+                anchor_data=anchor_data,
+            )
+
+    candidate = deepcopy(original)
+    candidate["protocol_hashes"].pop("src/fieldtrue/splits.py")
+    _write_json(candidate_path, candidate)
+    with pytest.raises(ProofBundleVerificationError, match="omits a mandatory protocol file"):
+        verification_module._trusted_attempt_authority(
+            candidate_path,
+            anchor=anchor,
+            anchor_data=anchor_data,
+        )
+
+    candidate = deepcopy(original)
+    candidate["protocol_hashes"][verification_module._ANCHOR_PROTOCOL_PATH] = "0" * 64
+    _write_json(candidate_path, candidate)
+    with pytest.raises(ProofBundleVerificationError, match="signer-anchor hash differs"):
+        verification_module._trusted_attempt_authority(
+            candidate_path,
+            anchor=anchor,
+            anchor_data=anchor_data,
+        )
+
+
+def test_authority_consumption_rejects_resigned_semantic_tampering(tmp_path: Path) -> None:
+    proof = tmp_path / "proof"
+    proof.mkdir()
+    key = SigningKey.generate()
+    anchor_path = tmp_path / "anchor.json"
+    write_signer_anchor(
+        anchor_path,
+        key,
+        anchor_id="iter000-execution-ledger",
+        ledger_scope=_ITERATION_ID,
+    )
+    anchor = load_signer_anchor(anchor_path)
+    anchor_data = anchor_path.read_bytes()
+    authority_data = canonical_json_pretty({"authority_id": "iter000_001"})
+    authority = {"runtime_constraints": {"tls": verification_module._ATTEMPT_001_TLS_CONSTRAINTS}}
+    protocol_hashes = {verification_module._AMENDMENT_CONTRACT_PATH: "a" * 64}
+    runtime = runtime_identity().model_copy(
+        update={"command": ("fieldtrue", "experiment", "iter000-amendment-001")}
+    )
+    run_id = f"iter000-attempt_001-{runtime.git_commit[:12]}"
+    body = {
+        "schema_version": "fieldtrue.attempt-authority-consumption.v1",
+        "authority_id": "iter000_001",
+        "iteration_id": _ITERATION_ID,
+        "attempt_id": "attempt_001",
+        "run_id": run_id,
+        "consumed_at": "2026-07-14T12:00:00+00:00",
+        "authority_specification": {
+            "path": verification_module._AUTHORITY_PROTOCOL_PATH,
+            "sha256": sha256_bytes(authority_data),
+        },
+        "amendment": {
+            "amendment_id": "iter000_001",
+            "path": verification_module._AMENDMENT_CONTRACT_PATH,
+            "sha256": protocol_hashes[verification_module._AMENDMENT_CONTRACT_PATH],
+        },
+        "signer_anchor": {
+            "path": verification_module._ANCHOR_PROTOCOL_PATH,
+            "sha256": sha256_bytes(anchor_data),
+        },
+        "runtime": runtime.model_dump(mode="json"),
+        "tls_runtime": verification_module._ATTEMPT_001_TLS_CONSTRAINTS,
+        "signer_public_key": anchor.signer_public_key,
+        "trust_level": "local_ed25519_no_external_timestamp",
+        "same_local_owner_can_delete_or_rollback_local_state": True,
+    }
+    receipt_hash = sha256_value(body)
+    original = {
+        **body,
+        "receipt_hash": receipt_hash,
+        "signature": key.sign(bytes.fromhex(receipt_hash)).signature.hex(),
+    }
+    receipt_path = proof / verification_module._AUTHORITY_CONSUMPTION_ARTIFACT
+    _write_json(receipt_path, original)
+    assert verification_module._verify_authority_consumption(
+        proof,
+        authority=authority,
+        authority_data=authority_data,
+        protocol_hashes=protocol_hashes,
+        anchor=anchor,
+        anchor_data=anchor_data,
+        run_id=run_id,
+        runtime=runtime,
+        signed_receipt_hash=receipt_hash,
+    ) == sha256_file(receipt_path)
+
+    semantic_mutations = (
+        (("consumed_at",), 7, "RFC 3339 string"),
+        (("consumed_at",), "not-a-time", "time is invalid"),
+        (("consumed_at",), "2026-07-14T12:00:00", "timezone-aware"),
+        (("run_id",), "iter000-attempt_001-other", "identity is inconsistent"),
+        (("authority_specification", "sha256"), "0" * 64, "trusted authority"),
+        (("amendment", "sha256"), "0" * 64, "bind Amendment 001"),
+        (("signer_anchor", "sha256"), "0" * 64, "selected signer anchor"),
+        (("tls_runtime", "trust_store_version"), "other", "TLS runtime differs"),
+        (
+            ("runtime",),
+            runtime.model_copy(update={"command": ("other",)}).model_dump(mode="json"),
+            "runtime differs",
+        ),
+    )
+    for keys, replacement, message in semantic_mutations:
+        candidate = deepcopy(original)
+        target = candidate
+        for field in keys[:-1]:
+            target = target[field]
+        target[keys[-1]] = replacement
+        candidate_body = dict(candidate)
+        candidate_body.pop("receipt_hash")
+        candidate_body.pop("signature")
+        candidate_hash = sha256_value(candidate_body)
+        candidate["receipt_hash"] = candidate_hash
+        candidate["signature"] = key.sign(bytes.fromhex(candidate_hash)).signature.hex()
+        _write_json(receipt_path, candidate)
+        with pytest.raises(ProofBundleVerificationError, match=message):
+            verification_module._verify_authority_consumption(
+                proof,
+                authority=authority,
+                authority_data=authority_data,
+                protocol_hashes=protocol_hashes,
+                anchor=anchor,
+                anchor_data=anchor_data,
+                run_id=run_id,
+                runtime=runtime,
+                signed_receipt_hash=candidate_hash,
+            )
+
+    malformed_signature_cases = (
+        ({**original, "signature": 7}, "signature must be hexadecimal"),
+        ({**original, "receipt_hash": "0" * 64}, "receipt hash mismatch"),
+        ({**original, "signature": "not-hex"}, "signature is invalid"),
+    )
+    for candidate, message in malformed_signature_cases:
+        _write_json(receipt_path, candidate)
+        with pytest.raises(ProofBundleVerificationError, match=message):
+            verification_module._verify_authority_consumption(
+                proof,
+                authority=authority,
+                authority_data=authority_data,
+                protocol_hashes=protocol_hashes,
+                anchor=anchor,
+                anchor_data=anchor_data,
+                run_id=run_id,
+                runtime=runtime,
+                signed_receipt_hash=str(candidate["receipt_hash"]),
+            )
+
+
 def test_signed_scientifically_impossible_pass_is_rejected(tmp_path: Path) -> None:
     proof, anchor, _ = _fixture_bundle(
         tmp_path,
@@ -387,6 +662,121 @@ def test_manifest_and_artifact_bundle_self_hashes_are_checked(tmp_path: Path) ->
     proof, anchor, _ = _fixture_bundle(tmp_path / "bundle-case", corrupt_bundle_self_hash=True)
     with pytest.raises(ProofBundleVerificationError, match="artifact bundle content hash"):
         verify_iter000_proof_bundle(proof, signer_anchor_path=anchor)
+
+
+def test_verifier_rejects_cross_layer_commitment_rebinding(tmp_path: Path) -> None:
+    def rejected(case: str, message: str, **fixture_options: Any) -> None:
+        proof, anchor, _ = _fixture_bundle(tmp_path / case, **fixture_options)
+        with pytest.raises(ProofBundleVerificationError, match=message):
+            verify_iter000_proof_bundle(proof, signer_anchor_path=anchor)
+
+    rejected(
+        "bundle-schema",
+        "unsupported artifact bundle schema",
+        bundle_overrides={"schema_version": "unsupported"},
+    )
+    rejected(
+        "bundle-run",
+        "artifact bundle run_id differs",
+        bundle_overrides={"run_id": "other-run"},
+    )
+    rejected(
+        "bundle-artifact",
+        "artifact bundle hash mismatch",
+        bundled_artifact_overrides={"RESULT.md": "0" * 64},
+    )
+    rejected(
+        "terminal-bundle",
+        "signed terminal event does not commit",
+        terminal_overrides={"artifact_bundle_hash": "0" * 64},
+    )
+
+    report = _normal_report()
+    reordered = report.model_copy(
+        update={"gates": (report.gates[1], report.gates[0], *report.gates[2:])}
+    )
+    rejected(
+        "gate-sequence",
+        "frozen iter000 gate sequence",
+        report_override=reordered,
+    )
+    rejected(
+        "derived-verdict",
+        "verdict does not follow",
+        report_override=ReadinessReport.model_validate(
+            {**report.model_dump(mode="json"), "verdict": "PASS"}
+        ),
+    )
+    rejected(
+        "result-render",
+        "RESULT.md is not reproducible",
+        result_override="counterfeit result\n",
+    )
+    rejected(
+        "learning",
+        "iteration learning is inconsistent",
+        learning_overrides={"engine_construction_authorized": True},
+    )
+    rejected(
+        "dataset-binding",
+        "dataset lock differs",
+        protocol_overrides={verification_module._DATASET_PROTOCOL_PATH: "0" * 64},
+    )
+    rejected(
+        "amendment-document-binding",
+        "Amendment 001 document differs",
+        protocol_overrides={verification_module._AMENDMENT_DOCUMENT_PATH: "0" * 64},
+    )
+    rejected(
+        "amendment-contract-binding",
+        "Amendment 001 contract differs",
+        protocol_overrides={verification_module._AMENDMENT_CONTRACT_PATH: "0" * 64},
+    )
+    rejected(
+        "source-dataset",
+        "dataset identity differs",
+        source_overrides={"dataset_id": "other-dataset"},
+    )
+    rejected(
+        "source-resources",
+        "source ledger resources differ",
+        source_overrides={"resources": []},
+    )
+    rejected(
+        "receipt-coverage",
+        "does not commit to proof/coverage",
+        receipt_overrides={"coverage_report_sha256": "0" * 64},
+    )
+    rejected(
+        "receipt-evidence",
+        "does not commit to the model evidence manifest",
+        receipt_overrides={"evidence_manifest_sha256": "0" * 64},
+    )
+    rejected(
+        "receipt-truth",
+        "does not commit to the proof-local truth manifest",
+        receipt_overrides={"truth_manifest_sha256": "0" * 64},
+    )
+    rejected(
+        "ingestion-event",
+        "signed ingestion event differs",
+        ingested_overrides={"coverage_hash": "0" * 64},
+    )
+    rejected(
+        "adjudication-event",
+        "signed readiness adjudication differs",
+        adjudicated_overrides={"verdict": "PASS"},
+    )
+    rejected(
+        "terminal-verdict",
+        "signed terminal verdict differs",
+        terminal_overrides={"verdict": "PASS"},
+    )
+    rejected(
+        "manifest-verdict",
+        "run manifest verdict differs",
+        manifest_overrides={"verdict": "PASS"},
+    )
 
 
 def test_unsigned_full_verdict_rewrite_fails_signed_manifest_commitment(
@@ -575,7 +965,7 @@ def test_signed_protocol_guards_reject_scope_and_authority_changes(tmp_path: Pat
 def test_signed_source_guards_reject_unfrozen_or_paid_inputs(tmp_path: Path) -> None:
     proof, anchor, _ = _fixture_bundle(tmp_path)
     events = verification_module._parse_events((proof / "execution_ledger.jsonl").read_bytes())
-    protocol_files = verification_module._verify_started(events[0], anchor.read_bytes())
+    protocol_files, _ = verification_module._verify_started(events[0], anchor.read_bytes())
     source = events[1]
 
     payload = deepcopy(source.payload)
@@ -604,7 +994,9 @@ def test_invalidity_adjudicator_rejects_semantic_rewrites(tmp_path: Path) -> Non
     proof, anchor, _ = _fixture_bundle(tmp_path, flow="source-invalid")
     events_list = verification_module._parse_events((proof / "execution_ledger.jsonl").read_bytes())
     events = {event.event_type: event for event in events_list}
-    protocol_files = verification_module._verify_started(events["run-started"], anchor.read_bytes())
+    protocol_files, _ = verification_module._verify_started(
+        events["run-started"], anchor.read_bytes()
+    )
     report = ReadinessReport.model_validate_json((proof / "readiness_report.json").read_bytes())
     invalidity_path = proof / "invalidity.json"
     original = json.loads(invalidity_path.read_text())

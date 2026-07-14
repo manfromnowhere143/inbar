@@ -23,6 +23,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
+  "certifi>=2026.6.17,<2027",
   "networkx>=3.4,<4",
   "numpy>=2.0,<3",
   "pydantic>=2.10,<3",

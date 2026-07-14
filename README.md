@@ -23,6 +23,17 @@ The repository is at corpus qualification. Iteration 000 is a preregistered read
 over the public NASA ADAPT corpus. It is not a model benchmark. No diagnosis, recovery, safety,
 transfer, product-readiness, state-of-the-art, or economic-value claim is authorized.
 
+Attempt 000 stopped before accepting source data when the Python runtime could not validate its
+local certificate-authority path. Its signed ledger records only `run-started` and `run-failed`;
+it produced no scientific verdict. Amendment 001 preserves that evidence and authorizes one
+isolated retry with a verified `certifi` trust store. It changes no scientific input or gate.
+
+The retry authority is consumed before attempt output is created. A signed, synchronized receipt
+survives ordinary proof deletion, and the execution binds the exact amendment, signer, lockfile,
+installed CA bundle, source tree, schemas, validator, verifier, and gate-control seal. This is a
+local Git and Ed25519 trust boundary. It does not claim external timestamping, write-once storage,
+or protection against the same local owner deleting or rolling back local state.
+
 The expected result is useful even if blocked: it determines whether the corpus can support the
 central experiment before model training or cloud spend begins.
 
@@ -68,10 +79,13 @@ uv run fieldtrue mission validate
 Third-party dataset bytes are not committed. The frozen iteration hypothesis defines acquisition,
 stop rules, verdict classes, expected proof artifacts, and forbidden claims.
 
-The iteration proof contains the exact dataset lock, ingestion receipt, coverage report,
-model-visible manifest, separately sealed truth manifest, machine-readable readiness report, and
-one authoritative human-readable result. Verification fails when the reported gates differ from
-proof-local recomputation, even when every producer artifact and ledger event is validly signed.
+Each execution has an immutable attempt-specific proof root. The completed iteration proof contains
+the exact amendment, dataset lock, ingestion receipt, coverage report, model-visible manifest,
+separately sealed truth manifest, machine-readable readiness report, and one authoritative
+human-readable result. The verifier requires the separately selected attempt authority and rejects
+self-consistent proof-local replacements. Verification also fails when the reported gates differ
+from proof-local recomputation, even when every producer artifact and ledger event is validly
+signed.
 
 ## Repository map
 

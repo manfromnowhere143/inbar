@@ -6,21 +6,32 @@ import ast
 import json
 import re
 import shutil
+import ssl
 import subprocess
 import sys
+import tomllib
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as distribution_version
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
 
+import certifi
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 from pydantic import BaseModel, ConfigDict
 
+from fieldtrue.adapters import adapt as adapt_adapter
 from fieldtrue.adapters.adapt import load_adapt_lock
-from fieldtrue.canonical import canonical_json_pretty, sha256_bytes, sha256_value
+from fieldtrue.canonical import canonical_json, canonical_json_pretty, sha256_bytes, sha256_value
 from fieldtrue.domain import ClaimRecord
 from fieldtrue.memory import load_memory_records, verify_memory
-from fieldtrue.receipts import load_signer_anchor
+from fieldtrue.receipts import (
+    LedgerEvent,
+    LedgerVerificationError,
+    load_signer_anchor,
+    verify_ledger,
+)
 from fieldtrue.schemas import verify_schemas
 
 _GIT_OBJECT_ID_PATTERN = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -43,6 +54,109 @@ _ITER000_GATE_FAILURE_CLASSES = {
 }
 _PUBLICATION_ANCHOR_ID = "publication-transition"
 _PUBLICATION_LEDGER_SCOPE = "publication-gates"
+_ITER000_ID = "iter000_nasa_adapt_corpus_readiness"
+_AMENDMENT_001_PATH = "protocol/amendments/iter000_001.json"
+_AMENDMENT_001_DOCUMENT_PATH = f"experiments/{_ITER000_ID}/AMENDMENT_001.md"
+_ATTEMPT_000_PROOF_PATH = f"experiments/{_ITER000_ID}/proof/attempt_000"
+_ATTEMPT_000_LEDGER_PATH = f"{_ATTEMPT_000_PROOF_PATH}/execution_ledger.jsonl"
+_ATTEMPT_000_HEAD_PATH = f"{_ATTEMPT_000_PROOF_PATH}/execution_ledger.head.json"
+_ITER000_ANCHOR_PATH = "protocol/trust/iter000_signer_anchor.json"
+_ITER000_DATASET_PATH = "protocol/datasets/nasa_adapt_v1.json"
+_ITER000_GATE_CONTROL_PATH = "protocol/gate_controls/v1.json"
+_ITER000_HYPOTHESIS_PATH = f"experiments/{_ITER000_ID}/HYPOTHESIS.md"
+_ITER000_ATTEMPT_001_AUTHORITY_PATH = "protocol/attempt_authorities/iter000_001.json"
+_ITER000_ATTEMPT_001_RECEIPT_PATH = (
+    f"experiments/{_ITER000_ID}/authority/attempt_001_consumption.json"
+)
+_ITER000_TRIGGER_COMMIT = "2fb078a1cac5f76f251ab49e0368ae0ea3e8da2e"
+_ITER000_ATTEMPT_000_HEAD = "acf079ecb5b989d3b5615d01bed4141fbd1d9c95436baabc65cfff707ff914d9"
+_ITER000_ATTEMPT_000_RUN_ID = "iter000-2fb078a1cac5"
+_ITER000_ATTEMPT_000_FAILURE = (
+    "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+    "unable to get local issuer certificate (_ssl.c:1000)>"
+)
+_ITER000_CERTIFI_VERSION = "2026.6.17"
+_ITER000_CA_BUNDLE_SHA256 = "bbc7e9c01d7551bb8a159b5dedd989b8ee3ce105aff522b68eb1b01bf854cab0"
+_ITER000_TLS_CONSTRAINTS: dict[str, object] = {
+    "bypass_forbidden": True,
+    "ca_bundle_sha256": _ITER000_CA_BUNDLE_SHA256,
+    "certificate_verification": "required",
+    "hostname_verification": "required",
+    "minimum_tls_version": "TLSv1.2",
+    "trust_store": "certifi",
+    "trust_store_version": _ITER000_CERTIFI_VERSION,
+}
+_ITER000_FROZEN_HASHES = {
+    _ATTEMPT_000_LEDGER_PATH: "c84327a7c15e48e7169711b7b84aa7167fa170ab3b735993b3ff5b224d7e5982",
+    _ATTEMPT_000_HEAD_PATH: "332878b131ab2c5a0c024854f0a43a552c0f8b0a36330d18a0b3b405b89bfa07",
+    _ITER000_ANCHOR_PATH: "7174bedb14de9f6cc7bd178a2b70a71f75baa04d1291004dbfaa6304fb701022",
+    _ITER000_DATASET_PATH: "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+    _ITER000_HYPOTHESIS_PATH: "b5f18e02b54a137aa966ce70a3f89f2616167992cc2583508f2b3b0403d205d5",
+}
+_ITER000_ATTEMPT_001_PROTOCOL_PATHS = frozenset(
+    {
+        "PREREGISTRATION.md",
+        "claims/registry.jsonl",
+        _AMENDMENT_001_DOCUMENT_PATH,
+        _ITER000_HYPOTHESIS_PATH,
+        "mission/contract.json",
+        "mission/loop.json",
+        "mission/name.json",
+        _AMENDMENT_001_PATH,
+        "protocol/baselines/v1.json",
+        _ITER000_DATASET_PATH,
+        _ITER000_GATE_CONTROL_PATH,
+        _ITER000_ANCHOR_PATH,
+        "pyproject.toml",
+        "src/fieldtrue/__init__.py",
+        "src/fieldtrue/adapters/__init__.py",
+        "src/fieldtrue/adapters/adapt.py",
+        "src/fieldtrue/adapters/local_replay.py",
+        "src/fieldtrue/approvals.py",
+        "src/fieldtrue/canonical.py",
+        "src/fieldtrue/cli.py",
+        "src/fieldtrue/diagnosis.py",
+        "src/fieldtrue/domain.py",
+        "src/fieldtrue/experiment.py",
+        "src/fieldtrue/memory.py",
+        "src/fieldtrue/mission.py",
+        "src/fieldtrue/planning.py",
+        "src/fieldtrue/ports.py",
+        "src/fieldtrue/py.typed",
+        "src/fieldtrue/readiness.py",
+        "src/fieldtrue/receipts.py",
+        "src/fieldtrue/runtime.py",
+        "src/fieldtrue/schemas.py",
+        "src/fieldtrue/splits.py",
+        "src/fieldtrue/verification.py",
+        "uv.lock",
+    }
+)
+# These administrative files may differ from the trigger, but the authority manifest still
+# binds their exact HEAD bytes. This avoids self-hashing mission policy in source constants.
+_ITER000_ATTEMPT_001_RECOVERY_PATHS = frozenset(
+    {
+        _AMENDMENT_001_DOCUMENT_PATH,
+        _AMENDMENT_001_PATH,
+        _ITER000_GATE_CONTROL_PATH,
+        "pyproject.toml",
+        "src/fieldtrue/cli.py",
+        "src/fieldtrue/mission.py",
+        "src/fieldtrue/verification.py",
+        "uv.lock",
+    }
+)
+_ITER000_ATTEMPT_001_AUTHORIZED_SOURCE_HASHES = {
+    "src/fieldtrue/adapters/adapt.py": (
+        "586d44ad6fa45cca45dfd70bb9ae6f6c4a21e9eab47873ba5e6809c5e2a1dcfc",
+        "ccb0865cf045373216b072ae6f9705edb4013992e19cb54903d8e13df1c1587e",
+    ),
+    "src/fieldtrue/experiment.py": (
+        "25dea0b8dbc521f892fc20bc06e177cf00987dc90acb1e587d97dc245b00f506",
+        "a2f05e5dbeeb5a57d99696761b449757a2a2573dcbb91cb670ee39303804bb1f",
+    ),
+}
+_ITER000_SIGNER_PUBLIC_KEY = "0d5d5313b054a05978811e3f56195d4e806b50924af05cb9c811dca8c1767646"
 _GATE_CONTROL_SEALED_PATHS = (
     "src/fieldtrue/adapters/adapt.py",
     "src/fieldtrue/domain.py",
@@ -458,6 +572,631 @@ def _git_is_ancestor(repo_root: Path, git: str, ancestor: str, descendant: str) 
     return result.returncode == 0
 
 
+def _expected_iteration_amendment_001(document_sha256: str) -> dict[str, Any]:
+    return {
+        "amendment_document": {
+            "path": _AMENDMENT_001_DOCUMENT_PATH,
+            "sha256": document_sha256,
+        },
+        "amendment_id": "iter000_001",
+        "frozen_inputs": {
+            "dataset_lock": {
+                "path": _ITER000_DATASET_PATH,
+                "sha256": _ITER000_FROZEN_HASHES[_ITER000_DATASET_PATH],
+            },
+            "hypothesis": {
+                "path": _ITER000_HYPOTHESIS_PATH,
+                "sha256": _ITER000_FROZEN_HASHES[_ITER000_HYPOTHESIS_PATH],
+            },
+        },
+        "iteration_id": _ITER000_ID,
+        "retry_authorization": {
+            "authorized_changes": {
+                "administrative_controls": [
+                    "attempt_output_isolation",
+                    "amendment_artifact_binding",
+                    "cli_attempt_routing",
+                    "verifier_attempt_routing",
+                    "signed_single_use_authority_consumption",
+                    "gate_control_seal_regeneration",
+                ],
+                "infrastructure": "python_tls_trust_store",
+                "scientific": "none",
+            },
+            "attempt_id": "attempt_001",
+            "forbidden_changes": [
+                "dataset",
+                "hypothesis",
+                "selection_rules",
+                "gate_thresholds",
+                "scientific_claims",
+            ],
+            "maximum_additional_attempts": 1,
+            "tls": _ITER000_TLS_CONSTRAINTS,
+        },
+        "schema_version": "fieldtrue.iter000-amendment.v1",
+        "status": "authorized",
+        "trigger_attempt": {
+            "artifacts": {
+                "ledger": {
+                    "path": _ATTEMPT_000_LEDGER_PATH,
+                    "sha256": _ITER000_FROZEN_HASHES[_ATTEMPT_000_LEDGER_PATH],
+                },
+                "ledger_head": {
+                    "path": _ATTEMPT_000_HEAD_PATH,
+                    "sha256": _ITER000_FROZEN_HASHES[_ATTEMPT_000_HEAD_PATH],
+                },
+                "signer_anchor": {
+                    "path": _ITER000_ANCHOR_PATH,
+                    "sha256": _ITER000_FROZEN_HASHES[_ITER000_ANCHOR_PATH],
+                },
+            },
+            "attempt_id": "attempt_000",
+            "expected_event_types": ["run-started", "run-failed"],
+            "expected_head_hash": _ITER000_ATTEMPT_000_HEAD,
+            "expected_run_id": _ITER000_ATTEMPT_000_RUN_ID,
+            "failure": {
+                "error_type": "URLError",
+                "message": _ITER000_ATTEMPT_000_FAILURE,
+            },
+            "scientific_effect": {
+                "accepted_data": False,
+                "result_artifact": False,
+                "scientific_verdict": False,
+            },
+            "triggering_git_commit": _ITER000_TRIGGER_COMMIT,
+        },
+    }
+
+
+def _qualified_ast_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = _qualified_ast_name(node.value)
+        return f"{prefix}.{node.attr}" if prefix is not None else None
+    return None
+
+
+def _adapt_tls_source_is_verified(path: Path) -> bool:
+    try:
+        module = ast.parse(path.read_text(encoding="utf-8"), filename=path.as_posix())
+    except (OSError, SyntaxError, UnicodeError):
+        return False
+    functions = {
+        node.name: node
+        for node in module.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    context_function = functions.get("_verified_tls_context")
+    download_function = functions.get("_download_resource")
+    if context_function is None or download_function is None:
+        return False
+
+    context_calls = [
+        node
+        for node in ast.walk(context_function)
+        if isinstance(node, ast.Call)
+        and _qualified_ast_name(node.func) == "ssl.create_default_context"
+    ]
+    certifi_context = False
+    for call in context_calls:
+        cafile = next((item.value for item in call.keywords if item.arg == "cafile"), None)
+        if (
+            isinstance(cafile, ast.Call)
+            and not cafile.args
+            and not cafile.keywords
+            and _qualified_ast_name(cafile.func) == "certifi.where"
+        ):
+            certifi_context = True
+    urlopen_calls = [
+        node
+        for node in ast.walk(download_function)
+        if isinstance(node, ast.Call) and _qualified_ast_name(node.func) == "urllib.request.urlopen"
+    ]
+    verified_download = False
+    if len(urlopen_calls) == 1:
+        context = next(
+            (item.value for item in urlopen_calls[0].keywords if item.arg == "context"),
+            None,
+        )
+        verified_download = (
+            isinstance(context, ast.Call)
+            and not context.args
+            and not context.keywords
+            and _qualified_ast_name(context.func) == "_verified_tls_context"
+        )
+
+    forbidden_names = {
+        "CERT_NONE",
+        "PYTHONHTTPSVERIFY",
+        "_create_unverified_context",
+        "create_unverified_context",
+    }
+    forbidden_literals = {
+        "--insecure",
+        "PYTHONHTTPSVERIFY",
+    }
+    bypass_present = any(
+        (
+            isinstance(node, (ast.Name, ast.Attribute))
+            and (_qualified_ast_name(node) or "").split(".")[-1] in forbidden_names
+        )
+        or (isinstance(node, ast.Constant) and node.value in forbidden_literals)
+        or (
+            isinstance(node, ast.keyword)
+            and node.arg in {"verify", "check_hostname"}
+            and isinstance(node.value, ast.Constant)
+            and node.value.value is False
+        )
+        or (
+            isinstance(node, (ast.Assign, ast.AnnAssign))
+            and isinstance(node.value, ast.Constant)
+            and node.value.value is False
+            and any(
+                isinstance(target, ast.Attribute) and target.attr == "check_hostname"
+                for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+            )
+        )
+        for node in ast.walk(module)
+    )
+    return certifi_context and verified_download and not bypass_present
+
+
+def _verified_tls_runtime_active() -> bool:
+    try:
+        certifi_path = Path(certifi.where())
+        if certifi_path.is_symlink() or not certifi_path.is_file():
+            return False
+        certifi_bundle_hash = sha256_bytes(certifi_path.read_bytes())
+        actual = adapt_adapter._verified_tls_context()
+        expected = ssl.create_default_context(cafile=certifi.where())
+        actual_authorities = {
+            sha256_bytes(certificate) for certificate in actual.get_ca_certs(binary_form=True)
+        }
+        expected_authorities = {
+            sha256_bytes(certificate) for certificate in expected.get_ca_certs(binary_form=True)
+        }
+    except (OSError, PackageNotFoundError, ValueError, ssl.SSLError):
+        return False
+    return (
+        distribution_version("certifi") == _ITER000_CERTIFI_VERSION
+        and certifi_bundle_hash == _ITER000_CA_BUNDLE_SHA256
+        and isinstance(actual, ssl.SSLContext)
+        and actual.verify_mode == ssl.CERT_REQUIRED
+        and actual.check_hostname is True
+        and actual.minimum_version >= ssl.TLSVersion.TLSv1_2
+        and bool(actual_authorities)
+        and actual_authorities == expected_authorities
+    )
+
+
+def _certifi_dependency_is_locked(repo_root: Path) -> bool:
+    try:
+        project = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+        lock = tomllib.loads((repo_root / "uv.lock").read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return False
+    dependencies = project.get("project", {}).get("dependencies", [])
+    packages = lock.get("package", [])
+    fieldtrue_package = next(
+        (
+            package
+            for package in packages
+            if isinstance(package, dict) and package.get("name") == "fieldtrue"
+        ),
+        None,
+    )
+    locked_dependencies = (
+        fieldtrue_package.get("dependencies", []) if isinstance(fieldtrue_package, dict) else []
+    )
+    certifi_package = next(
+        (
+            package
+            for package in packages
+            if isinstance(package, dict) and package.get("name") == "certifi"
+        ),
+        None,
+    )
+    return (
+        "certifi>=2026.6.17,<2027" in dependencies
+        and isinstance(certifi_package, dict)
+        and certifi_package.get("version") == _ITER000_CERTIFI_VERSION
+        and any(
+            isinstance(dependency, dict) and dependency.get("name") == "certifi"
+            for dependency in locked_dependencies
+        )
+    )
+
+
+def _git_tree_paths(repo_root: Path, git: str, commit: str, prefix: str) -> set[str] | None:
+    result = subprocess.run(  # noqa: S603 - fixed Git operation and validated commit
+        [git, "ls-tree", "-r", "-z", "--name-only", commit, "--", f":(literal){prefix}"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return None
+    paths: set[str] = set()
+    for encoded in result.stdout.split(b"\0"):
+        if not encoded:
+            continue
+        try:
+            relative = encoded.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+        if _safe_relative_path(relative) is None or not relative.startswith(f"{prefix}/"):
+            return None
+        paths.add(relative)
+    return paths
+
+
+def _working_source_paths(repo_root: Path) -> set[str] | None:
+    source_root = repo_root / "src" / "fieldtrue"
+    if source_root.is_symlink() or not source_root.is_dir():
+        return None
+    paths: set[str] = set()
+    try:
+        candidates = tuple(source_root.rglob("*"))
+    except OSError:
+        return None
+    for candidate in candidates:
+        relative = candidate.relative_to(repo_root)
+        if "__pycache__" in relative.parts:
+            if candidate.is_symlink() or (candidate.is_file() and candidate.suffix != ".pyc"):
+                return None
+            continue
+        if candidate.is_symlink():
+            return None
+        if candidate.is_file():
+            paths.add(relative.as_posix())
+        elif not candidate.is_dir():
+            return None
+    return paths
+
+
+def _expected_attempt_001_authority() -> dict[str, Any]:
+    return {
+        "amendment": {
+            "binding": "sha256_at_consumption",
+            "path": _AMENDMENT_001_PATH,
+        },
+        "attempt_id": "attempt_001",
+        "authority_id": "iter000_001",
+        "authorized_command": ["fieldtrue", "experiment", "iter000-amendment-001"],
+        "consumption": {
+            "creation_timing": "before_attempt_output_creation",
+            "failure_mode": "fail_closed",
+            "maximum_consumptions": 1,
+            "proof_deletion_restores_authority": False,
+            "receipt_path": _ITER000_ATTEMPT_001_RECEIPT_PATH,
+            "receipt_presence_consumes_authority": True,
+        },
+        "iteration_id": _ITER000_ID,
+        "protocol_hashes": None,
+        "runtime_constraints": {"tls": _ITER000_TLS_CONSTRAINTS},
+        "schema_version": "fieldtrue.attempt-authority.v1",
+        "signer_anchor": {
+            "binding": "sha256_at_consumption",
+            "path": _ITER000_ANCHOR_PATH,
+            "signer_public_key": _ITER000_SIGNER_PUBLIC_KEY,
+        },
+        "trust_model": {
+            "blocks": [
+                "ordinary_attempt_output_deletion",
+                "concurrent_local_replay",
+            ],
+            "does_not_block": [
+                "same_local_owner_deletes_receipt",
+                "same_local_owner_rolls_back_repository",
+                "signing_key_compromise",
+            ],
+            "external_timestamp": False,
+            "signature": "git_pinned_local_ed25519",
+        },
+    }
+
+
+def _verify_attempt_001_scientific_surface(
+    repo_root: Path,
+    *,
+    git: str,
+    head: str,
+) -> tuple[bool, str]:
+    authority_path = repo_root / _ITER000_ATTEMPT_001_AUTHORITY_PATH
+    try:
+        authority = _json(authority_path)
+        authority_bytes = authority_path.read_bytes()
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        return False, f"Attempt 001 authority is unreadable: {type(error).__name__}."
+    if authority_path.is_symlink() or not authority_path.is_file():
+        return False, "Attempt 001 authority must be a regular file."
+    if canonical_json_pretty(authority) != authority_bytes:
+        return False, "Attempt 001 authority must use canonical JSON."
+
+    protocol_hashes = authority.get("protocol_hashes")
+    normalized = dict(authority)
+    normalized["protocol_hashes"] = None
+    if normalized != _expected_attempt_001_authority() or not isinstance(protocol_hashes, dict):
+        return False, "Attempt 001 authority core or single-use receipt policy differs."
+
+    trigger_schema_paths = _git_tree_paths(
+        repo_root, git, _ITER000_TRIGGER_COMMIT, "protocol/schemas"
+    )
+    if trigger_schema_paths is None or not trigger_schema_paths:
+        return False, "Attempt 001 cannot resolve the triggering schema surface."
+    expected_protocol_paths = _ITER000_ATTEMPT_001_PROTOCOL_PATHS | trigger_schema_paths
+    if set(protocol_hashes) != expected_protocol_paths:
+        return False, "Attempt 001 authority does not enumerate the exact protocol surface."
+    for relative, expected_hash in protocol_hashes.items():
+        if (
+            not isinstance(relative, str)
+            or not isinstance(expected_hash, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected_hash) is None
+            or expected_hash == "0" * 64
+        ):
+            return False, f"Attempt 001 authority has an invalid hash binding: {relative}."
+        path = repo_root / relative
+        if path.is_symlink() or not path.is_file():
+            return False, f"Attempt 001 protocol input is not a regular file: {relative}."
+        if sha256_bytes(path.read_bytes()) != expected_hash:
+            return False, f"Attempt 001 protocol hash mismatch: {relative}."
+        if _git_blob_at_path(repo_root, git, head, relative) != path.read_bytes():
+            return False, f"Attempt 001 protocol input is not committed at HEAD: {relative}."
+    if (
+        _git_blob_at_path(repo_root, git, head, _ITER000_ATTEMPT_001_AUTHORITY_PATH)
+        != authority_bytes
+    ):
+        return False, "Attempt 001 authority is not committed at HEAD."
+
+    try:
+        anchor = load_signer_anchor(repo_root / _ITER000_ANCHOR_PATH)
+    except (OSError, ValueError):
+        return False, "Attempt 001 authority signer anchor is invalid."
+    if anchor.signer_public_key != _ITER000_SIGNER_PUBLIC_KEY:
+        return False, "Attempt 001 authority signer key differs from its frozen anchor."
+
+    trigger_source_paths = _git_tree_paths(repo_root, git, _ITER000_TRIGGER_COMMIT, "src/fieldtrue")
+    working_source_paths = _working_source_paths(repo_root)
+    if trigger_source_paths is None or working_source_paths is None:
+        return False, "Attempt 001 cannot resolve the complete source surface."
+    if working_source_paths != trigger_source_paths:
+        return False, "Attempt 001 added, removed, or linked a source-surface file."
+
+    for relative in sorted(trigger_source_paths):
+        path = repo_root / relative
+        trigger_blob = _git_blob_at_path(repo_root, git, _ITER000_TRIGGER_COMMIT, relative)
+        if trigger_blob is None:
+            return False, f"Attempt 001 triggering source is unavailable: {relative}."
+        current_bytes = path.read_bytes()
+        if relative in _ITER000_ATTEMPT_001_AUTHORIZED_SOURCE_HASHES:
+            before_hash, after_hash = _ITER000_ATTEMPT_001_AUTHORIZED_SOURCE_HASHES[relative]
+            if (
+                after_hash == "0" * 64
+                or sha256_bytes(trigger_blob) != before_hash
+                or sha256_bytes(current_bytes) != after_hash
+                or protocol_hashes.get(relative) != after_hash
+            ):
+                return False, f"Attempt 001 authorized source binding differs: {relative}."
+            continue
+        if relative in _ITER000_ATTEMPT_001_RECOVERY_PATHS:
+            if protocol_hashes.get(relative) != sha256_bytes(current_bytes):
+                return False, f"Attempt 001 recovery control is not authority-bound: {relative}."
+            continue
+        if current_bytes != trigger_blob:
+            return False, f"Attempt 001 changed an unauthorized source file: {relative}."
+
+    gate_control_blob = _git_blob_at_path(
+        repo_root, git, _ITER000_TRIGGER_COMMIT, _ITER000_GATE_CONTROL_PATH
+    )
+    try:
+        trigger_gate_control = (
+            json.loads(gate_control_blob) if gate_control_blob is not None else None
+        )
+        current_gate_control = _json(repo_root / _ITER000_GATE_CONTROL_PATH)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False, "Attempt 001 gate-control registry is unreadable."
+    if not isinstance(trigger_gate_control, dict):
+        return False, "Attempt 001 triggering gate-control registry is unavailable."
+    trigger_gate_control.pop("execution_seal", None)
+    current_gate_control.pop("execution_seal", None)
+    if current_gate_control != trigger_gate_control:
+        return False, "Attempt 001 changed the scientific gate-control contract."
+
+    unchanged_protocol_paths = expected_protocol_paths - (
+        _ITER000_ATTEMPT_001_RECOVERY_PATHS | set(_ITER000_ATTEMPT_001_AUTHORIZED_SOURCE_HASHES)
+    )
+    for relative in sorted(unchanged_protocol_paths):
+        trigger_blob = _git_blob_at_path(repo_root, git, _ITER000_TRIGGER_COMMIT, relative)
+        if trigger_blob != (repo_root / relative).read_bytes():
+            return False, f"Attempt 001 changed a trigger-commit protocol input: {relative}."
+
+    receipt_path = repo_root / _ITER000_ATTEMPT_001_RECEIPT_PATH
+    receipt_directory = receipt_path.parent
+    if receipt_directory.is_symlink() or (
+        receipt_directory.exists() and not receipt_directory.is_dir()
+    ):
+        return False, "Attempt 001 authority consumption directory must not be linked."
+    if receipt_path.is_symlink() or (receipt_path.exists() and not receipt_path.is_file()):
+        return False, "Attempt 001 authority consumption path is not a regular file."
+    return (
+        True,
+        "Attempt 001 authority binds the complete protocol and source surface; only the exact "
+        "TLS and attempt-control changes are admitted.",
+    )
+
+
+def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
+    amendment_path = repo_root / _AMENDMENT_001_PATH
+    try:
+        amendment = _json(amendment_path)
+        amendment_bytes = amendment_path.read_bytes()
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        return False, f"Amendment 001 is unreadable: {type(error).__name__}."
+    document_binding = amendment.get("amendment_document")
+    document_sha256 = document_binding.get("sha256") if isinstance(document_binding, dict) else None
+    if (
+        not isinstance(document_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", document_sha256) is None
+        or document_sha256 == "0" * 64
+        or amendment != _expected_iteration_amendment_001(document_sha256)
+    ):
+        return False, "Amendment 001 differs from the exact authorized recovery contract."
+    if canonical_json_pretty(amendment) != amendment_bytes:
+        return False, "Amendment 001 must use canonical JSON."
+
+    document_path = repo_root / _AMENDMENT_001_DOCUMENT_PATH
+    ledger_path = repo_root / _ATTEMPT_000_LEDGER_PATH
+    head_path = repo_root / _ATTEMPT_000_HEAD_PATH
+    anchor_path = repo_root / _ITER000_ANCHOR_PATH
+    frozen_paths = {relative: repo_root / relative for relative in _ITER000_FROZEN_HASHES}
+    required_paths = {
+        amendment_path,
+        document_path,
+        *frozen_paths.values(),
+    }
+    if any(path.is_symlink() or not path.is_file() for path in required_paths):
+        return False, "Amendment 001 trust inputs must be regular files."
+    if sha256_bytes(document_path.read_bytes()) != amendment["amendment_document"]["sha256"]:
+        return False, "Amendment 001 document bytes do not match its contract."
+    for relative, expected_hash in _ITER000_FROZEN_HASHES.items():
+        if sha256_bytes(frozen_paths[relative].read_bytes()) != expected_hash:
+            return False, f"Amendment 001 frozen bytes changed: {relative}."
+
+    proof_root = repo_root / "experiments" / _ITER000_ID / "proof"
+    attempt_root = repo_root / _ATTEMPT_000_PROOF_PATH
+    if proof_root.is_symlink() or attempt_root.is_symlink():
+        return False, "Iteration 000 proof roots must not be symbolic links."
+    try:
+        attempt_entries = {entry.name for entry in attempt_root.iterdir()}
+        proof_children = tuple(proof_root.iterdir())
+        proof_entries = {entry.name for entry in proof_children}
+    except OSError:
+        return False, "Attempt 000 proof evidence is unavailable."
+    if attempt_entries != {"execution_ledger.jsonl", "execution_ledger.head.json"}:
+        return False, "Attempt 000 must contain only its signed failure ledger and head."
+    if not proof_entries.issubset({"attempt_000", "attempt_001"}) or any(
+        child.is_symlink() or not child.is_dir() for child in proof_children
+    ):
+        return False, "Amendment 001 authorizes at most one isolated additional attempt root."
+
+    try:
+        anchor = load_signer_anchor(anchor_path)
+        ledger_verification = verify_ledger(
+            ledger_path,
+            head_path,
+            expected_signer_public_key=anchor.signer_public_key,
+        )
+        ledger_lines = ledger_path.read_text(encoding="utf-8").splitlines()
+        events = [LedgerEvent.model_validate_json(line) for line in ledger_lines]
+    except (OSError, ValueError, LedgerVerificationError) as error:
+        return False, f"Attempt 000 ledger does not verify: {type(error).__name__}."
+    if any(
+        line.encode("utf-8") != canonical_json(event)
+        for line, event in zip(ledger_lines, events, strict=True)
+    ):
+        return False, "Attempt 000 ledger must remain canonical JSONL."
+    if (
+        ledger_verification.event_count != 2
+        or ledger_verification.head_hash != _ITER000_ATTEMPT_000_HEAD
+        or [event.event_type for event in events] != ["run-started", "run-failed"]
+        or any(event.run_id != _ITER000_ATTEMPT_000_RUN_ID for event in events)
+        or any(event.runtime.git_commit != _ITER000_TRIGGER_COMMIT for event in events)
+        or any(event.approval_receipt_hash is not None for event in events)
+    ):
+        return False, "Attempt 000 is not the exact pre-data failure authorized by Amendment 001."
+    started, failed = events
+    if (
+        set(started.payload)
+        != {
+            "cloud_authorized",
+            "gpu_authorized",
+            "hypothesis",
+            "live_action_authorized",
+            "protocol_bundle",
+        }
+        or started.payload.get("cloud_authorized") is not False
+        or started.payload.get("gpu_authorized") is not False
+        or started.payload.get("live_action_authorized") is not False
+        or started.payload.get("hypothesis") != _ITER000_HYPOTHESIS_PATH
+        or failed.payload != {"error_type": "URLError", "message": _ITER000_ATTEMPT_000_FAILURE}
+    ):
+        return False, "Attempt 000 recorded data acceptance or a different failure cause."
+
+    git = shutil.which("git")
+    if git is None:
+        return False, "Amendment 001 cannot verify committed evidence without Git."
+    try:
+        head = subprocess.run(  # noqa: S603 - fixed Git command
+            [git, "rev-parse", "HEAD"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        return False, "Amendment 001 cannot resolve HEAD."
+    if (
+        _GIT_OBJECT_ID_PATTERN.fullmatch(head) is None
+        or not _git_commit_resolves(repo_root, git, _ITER000_TRIGGER_COMMIT)
+        or not _git_is_ancestor(repo_root, git, _ITER000_TRIGGER_COMMIT, head)
+    ):
+        return False, "Amendment 001 triggering commit is not an ancestor of HEAD."
+    surface_valid, surface_detail = _verify_attempt_001_scientific_surface(
+        repo_root,
+        git=git,
+        head=head,
+    )
+    if not surface_valid:
+        return False, surface_detail
+    trust_inputs = (
+        _AMENDMENT_001_PATH,
+        _AMENDMENT_001_DOCUMENT_PATH,
+        _ITER000_ATTEMPT_001_AUTHORITY_PATH,
+        _ATTEMPT_000_LEDGER_PATH,
+        _ATTEMPT_000_HEAD_PATH,
+        _ITER000_ANCHOR_PATH,
+        _ITER000_DATASET_PATH,
+        _ITER000_HYPOTHESIS_PATH,
+        "pyproject.toml",
+        "uv.lock",
+        "src/fieldtrue/adapters/adapt.py",
+        "src/fieldtrue/cli.py",
+        "src/fieldtrue/experiment.py",
+        "src/fieldtrue/mission.py",
+        "src/fieldtrue/verification.py",
+    )
+    for relative in trust_inputs:
+        path = repo_root / relative
+        if path.is_symlink() or not path.is_file():
+            return False, f"Amendment 001 trust input is missing: {relative}."
+        if _git_blob_at_path(repo_root, git, head, relative) != path.read_bytes():
+            return False, f"Amendment 001 trust input is not committed at HEAD: {relative}."
+    for relative in (_ITER000_ANCHOR_PATH, _ITER000_DATASET_PATH, _ITER000_HYPOTHESIS_PATH):
+        if (
+            _git_blob_at_path(repo_root, git, _ITER000_TRIGGER_COMMIT, relative)
+            != (repo_root / relative).read_bytes()
+        ):
+            return False, f"Amendment 001 changed a trigger-commit input: {relative}."
+    if (repo_root / _ITER000_HYPOTHESIS_PATH).read_bytes() != _root_preregistration_bytes(
+        repo_root, _ITER000_HYPOTHESIS_PATH
+    ):
+        return False, "Amendment 001 changed the root-preregistered hypothesis."
+
+    if not _certifi_dependency_is_locked(repo_root):
+        return False, "Amendment 001 requires a locked direct certifi dependency."
+    if not _adapt_tls_source_is_verified(repo_root / "src" / "fieldtrue" / "adapters" / "adapt.py"):
+        return False, "Amendment 001 TLS source contract is missing or permits a bypass."
+    if not _verified_tls_runtime_active():
+        return False, "Amendment 001 TLS runtime is not certifi-backed and fully verified."
+    return (
+        True,
+        "Amendment 001 authorizes one isolated certifi-backed retry from signed "
+        "pre-data failure evidence.",
+    )
+
+
 def _verify_publication_transition(
     repo_root: Path,
     loop: dict[str, Any],
@@ -743,6 +1482,14 @@ def validate_mission(repo_root: Path) -> MissionValidation:
             dataset_lock.expected_experiment_files == 16
             and all(resource.url.startswith("https://") for resource in dataset_lock.resources),
             "NASA ADAPT bytes and exact expected file count are frozen.",
+        )
+    )
+    amendment_valid, amendment_detail = _verify_iteration_amendment_001(repo_root)
+    checks.append(
+        _check(
+            "iteration-amendment-001",
+            amendment_valid,
+            amendment_detail,
         )
     )
     claims = _claims(repo_root / "claims" / "registry.jsonl")

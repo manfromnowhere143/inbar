@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, NoReturn, TypeVar, cast
 
+from nacl.exceptions import BadSignatureError
+from nacl.signing import VerifyKey
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from fieldtrue.adapters.adapt import (
@@ -35,11 +38,48 @@ from fieldtrue.runtime import RuntimeIdentity
 _ITERATION_ID = "iter000_nasa_adapt_corpus_readiness"
 _ANCHOR_ID = "iter000-execution-ledger"
 _HYPOTHESIS_PATH = f"experiments/{_ITERATION_ID}/HYPOTHESIS.md"
+_AMENDMENT_DOCUMENT_PATH = f"experiments/{_ITERATION_ID}/AMENDMENT_001.md"
+_AMENDMENT_CONTRACT_PATH = "protocol/amendments/iter000_001.json"
+_AUTHORITY_PROTOCOL_PATH = "protocol/attempt_authorities/iter000_001.json"
 _ANCHOR_PROTOCOL_PATH = "protocol/trust/iter000_signer_anchor.json"
 _DATASET_PROTOCOL_PATH = "protocol/datasets/nasa_adapt_v1.json"
+_LOCKFILE_PROTOCOL_PATH = "uv.lock"
+_AUTHORITY_ARTIFACT = "attempt_authority.json"
+_AUTHORITY_CONSUMPTION_ARTIFACT = "attempt_authority_consumption.json"
+_AUTHORITY_RECEIPT_PATH = f"experiments/{_ITERATION_ID}/authority/attempt_001_consumption.json"
+_AUTHORIZED_COMMAND = ("fieldtrue", "experiment", "iter000-amendment-001")
+_CLEAN_STATE_HASH = sha256_bytes(b"")
+_ATTEMPT_000_LEDGER_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_000/execution_ledger.jsonl"
+_ATTEMPT_000_HEAD_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_000/execution_ledger.head.json"
+_ATTEMPT_000_LEDGER_HASH = "c84327a7c15e48e7169711b7b84aa7167fa170ab3b735993b3ff5b224d7e5982"
+_ATTEMPT_000_HEAD_FILE_HASH = "332878b131ab2c5a0c024854f0a43a552c0f8b0a36330d18a0b3b405b89bfa07"
+_ATTEMPT_000_HEAD_HASH = "acf079ecb5b989d3b5615d01bed4141fbd1d9c95436baabc65cfff707ff914d9"
+_ATTEMPT_000_COMMIT = "2fb078a1cac5f76f251ab49e0368ae0ea3e8da2e"
+_ATTEMPT_000_FAILURE = (
+    "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+    "unable to get local issuer certificate (_ssl.c:1000)>"
+)
+_ATTEMPT_001_CERTIFI_VERSION = "2026.6.17"
+_ATTEMPT_001_CA_BUNDLE_SHA256 = "bbc7e9c01d7551bb8a159b5dedd989b8ee3ce105aff522b68eb1b01bf854cab0"
+_ATTEMPT_001_TLS_CONSTRAINTS: dict[str, object] = {
+    "bypass_forbidden": True,
+    "ca_bundle_sha256": _ATTEMPT_001_CA_BUNDLE_SHA256,
+    "certificate_verification": "required",
+    "hostname_verification": "required",
+    "minimum_tls_version": "TLSv1.2",
+    "trust_store": "certifi",
+    "trust_store_version": _ATTEMPT_001_CERTIFI_VERSION,
+}
 
 _COMMON_BUNDLE_ARTIFACTS = frozenset(
-    {"dataset_lock.json", "readiness_report.json", "RESULT.md", "LEARNING.json"}
+    {
+        "AMENDMENT_001.md",
+        "amendment_001.json",
+        "dataset_lock.json",
+        "readiness_report.json",
+        "RESULT.md",
+        "LEARNING.json",
+    }
 )
 _NORMAL_BUNDLE_ARTIFACTS = _COMMON_BUNDLE_ARTIFACTS | frozenset(
     {
@@ -50,6 +90,7 @@ _NORMAL_BUNDLE_ARTIFACTS = _COMMON_BUNDLE_ARTIFACTS | frozenset(
     }
 )
 _INVALID_BUNDLE_ARTIFACTS = _COMMON_BUNDLE_ARTIFACTS | frozenset({"invalidity.json"})
+_AUTHORITY_BUNDLE_ARTIFACTS = frozenset({_AUTHORITY_ARTIFACT, _AUTHORITY_CONSUMPTION_ARTIFACT})
 _GATE_IDS = (
     "source-integrity",
     "parser-integrity",
@@ -111,6 +152,8 @@ class Iter000ProofVerification(BaseModel):
     artifact_hashes: dict[str, Sha256]
     result_sha256: Sha256
     result_reproducible: Literal[True] = True
+    authority_specification_sha256: Sha256 | None = None
+    authority_consumption_sha256: Sha256 | None = None
     ledger_checkpoint: LedgerVerification
     ledger_verification: LedgerVerification
 
@@ -230,18 +273,24 @@ def _expected_verdict(report: ReadinessReport) -> Iter000Verdict:
     return "BLOCKED_EVIDENCE"
 
 
-def _verify_started(event: LedgerEvent, anchor_data: bytes) -> dict[str, Any]:
+def _verify_started(
+    event: LedgerEvent,
+    anchor_data: bytes,
+    *,
+    authority_required: bool = False,
+) -> tuple[dict[str, Any], str | None]:
+    expected_payload = {
+        "hypothesis",
+        "protocol_bundle",
+        "gpu_authorized",
+        "cloud_authorized",
+        "live_action_authorized",
+    }
+    if authority_required:
+        expected_payload.add("attempt_authority_consumption_receipt_hash")
     started = _payload(
         event,
-        frozenset(
-            {
-                "hypothesis",
-                "protocol_bundle",
-                "gpu_authorized",
-                "cloud_authorized",
-                "live_action_authorized",
-            }
-        ),
+        frozenset(expected_payload),
     )
     if started["hypothesis"] != _HYPOTHESIS_PATH:
         _fail("signed run does not identify the frozen iter000 hypothesis")
@@ -266,11 +315,21 @@ def _verify_started(event: LedgerEvent, anchor_data: bytes) -> dict[str, Any]:
         _fail("signed protocol bundle content hash mismatch")
     if _HYPOTHESIS_PATH not in files:
         _fail("signed protocol bundle omits the frozen hypothesis")
+    if _AMENDMENT_DOCUMENT_PATH not in files or _AMENDMENT_CONTRACT_PATH not in files:
+        _fail("signed protocol bundle omits Amendment 001")
     if files.get(_ANCHOR_PROTOCOL_PATH) != sha256_bytes(anchor_data):
         _fail("signed protocol bundle does not commit to the selected signer anchor")
     if _DATASET_PROTOCOL_PATH not in files:
         _fail("signed protocol bundle omits the frozen dataset lock")
-    return files
+    authority_receipt_hash: str | None = None
+    if authority_required:
+        authority_receipt_hash = _hash(
+            started["attempt_authority_consumption_receipt_hash"],
+            "signed attempt-authority consumption hash",
+        )
+        if _AUTHORITY_PROTOCOL_PATH not in files:
+            _fail("signed protocol bundle omits the trusted attempt authority")
+    return files, authority_receipt_hash
 
 
 def _verify_sources(event: LedgerEvent, protocol_files: Mapping[str, Any]) -> dict[str, Any]:
@@ -294,6 +353,333 @@ def _verify_sources(event: LedgerEvent, protocol_files: Mapping[str, Any]) -> di
     if not isinstance(sources["resources"], list):
         _fail("signed source resources must be a list")
     return sources
+
+
+def _verify_amendment_contract(
+    proof_root: Path,
+    *,
+    actual_hashes: Mapping[str, str],
+    protocol_files: Mapping[str, Any],
+) -> None:
+    amendment, amendment_data = _read_json_object(
+        proof_root / "amendment_001.json", "Amendment 001 contract"
+    )
+    _canonical(amendment, amendment_data, "Amendment 001 contract")
+    expected = {
+        "schema_version": "fieldtrue.iter000-amendment.v1",
+        "amendment_id": "iter000_001",
+        "iteration_id": _ITERATION_ID,
+        "status": "authorized",
+        "amendment_document": {
+            "path": _AMENDMENT_DOCUMENT_PATH,
+            "sha256": actual_hashes["AMENDMENT_001.md"],
+        },
+        "frozen_inputs": {
+            "dataset_lock": {
+                "path": _DATASET_PROTOCOL_PATH,
+                "sha256": protocol_files[_DATASET_PROTOCOL_PATH],
+            },
+            "hypothesis": {
+                "path": _HYPOTHESIS_PATH,
+                "sha256": protocol_files[_HYPOTHESIS_PATH],
+            },
+        },
+        "retry_authorization": {
+            "authorized_changes": {
+                "administrative_controls": [
+                    "attempt_output_isolation",
+                    "amendment_artifact_binding",
+                    "cli_attempt_routing",
+                    "verifier_attempt_routing",
+                    "signed_single_use_authority_consumption",
+                    "gate_control_seal_regeneration",
+                ],
+                "infrastructure": "python_tls_trust_store",
+                "scientific": "none",
+            },
+            "attempt_id": "attempt_001",
+            "forbidden_changes": [
+                "dataset",
+                "hypothesis",
+                "selection_rules",
+                "gate_thresholds",
+                "scientific_claims",
+            ],
+            "maximum_additional_attempts": 1,
+            "tls": _ATTEMPT_001_TLS_CONSTRAINTS,
+        },
+        "trigger_attempt": {
+            "attempt_id": "attempt_000",
+            "expected_event_types": ["run-started", "run-failed"],
+            "expected_head_hash": _ATTEMPT_000_HEAD_HASH,
+            "expected_run_id": "iter000-2fb078a1cac5",
+            "triggering_git_commit": _ATTEMPT_000_COMMIT,
+            "failure": {
+                "error_type": "URLError",
+                "message": _ATTEMPT_000_FAILURE,
+            },
+            "scientific_effect": {
+                "accepted_data": False,
+                "result_artifact": False,
+                "scientific_verdict": False,
+            },
+            "artifacts": {
+                "ledger": {
+                    "path": _ATTEMPT_000_LEDGER_PATH,
+                    "sha256": _ATTEMPT_000_LEDGER_HASH,
+                },
+                "ledger_head": {
+                    "path": _ATTEMPT_000_HEAD_PATH,
+                    "sha256": _ATTEMPT_000_HEAD_FILE_HASH,
+                },
+                "signer_anchor": {
+                    "path": _ANCHOR_PROTOCOL_PATH,
+                    "sha256": protocol_files[_ANCHOR_PROTOCOL_PATH],
+                },
+            },
+        },
+    }
+    if amendment != expected:
+        _fail("Amendment 001 contract differs from the authorized retry contract")
+
+
+def _trusted_attempt_authority(
+    path: Path,
+    *,
+    anchor: SignerAnchor,
+    anchor_data: bytes,
+) -> tuple[dict[str, Any], bytes, dict[str, str]]:
+    authority, authority_data = _read_json_object(path, "trusted attempt authority")
+    _canonical(authority, authority_data, "trusted attempt authority")
+    _exact_keys(
+        authority,
+        frozenset(
+            {
+                "schema_version",
+                "authority_id",
+                "iteration_id",
+                "attempt_id",
+                "authorized_command",
+                "amendment",
+                "signer_anchor",
+                "protocol_hashes",
+                "runtime_constraints",
+                "consumption",
+                "trust_model",
+            }
+        ),
+        "trusted attempt authority",
+    )
+    if (
+        authority["schema_version"] != "fieldtrue.attempt-authority.v1"
+        or authority["authority_id"] != "iter000_001"
+        or authority["iteration_id"] != _ITERATION_ID
+        or authority["attempt_id"] != "attempt_001"
+        or authority["authorized_command"] != list(_AUTHORIZED_COMMAND)
+    ):
+        _fail("trusted attempt authority has the wrong identity or command")
+    if authority["amendment"] != {
+        "path": _AMENDMENT_CONTRACT_PATH,
+        "binding": "sha256_at_consumption",
+    }:
+        _fail("trusted attempt authority has the wrong amendment binding")
+    if authority["signer_anchor"] != {
+        "path": _ANCHOR_PROTOCOL_PATH,
+        "binding": "sha256_at_consumption",
+        "signer_public_key": anchor.signer_public_key,
+    }:
+        _fail("trusted attempt authority does not bind the selected signer")
+    if authority["consumption"] != {
+        "receipt_path": _AUTHORITY_RECEIPT_PATH,
+        "creation_timing": "before_attempt_output_creation",
+        "maximum_consumptions": 1,
+        "receipt_presence_consumes_authority": True,
+        "proof_deletion_restores_authority": False,
+        "failure_mode": "fail_closed",
+    }:
+        _fail("trusted attempt authority does not enforce one fail-closed consumption")
+    if authority["runtime_constraints"] != {"tls": _ATTEMPT_001_TLS_CONSTRAINTS}:
+        _fail("trusted attempt authority has the wrong TLS runtime constraints")
+    if authority["trust_model"] != {
+        "signature": "git_pinned_local_ed25519",
+        "external_timestamp": False,
+        "blocks": ["ordinary_attempt_output_deletion", "concurrent_local_replay"],
+        "does_not_block": [
+            "same_local_owner_deletes_receipt",
+            "same_local_owner_rolls_back_repository",
+            "signing_key_compromise",
+        ],
+    }:
+        _fail("trusted attempt authority misstates its local trust boundary")
+    raw_protocol_hashes = _object(authority["protocol_hashes"], "authority protocol hashes")
+    protocol_hashes = {
+        relative: _hash(digest, f"authority protocol hash for {relative}")
+        for relative, digest in raw_protocol_hashes.items()
+    }
+    mandatory_paths = {
+        "PREREGISTRATION.md",
+        "claims/registry.jsonl",
+        _AMENDMENT_DOCUMENT_PATH,
+        _HYPOTHESIS_PATH,
+        "mission/contract.json",
+        "mission/loop.json",
+        "mission/name.json",
+        _AMENDMENT_CONTRACT_PATH,
+        "protocol/baselines/v1.json",
+        _DATASET_PROTOCOL_PATH,
+        "protocol/gate_controls/v1.json",
+        _ANCHOR_PROTOCOL_PATH,
+        "pyproject.toml",
+        "src/fieldtrue/__init__.py",
+        "src/fieldtrue/adapters/__init__.py",
+        "src/fieldtrue/adapters/adapt.py",
+        "src/fieldtrue/adapters/local_replay.py",
+        "src/fieldtrue/approvals.py",
+        "src/fieldtrue/canonical.py",
+        "src/fieldtrue/cli.py",
+        "src/fieldtrue/diagnosis.py",
+        "src/fieldtrue/domain.py",
+        "src/fieldtrue/experiment.py",
+        "src/fieldtrue/memory.py",
+        "src/fieldtrue/mission.py",
+        "src/fieldtrue/planning.py",
+        "src/fieldtrue/ports.py",
+        "src/fieldtrue/py.typed",
+        "src/fieldtrue/readiness.py",
+        "src/fieldtrue/receipts.py",
+        "src/fieldtrue/runtime.py",
+        "src/fieldtrue/schemas.py",
+        "src/fieldtrue/splits.py",
+        "src/fieldtrue/verification.py",
+        _LOCKFILE_PROTOCOL_PATH,
+    }
+    if not mandatory_paths.issubset(protocol_hashes):
+        _fail("trusted attempt authority omits a mandatory protocol file")
+    if protocol_hashes[_ANCHOR_PROTOCOL_PATH] != sha256_bytes(anchor_data):
+        _fail("trusted attempt authority signer-anchor hash differs from the selected anchor")
+    return authority, authority_data, protocol_hashes
+
+
+def _verify_authorized_runtime(
+    *,
+    run_id: str,
+    runtime: RuntimeIdentity,
+    authority: Mapping[str, Any],
+    protocol_hashes: Mapping[str, str],
+) -> None:
+    expected_run_id = f"iter000-attempt_001-{runtime.git_commit[:12]}"
+    if run_id != expected_run_id:
+        _fail("amended proof run_id is not the authorized attempt_001 identity")
+    if (
+        runtime.command != tuple(authority["authorized_command"])
+        or runtime.command != _AUTHORIZED_COMMAND
+        or runtime.repository_dirty is not False
+        or runtime.dirty_state_hash != _CLEAN_STATE_HASH
+        or runtime.lockfile_hash != protocol_hashes[_LOCKFILE_PROTOCOL_PATH]
+    ):
+        _fail("amended proof runtime differs from the clean authorized execution")
+
+
+def _verify_authority_consumption(
+    proof_root: Path,
+    *,
+    authority: Mapping[str, Any],
+    authority_data: bytes,
+    protocol_hashes: Mapping[str, str],
+    anchor: SignerAnchor,
+    anchor_data: bytes,
+    run_id: str,
+    runtime: RuntimeIdentity,
+    signed_receipt_hash: str,
+) -> str:
+    receipt, receipt_data = _read_json_object(
+        proof_root / _AUTHORITY_CONSUMPTION_ARTIFACT,
+        "attempt-authority consumption receipt",
+    )
+    _canonical(receipt, receipt_data, "attempt-authority consumption receipt")
+    _exact_keys(
+        receipt,
+        frozenset(
+            {
+                "schema_version",
+                "authority_id",
+                "iteration_id",
+                "attempt_id",
+                "run_id",
+                "consumed_at",
+                "authority_specification",
+                "amendment",
+                "signer_anchor",
+                "runtime",
+                "tls_runtime",
+                "signer_public_key",
+                "trust_level",
+                "same_local_owner_can_delete_or_rollback_local_state",
+                "receipt_hash",
+                "signature",
+            }
+        ),
+        "attempt-authority consumption receipt",
+    )
+    body = dict(receipt)
+    receipt_hash = _hash(body.pop("receipt_hash"), "attempt-authority receipt hash")
+    signature = body.pop("signature")
+    if not isinstance(signature, str):
+        _fail("attempt-authority receipt signature must be hexadecimal")
+    if sha256_value(body) != receipt_hash or receipt_hash != signed_receipt_hash:
+        _fail("attempt-authority consumption receipt hash mismatch")
+    try:
+        VerifyKey(bytes.fromhex(anchor.signer_public_key)).verify(
+            bytes.fromhex(receipt_hash), bytes.fromhex(signature)
+        )
+    except (BadSignatureError, ValueError) as error:
+        raise ProofBundleVerificationError(
+            "attempt-authority consumption signature is invalid"
+        ) from error
+    consumed_at = receipt["consumed_at"]
+    if not isinstance(consumed_at, str):
+        _fail("attempt-authority consumption time must be an RFC 3339 string")
+    try:
+        parsed_time = datetime.fromisoformat(consumed_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ProofBundleVerificationError(
+            "attempt-authority consumption time is invalid"
+        ) from error
+    if parsed_time.tzinfo is None or parsed_time.utcoffset() is None:
+        _fail("attempt-authority consumption time must be timezone-aware")
+    if (
+        receipt["schema_version"] != "fieldtrue.attempt-authority-consumption.v1"
+        or receipt["authority_id"] != "iter000_001"
+        or receipt["iteration_id"] != _ITERATION_ID
+        or receipt["attempt_id"] != "attempt_001"
+        or receipt["run_id"] != run_id
+        or receipt["signer_public_key"] != anchor.signer_public_key
+        or receipt["trust_level"] != "local_ed25519_no_external_timestamp"
+        or receipt["same_local_owner_can_delete_or_rollback_local_state"] is not True
+    ):
+        _fail("attempt-authority consumption identity is inconsistent")
+    if receipt["authority_specification"] != {
+        "path": _AUTHORITY_PROTOCOL_PATH,
+        "sha256": sha256_bytes(authority_data),
+    }:
+        _fail("attempt-authority consumption does not bind the trusted authority")
+    if receipt["amendment"] != {
+        "amendment_id": "iter000_001",
+        "path": _AMENDMENT_CONTRACT_PATH,
+        "sha256": protocol_hashes[_AMENDMENT_CONTRACT_PATH],
+    }:
+        _fail("attempt-authority consumption does not bind Amendment 001")
+    if receipt["signer_anchor"] != {
+        "path": _ANCHOR_PROTOCOL_PATH,
+        "sha256": sha256_bytes(anchor_data),
+    }:
+        _fail("attempt-authority consumption does not bind the selected signer anchor")
+    if receipt["tls_runtime"] != authority["runtime_constraints"]["tls"]:
+        _fail("attempt-authority consumption TLS runtime differs from the selected authority")
+    receipt_runtime = _model(RuntimeIdentity, receipt["runtime"], "authority receipt runtime")
+    if receipt_runtime != runtime:
+        _fail("attempt-authority consumption runtime differs from the signed run")
+    return sha256_bytes(receipt_data)
 
 
 def _verify_invalidity(
@@ -386,11 +772,13 @@ def verify_iter000_proof_bundle(
     proof_root: Path,
     *,
     signer_anchor_path: Path,
+    authority_specification_path: Path | None = None,
 ) -> Iter000ProofVerification:
     """Fail closed unless the complete iter000 result follows from pinned evidence.
 
-    Every result artifact is read from ``proof_root``. The only external trust input is the
-    explicitly selected, Git-pinned signer anchor; no raw or derived dataset path is read.
+    Every result artifact is read from ``proof_root``. Trust inputs are the explicitly selected,
+    Git-pinned signer anchor and, for an amended run, its separately selected attempt authority.
+    No raw or derived dataset path is read.
     """
 
     if proof_root.is_symlink() or not proof_root.is_dir():
@@ -401,6 +789,17 @@ def verify_iter000_proof_bundle(
     _canonical(anchor, anchor_data, "signer anchor")
     if anchor.anchor_id != _ANCHOR_ID or anchor.ledger_scope != _ITERATION_ID:
         _fail("signer anchor does not authorize the frozen iter000 ledger scope")
+
+    authority: dict[str, Any] | None = None
+    authority_data: bytes | None = None
+    authority_protocol_hashes: dict[str, str] | None = None
+    if authority_specification_path is not None:
+        authority, authority_data, authority_protocol_hashes = _trusted_attempt_authority(
+            authority_specification_path,
+            anchor=anchor,
+            anchor_data=anchor_data,
+        )
+    authority_required = authority is not None
 
     ledger_path = proof_root / "execution_ledger.jsonl"
     head_path = proof_root / "execution_ledger.head.json"
@@ -470,6 +869,17 @@ def verify_iter000_proof_bundle(
     runtime = _model(RuntimeIdentity, manifest["runtime"], "run manifest runtime")
     if any(event.run_id != run_id or event.runtime != runtime for event in events):
         _fail("run identity or runtime differs between manifest and signed ledger")
+    if authority_required:
+        assert authority is not None
+        assert authority_protocol_hashes is not None
+        _verify_authorized_runtime(
+            run_id=run_id,
+            runtime=runtime,
+            authority=authority,
+            protocol_hashes=authority_protocol_hashes,
+        )
+    elif run_id.startswith("iter000-attempt_001-"):
+        _fail("attempt_001 proof verification requires a trusted authority specification")
 
     checkpoint = _model(
         LedgerVerification, manifest["ledger_checkpoint"], "manifest ledger checkpoint"
@@ -484,6 +894,8 @@ def verify_iter000_proof_bundle(
         _fail("run manifest checkpoint does not match the signed preterminal ledger")
 
     bundle_names = _NORMAL_BUNDLE_ARTIFACTS if flow == "normal" else _INVALID_BUNDLE_ARTIFACTS
+    if authority_required:
+        bundle_names = bundle_names | _AUTHORITY_BUNDLE_ARTIFACTS
     manifest_names = bundle_names | frozenset({"artifact_bundle.json"})
     claimed_artifacts = _object(manifest["artifacts"], "run manifest artifacts")
     _exact_keys(claimed_artifacts, manifest_names, "run manifest artifacts")
@@ -569,7 +981,47 @@ def verify_iter000_proof_bundle(
     ):
         _fail("iteration learning is inconsistent with the frozen iter000 result")
 
-    protocol_files = _verify_started(events_by_type["run-started"], anchor_data)
+    protocol_files, signed_authority_receipt_hash = _verify_started(
+        events_by_type["run-started"],
+        anchor_data,
+        authority_required=authority_required,
+    )
+    authority_specification_hash: str | None = None
+    authority_consumption_hash: str | None = None
+    if authority_required:
+        assert authority is not None
+        assert authority_data is not None
+        assert authority_protocol_hashes is not None
+        assert signed_authority_receipt_hash is not None
+        authority_specification_hash = sha256_bytes(authority_data)
+        expected_protocol_files = {
+            **authority_protocol_hashes,
+            _AUTHORITY_PROTOCOL_PATH: authority_specification_hash,
+        }
+        if protocol_files != expected_protocol_files:
+            _fail("signed protocol bundle differs from the trusted attempt authority")
+        proof_authority_data = _read_regular_file(
+            proof_root / _AUTHORITY_ARTIFACT,
+            "proof-local attempt authority",
+        )
+        if (
+            proof_authority_data != authority_data
+            or actual_hashes[_AUTHORITY_ARTIFACT] != authority_specification_hash
+        ):
+            _fail("proof-local attempt authority differs from the selected trust input")
+        authority_consumption_hash = _verify_authority_consumption(
+            proof_root,
+            authority=authority,
+            authority_data=authority_data,
+            protocol_hashes=authority_protocol_hashes,
+            anchor=anchor,
+            anchor_data=anchor_data,
+            run_id=run_id,
+            runtime=runtime,
+            signed_receipt_hash=signed_authority_receipt_hash,
+        )
+        if authority_consumption_hash != actual_hashes[_AUTHORITY_CONSUMPTION_ARTIFACT]:
+            _fail("bundled attempt-authority receipt differs from its signed content")
     dataset_lock_value, dataset_lock_data = _read_json_object(
         proof_root / "dataset_lock.json", "dataset lock"
     )
@@ -577,6 +1029,15 @@ def verify_iter000_proof_bundle(
     _canonical(dataset_lock, dataset_lock_data, "dataset lock")
     if actual_hashes["dataset_lock.json"] != protocol_files[_DATASET_PROTOCOL_PATH]:
         _fail("proof-local dataset lock differs from the signed protocol bundle")
+    if actual_hashes["AMENDMENT_001.md"] != protocol_files[_AMENDMENT_DOCUMENT_PATH]:
+        _fail("proof-local Amendment 001 document differs from the signed protocol bundle")
+    if actual_hashes["amendment_001.json"] != protocol_files[_AMENDMENT_CONTRACT_PATH]:
+        _fail("proof-local Amendment 001 contract differs from the signed protocol bundle")
+    _verify_amendment_contract(
+        proof_root,
+        actual_hashes=actual_hashes,
+        protocol_files=protocol_files,
+    )
     sources: dict[str, Any] | None = None
     if flow != "source-invalid":
         sources = _verify_sources(events_by_type["sources-verified"], protocol_files)
@@ -694,6 +1155,13 @@ def verify_iter000_proof_bundle(
         _fail("run manifest changed during verification")
     if _read_regular_file(signer_anchor_path, "signer anchor") != anchor_data:
         _fail("signer anchor changed during verification")
+    if (
+        authority_specification_path is not None
+        and authority_data is not None
+        and _read_regular_file(authority_specification_path, "trusted attempt authority")
+        != authority_data
+    ):
+        _fail("trusted attempt authority changed during verification")
     if _read_regular_file(ledger_path, "execution ledger") != ledger_data:
         _fail("execution ledger changed during verification")
     if _read_regular_file(head_path, "execution ledger head") != head_data:
@@ -710,6 +1178,8 @@ def verify_iter000_proof_bundle(
         artifact_bundle_hash=actual_hashes["artifact_bundle.json"],
         artifact_hashes=actual_hashes,
         result_sha256=result_hash,
+        authority_specification_sha256=authority_specification_hash,
+        authority_consumption_sha256=authority_consumption_hash,
         ledger_checkpoint=checkpoint,
         ledger_verification=ledger_verification,
     )

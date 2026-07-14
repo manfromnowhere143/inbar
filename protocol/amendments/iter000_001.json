@@ -1,0 +1,85 @@
+{
+  "amendment_document": {
+    "path": "experiments/iter000_nasa_adapt_corpus_readiness/AMENDMENT_001.md",
+    "sha256": "85ef78eab3bd9bff0507f855af1195ebab4753b0c77e1535e3345f7b4ba8536e"
+  },
+  "amendment_id": "iter000_001",
+  "frozen_inputs": {
+    "dataset_lock": {
+      "path": "protocol/datasets/nasa_adapt_v1.json",
+      "sha256": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367"
+    },
+    "hypothesis": {
+      "path": "experiments/iter000_nasa_adapt_corpus_readiness/HYPOTHESIS.md",
+      "sha256": "b5f18e02b54a137aa966ce70a3f89f2616167992cc2583508f2b3b0403d205d5"
+    }
+  },
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "retry_authorization": {
+    "attempt_id": "attempt_001",
+    "authorized_changes": {
+      "administrative_controls": [
+        "attempt_output_isolation",
+        "amendment_artifact_binding",
+        "cli_attempt_routing",
+        "verifier_attempt_routing",
+        "signed_single_use_authority_consumption",
+        "gate_control_seal_regeneration"
+      ],
+      "infrastructure": "python_tls_trust_store",
+      "scientific": "none"
+    },
+    "forbidden_changes": [
+      "dataset",
+      "hypothesis",
+      "selection_rules",
+      "gate_thresholds",
+      "scientific_claims"
+    ],
+    "maximum_additional_attempts": 1,
+    "tls": {
+      "bypass_forbidden": true,
+      "ca_bundle_sha256": "bbc7e9c01d7551bb8a159b5dedd989b8ee3ce105aff522b68eb1b01bf854cab0",
+      "certificate_verification": "required",
+      "hostname_verification": "required",
+      "minimum_tls_version": "TLSv1.2",
+      "trust_store": "certifi",
+      "trust_store_version": "2026.6.17"
+    }
+  },
+  "schema_version": "fieldtrue.iter000-amendment.v1",
+  "status": "authorized",
+  "trigger_attempt": {
+    "artifacts": {
+      "ledger": {
+        "path": "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_000/execution_ledger.jsonl",
+        "sha256": "c84327a7c15e48e7169711b7b84aa7167fa170ab3b735993b3ff5b224d7e5982"
+      },
+      "ledger_head": {
+        "path": "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_000/execution_ledger.head.json",
+        "sha256": "332878b131ab2c5a0c024854f0a43a552c0f8b0a36330d18a0b3b405b89bfa07"
+      },
+      "signer_anchor": {
+        "path": "protocol/trust/iter000_signer_anchor.json",
+        "sha256": "7174bedb14de9f6cc7bd178a2b70a71f75baa04d1291004dbfaa6304fb701022"
+      }
+    },
+    "attempt_id": "attempt_000",
+    "expected_event_types": [
+      "run-started",
+      "run-failed"
+    ],
+    "expected_head_hash": "acf079ecb5b989d3b5615d01bed4141fbd1d9c95436baabc65cfff707ff914d9",
+    "expected_run_id": "iter000-2fb078a1cac5",
+    "failure": {
+      "error_type": "URLError",
+      "message": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)>"
+    },
+    "scientific_effect": {
+      "accepted_data": false,
+      "result_artifact": false,
+      "scientific_verdict": false
+    },
+    "triggering_git_commit": "2fb078a1cac5f76f251ab49e0368ae0ea3e8da2e"
+  }
+}

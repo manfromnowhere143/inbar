@@ -1,0 +1,112 @@
+{
+  "amendment": {
+    "binding": "sha256_at_consumption",
+    "path": "protocol/amendments/iter000_001.json"
+  },
+  "attempt_id": "attempt_001",
+  "authority_id": "iter000_001",
+  "authorized_command": [
+    "fieldtrue",
+    "experiment",
+    "iter000-amendment-001"
+  ],
+  "consumption": {
+    "creation_timing": "before_attempt_output_creation",
+    "failure_mode": "fail_closed",
+    "maximum_consumptions": 1,
+    "proof_deletion_restores_authority": false,
+    "receipt_path": "experiments/iter000_nasa_adapt_corpus_readiness/authority/attempt_001_consumption.json",
+    "receipt_presence_consumes_authority": true
+  },
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "protocol_hashes": {
+    "PREREGISTRATION.md": "fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac",
+    "claims/registry.jsonl": "e61cc7874e56d3ed344d928922aee6aa02a7a9fc2d74281545e0c8641410b2a5",
+    "experiments/iter000_nasa_adapt_corpus_readiness/AMENDMENT_001.md": "85ef78eab3bd9bff0507f855af1195ebab4753b0c77e1535e3345f7b4ba8536e",
+    "experiments/iter000_nasa_adapt_corpus_readiness/HYPOTHESIS.md": "b5f18e02b54a137aa966ce70a3f89f2616167992cc2583508f2b3b0403d205d5",
+    "mission/contract.json": "01171f468a2af3c8f2577a2e35548596266b421852e85b4118cc368f5c81901d",
+    "mission/loop.json": "bec703b7b76d1ccf15ceb3af68f572b9835726bdefd7282d0c3ac221081f6d3c",
+    "mission/name.json": "81996c26fc929fb99a8a94f910dedf80506d55a50f315d7eb39b1c6fa5130c6f",
+    "protocol/amendments/iter000_001.json": "c7aff0b2c61f95a396646a7869f8269778b8ef04cdf4e3ccc8e60943a570d8cc",
+    "protocol/baselines/v1.json": "482cdda19d378aa3014af6a99976e929986e17d22ce2f74e3e54f7871ea0b49b",
+    "protocol/datasets/nasa_adapt_v1.json": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+    "protocol/gate_controls/v1.json": "a3ee8a351ebf06ce9f8e7c5f14ab5303fe9002aeba2b938a2990d853e4efd0f4",
+    "protocol/schemas/adapt_coverage.schema.json": "3dcb912b71735da1596cf503853755578a0c26e9afc8072acd4dde9e6f5dcd6d",
+    "protocol/schemas/adapt_dataset_lock.schema.json": "d771dbfa25dee070db56dbcfff806b57a16f5aafd6ac511a54e89590049a39b3",
+    "protocol/schemas/adapt_ingestion_receipt.schema.json": "24a465b23d55d182fb5b83c972239346333f178811680f983136aaccad969bb3",
+    "protocol/schemas/approval_receipt.schema.json": "391072fcee2abad6f6ef2507cdcb9728ff51588592aa198c9f2ee61d7f55ad4b",
+    "protocol/schemas/assurance_certificate.schema.json": "bd5e9a75d1a031c4b4eb77194f29fa12cbbea4e6bc7d227a5b93dc0489ad05c2",
+    "protocol/schemas/claim_record.schema.json": "b2d9d71f4748e77ca7f3602446552acdc39cd6ae5367b6cdcc9d7a343ed88515",
+    "protocol/schemas/discriminating_test.schema.json": "e3875ec5f5a1e3f8c4d25927aebc4ceeca093a565c5928d4d6d3fb476673efa5",
+    "protocol/schemas/evidence_bundle.schema.json": "fa150a3c942d88a8d1caf5eb6e023baf9f7940e60ea42efa078152faf05bf14b",
+    "protocol/schemas/hypothesis_set.schema.json": "42aba1fd24f550f5947c5014aeb9ab56c04202089a0aeb297eb40a4a3685c5bf",
+    "protocol/schemas/job_spec.schema.json": "4f75d9f1ccaa98d1b81d47c274a4487879bb037180c34acee553f62202993f4e",
+    "protocol/schemas/ledger_event.schema.json": "d0761eee4d0d8cc447843b5b0eef8ea4a7b097f4f4ffde8854872b61b92c6b11",
+    "protocol/schemas/ledger_head.schema.json": "4f2c86b9e4ad94b9fd96ba47de8f582de644fe32f8b4a19afdf1e7c17d9f9c07",
+    "protocol/schemas/monitor_specification.schema.json": "e9feed842c1d74b7138748fe4e467c9d0f30802518d953500b50d81a3f6c6a84",
+    "protocol/schemas/readiness_report.schema.json": "ae5a7db2778b2e721b97419252abf2d437d2d35549e0c7e162de5939538d2ea9",
+    "protocol/schemas/recovery_plan.schema.json": "7a5e7cad2f6f58d4026794138ebf9d96b625969c0e6af6e970448b4ce6b197e8",
+    "protocol/schemas/research_memory.schema.json": "0dd41187c7706f7f8f5e2e46574f70d77e041f58f8ad4c6b797de859badea1df",
+    "protocol/schemas/runtime_identity.schema.json": "1d32a031afe7bae982f36df03df1d4adc13c58bb341c9d3be437cc3562da201c",
+    "protocol/schemas/safety_envelope.schema.json": "c5814542cb24d0f3d80bdbb889d7d109f0f8ca546047a7cc8f8946a8352265f0",
+    "protocol/schemas/signer_anchor.schema.json": "8331e7191a0d12eada0d6408e8901e5be3a7871c8c3d66a5ab2e3ca7ebaff74b",
+    "protocol/schemas/split_lock.schema.json": "d8653e198c0a1c8a906106126d90d70a4dcab83b1f5a5322a7ef0565789d1764",
+    "protocol/schemas/test_observation.schema.json": "5b9f887af7e4c8660bc451624329fe9869297f717ab85b930fb2cd2246fcc21b",
+    "protocol/schemas/truth_record.schema.json": "23b9485a9a5b342ad442061c28ae96e5210dde7f416312f40e6506e5f44a8844",
+    "protocol/schemas/verification_result.schema.json": "118de2051879da25f4e6b362498d61281318e6a4894d95e57f76ff2f4bf2838a",
+    "protocol/trust/iter000_signer_anchor.json": "7174bedb14de9f6cc7bd178a2b70a71f75baa04d1291004dbfaa6304fb701022",
+    "pyproject.toml": "3da960709eb91b569fed548c3d21f0fad8596ea681c30c8b1433bbde1b83c37f",
+    "src/fieldtrue/__init__.py": "4583b023478a2eb342682fa37902148d96eb48cf923ebc312d5672b0f72295bb",
+    "src/fieldtrue/adapters/__init__.py": "0461bc3d888b5d8c7f4f1301caf3249501feea9aa958861305cb5bc67192a15a",
+    "src/fieldtrue/adapters/adapt.py": "ccb0865cf045373216b072ae6f9705edb4013992e19cb54903d8e13df1c1587e",
+    "src/fieldtrue/adapters/local_replay.py": "6074bfee3b1d262b8ad8cf258ee2e22c78a013129c41411d967f2f14470a399e",
+    "src/fieldtrue/approvals.py": "c54ed7f1cb947ac84ec6c566bc6bdb0ee9a37d8a771ab14cf3cc6c681bff40bd",
+    "src/fieldtrue/canonical.py": "17fab2b662edfe8082297bc634168946fd6621b0c62ff515cfbbd1d64fa2fc7d",
+    "src/fieldtrue/cli.py": "4ab68680415a8aff71ae796192073f66c9e476b7bcd1be90a363b3d43d793f50",
+    "src/fieldtrue/diagnosis.py": "4bf420c29e00fe571523c64706344e2fe179ba6273e44c541e29394cf1335f85",
+    "src/fieldtrue/domain.py": "da410c9b7b21fc19582328197920f7044803f97186a4d28f778ccf3124447893",
+    "src/fieldtrue/experiment.py": "a2f05e5dbeeb5a57d99696761b449757a2a2573dcbb91cb670ee39303804bb1f",
+    "src/fieldtrue/memory.py": "5734da57e5fb09bbbe4d3983c6e37d4582083c02860eea1ff436bfe1744eb60f",
+    "src/fieldtrue/mission.py": "1f0d62e079c0affd6ebb82984ee7cd6af2890407ae93e40efb4253dffae95d28",
+    "src/fieldtrue/planning.py": "5bcf10f0c236b7f9307df44a243983af44eff300b9d06f8db1a7cfcac52ad4d3",
+    "src/fieldtrue/ports.py": "414c1f5a0139deed279ad39ceaf01525eb16c4eb6098fa5e52b8de09749d823b",
+    "src/fieldtrue/py.typed": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "src/fieldtrue/readiness.py": "10f6e5cb62ebd89f923559e0f4adb4e826d3bbdba0e585917dd67e7a8a0a81e5",
+    "src/fieldtrue/receipts.py": "450da167c617ac9665390a196e325a53796eb6ae7383855a99d712e22c8c215c",
+    "src/fieldtrue/runtime.py": "f95635a85e76d45e7e77064a187b839b8be36b18913ba22d1a1c40ead9093e64",
+    "src/fieldtrue/schemas.py": "ddd530ee3dd5d412384fa81eb2de800c9ca47bad69e703565203e942a4f5934a",
+    "src/fieldtrue/splits.py": "be75782489205b057d5877499b26b1f5a94d087f5e3db8b6afddf12fb6beb412",
+    "src/fieldtrue/verification.py": "36a9b5fef440fc60fd8d70252db6454563f07ca9ed08887d18bc0255cf38d7e5",
+    "uv.lock": "19fe8aaea2f7af991cc614d8b439aa7101e02ced0147b7e534decb858efbb196"
+  },
+  "runtime_constraints": {
+    "tls": {
+      "bypass_forbidden": true,
+      "ca_bundle_sha256": "bbc7e9c01d7551bb8a159b5dedd989b8ee3ce105aff522b68eb1b01bf854cab0",
+      "certificate_verification": "required",
+      "hostname_verification": "required",
+      "minimum_tls_version": "TLSv1.2",
+      "trust_store": "certifi",
+      "trust_store_version": "2026.6.17"
+    }
+  },
+  "schema_version": "fieldtrue.attempt-authority.v1",
+  "signer_anchor": {
+    "binding": "sha256_at_consumption",
+    "path": "protocol/trust/iter000_signer_anchor.json",
+    "signer_public_key": "0d5d5313b054a05978811e3f56195d4e806b50924af05cb9c811dca8c1767646"
+  },
+  "trust_model": {
+    "blocks": [
+      "ordinary_attempt_output_deletion",
+      "concurrent_local_replay"
+    ],
+    "does_not_block": [
+      "same_local_owner_deletes_receipt",
+      "same_local_owner_rolls_back_repository",
+      "signing_key_compromise"
+    ],
+    "external_timestamp": false,
+    "signature": "git_pinned_local_ed25519"
+  }
+}
