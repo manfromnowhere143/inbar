@@ -1,0 +1,8 @@
+{
+  "anchor_id": "iter000-verification-correction-001",
+  "ledger_scope": "iter000_nasa_adapt_corpus_readiness/attempt_001/correction_001",
+  "mission_id": "fieldtrue",
+  "schema_version": "fieldtrue.signer-anchor.v1",
+  "signer_public_key": "4c67fd1a8cda703c589e8ee00963f5787be09c20ba86e0758eef37bb7878af05",
+  "trust_basis": "git-preregistered-local-key"
+}

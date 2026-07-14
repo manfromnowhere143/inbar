@@ -1,0 +1,176 @@
+{
+  "amendments": [
+    {
+      "path": "protocol/amendments/iter000_verification_001.json",
+      "sha256": "919df0feab263c52889964b728ddd296c8d585019a66fe3c01bd997fc893bfa9"
+    },
+    {
+      "path": "protocol/amendments/iter000_verification_002.json",
+      "sha256": "45d5d90c63bfda2b84bf962c9d7bf4c76db58fb241b7eb6d1b146a5535c7382c"
+    }
+  ],
+  "authority_id": "iter000_verification_001",
+  "authorized_command": [
+    "fieldtrue",
+    "experiment",
+    "verify-iter000-amendment-001-correction-001"
+  ],
+  "consumption": {
+    "consumption_timing": "before_outcome_artifact_interpretation",
+    "failure_mode": "fail_closed",
+    "maximum_consumptions": 1,
+    "proof_deletion_restores_authority": false,
+    "receipt_path": "experiments/iter000_nasa_adapt_corpus_readiness/verification/attempt_001_correction_001.json",
+    "receipt_presence_consumes_authority": true
+  },
+  "correction": {
+    "canonical_pretty_sha256": "5dd5875185f5a96e90dc31548d24318f8182e92fe34378dce05a2c5840a4fe88",
+    "path": "dataset_lock.json",
+    "protocol_path": "protocol/datasets/nasa_adapt_v1.json",
+    "raw_sha256": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+    "semantic_canonical_sha256": "5721cff5c79c34e4933724d607a2a48ed9fa8936ee0c453e5fc76f14bc46082f"
+  },
+  "implementation": {
+    "git_commit": "d07789886f7350a0405f49a358e3dabfdca6c878",
+    "git_tree": "ae669924fa31893d05d062bce51ae08d02d0a692",
+    "protocol_hashes": {
+      "experiments/iter000_nasa_adapt_corpus_readiness/HYPOTHESIS.md": "b5f18e02b54a137aa966ce70a3f89f2616167992cc2583508f2b3b0403d205d5",
+      "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_001.md": "d472b8b594b2a278f095de50435df2dfed1e4b72a9b4b9bb53502283545c9048",
+      "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_002.md": "394815237a85354a4b8b93054dd57fe5c3fe537dd593a55464c887a92cba37ba",
+      "experiments/iter000_nasa_adapt_corpus_readiness/authority/attempt_001_consumption.json": "8d155b56440a4dfa25cbdfa400344a32b29e8d877cd39fa4f2c0612b4371b8aa",
+      "protocol/amendments/iter000_verification_001.json": "919df0feab263c52889964b728ddd296c8d585019a66fe3c01bd997fc893bfa9",
+      "protocol/amendments/iter000_verification_002.json": "45d5d90c63bfda2b84bf962c9d7bf4c76db58fb241b7eb6d1b146a5535c7382c",
+      "protocol/attempt_authorities/iter000_001.json": "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a",
+      "protocol/datasets/nasa_adapt_v1.json": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+      "protocol/trust/iter000_signer_anchor.json": "7174bedb14de9f6cc7bd178a2b70a71f75baa04d1291004dbfaa6304fb701022"
+    },
+    "pyproject_sha256": "3da960709eb91b569fed548c3d21f0fad8596ea681c30c8b1433bbde1b83c37f",
+    "source_hashes": {
+      "src/fieldtrue/__init__.py": "4583b023478a2eb342682fa37902148d96eb48cf923ebc312d5672b0f72295bb",
+      "src/fieldtrue/adapters/__init__.py": "0461bc3d888b5d8c7f4f1301caf3249501feea9aa958861305cb5bc67192a15a",
+      "src/fieldtrue/adapters/adapt.py": "ccb0865cf045373216b072ae6f9705edb4013992e19cb54903d8e13df1c1587e",
+      "src/fieldtrue/adapters/local_replay.py": "6074bfee3b1d262b8ad8cf258ee2e22c78a013129c41411d967f2f14470a399e",
+      "src/fieldtrue/approvals.py": "c54ed7f1cb947ac84ec6c566bc6bdb0ee9a37d8a771ab14cf3cc6c681bff40bd",
+      "src/fieldtrue/canonical.py": "17fab2b662edfe8082297bc634168946fd6621b0c62ff515cfbbd1d64fa2fc7d",
+      "src/fieldtrue/cli.py": "97f1113f19ca3870fd7ad4590abd02395d94680388daf20fcee667c243f9378f",
+      "src/fieldtrue/diagnosis.py": "4bf420c29e00fe571523c64706344e2fe179ba6273e44c541e29394cf1335f85",
+      "src/fieldtrue/domain.py": "da410c9b7b21fc19582328197920f7044803f97186a4d28f778ccf3124447893",
+      "src/fieldtrue/experiment.py": "a2f05e5dbeeb5a57d99696761b449757a2a2573dcbb91cb670ee39303804bb1f",
+      "src/fieldtrue/memory.py": "5734da57e5fb09bbbe4d3983c6e37d4582083c02860eea1ff436bfe1744eb60f",
+      "src/fieldtrue/mission.py": "e53bb262cc8a14264db5303d324597b03e2aea016fa9a6c1f83c8dbea3d1648a",
+      "src/fieldtrue/planning.py": "5bcf10f0c236b7f9307df44a243983af44eff300b9d06f8db1a7cfcac52ad4d3",
+      "src/fieldtrue/ports.py": "414c1f5a0139deed279ad39ceaf01525eb16c4eb6098fa5e52b8de09749d823b",
+      "src/fieldtrue/py.typed": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "src/fieldtrue/readiness.py": "10f6e5cb62ebd89f923559e0f4adb4e826d3bbdba0e585917dd67e7a8a0a81e5",
+      "src/fieldtrue/receipts.py": "450da167c617ac9665390a196e325a53796eb6ae7383855a99d712e22c8c215c",
+      "src/fieldtrue/runtime.py": "f95635a85e76d45e7e77064a187b839b8be36b18913ba22d1a1c40ead9093e64",
+      "src/fieldtrue/schemas.py": "ddd530ee3dd5d412384fa81eb2de800c9ca47bad69e703565203e942a4f5934a",
+      "src/fieldtrue/splits.py": "be75782489205b057d5877499b26b1f5a94d087f5e3db8b6afddf12fb6beb412",
+      "src/fieldtrue/verification.py": "1189f38fbb4aa266f5f5b3d6ff7ff9aa7590a83521d80f46209d112682eb7908"
+    },
+    "test_hashes": {
+      "tests/__init__.py": "1e47f9c59ca12679ca950cb3edfa506f904ef5332c45bbfd70321d51a24368f9",
+      "tests/helpers.py": "8931296ccefcb02459a390f9a15f8dcd2d4bd13abda92fc1e6b71078479832ef",
+      "tests/integration/__init__.py": "a202b2ce299b29305f45280b401ceed8f6f120f6efeaca04b3d133d94e083e7c",
+      "tests/integration/test_experiment.py": "ed7e706f26eb130dd9fff8a3c073e80419bd0f90bbab744abf65345940e7b4b7",
+      "tests/unit/__init__.py": "84efe2d840d27f4e20614902ca0cd3c6ec734f349aed4f15a61d15087a406571",
+      "tests/unit/test_adapt.py": "37227bf832cd582f6f6b7fc2afad250aa2fe97430bd013311c4750e820b95a9f",
+      "tests/unit/test_approvals.py": "90ba4a7fada208a39eb2203162ea6202640e1ecc5e8a51e344f48ab6391837bf",
+      "tests/unit/test_canonical.py": "6366cec9629daf03fb4ed00a1553a6e7f3233cf5812463ada6d8368d3b3431a0",
+      "tests/unit/test_cli.py": "303e4647f71ff9e9deed357e438e8befb23c76431f918a30feec3eb9de078375",
+      "tests/unit/test_diagnosis.py": "0c882c198209e0eeeb5a8262ecd6d42d299991c7403b9bb46883748fc7f84cc6",
+      "tests/unit/test_domain.py": "69fb3e60d6f8f73a701c7b5ab0cd7c6dc32af3470a91783ee5bb420e46ed7855",
+      "tests/unit/test_local_replay.py": "f450170b7f752282192f780f6ba024cebf33447a380c391ae1e88f90d7677bb4",
+      "tests/unit/test_memory.py": "a3e52be10a73e894dcbbfc8404684c901f3bf165312fe743644b4856379c6d62",
+      "tests/unit/test_mission.py": "55a1dc3a5d65260f791987fd745717ee9a283075aa87e537174c51ab6cb7a55e",
+      "tests/unit/test_planning.py": "a334bead1bc17c700b02f97b43c0bf4f71a3b2cc90c62b0dd9d9ff34ccc5f7c7",
+      "tests/unit/test_ports.py": "0d8b9cf06020015190fddc18d13f8ab7697ad2fe4abe71505ab0ae6c19e956fd",
+      "tests/unit/test_proof_readiness.py": "634e309d6d535666eea36723e871e38e1e8b3997175f4973ce5811bd720a5c68",
+      "tests/unit/test_readiness.py": "40b71fec96400b7249230d1b9bbbfe9d7f9e754c858d74d18715702098b3f803",
+      "tests/unit/test_receipts.py": "aeeb5b7e751868a4860fbe53db3312093318e31c0cb003ec6b14cfd604a9d2d9",
+      "tests/unit/test_schemas_runtime.py": "bb658a4d9431de7f5a542d514ec64c33d4b739762a9cbf65c7853700b93596e4",
+      "tests/unit/test_splits.py": "c3d617687f7b6f10c812b8133c34138f7d83ebadc4b4127de86c06aa1eba8d54",
+      "tests/unit/test_verification.py": "9022bedffcc27d0c8b1de3a132d3e3ae8bc80c547c916b4cc421560dd2343b0e"
+    },
+    "uv_lock_sha256": "19fe8aaea2f7af991cc614d8b439aa7101e02ced0147b7e534decb858efbb196"
+  },
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "proof_binding": {
+    "artifact_count": 16,
+    "content_map_sha256": "bcc358bb5d2f837bb284970cfa686919fd91aa0864452e42c02f17c356556341",
+    "file_sha256": {
+      "AMENDMENT_001.md": "85ef78eab3bd9bff0507f855af1195ebab4753b0c77e1535e3345f7b4ba8536e",
+      "LEARNING.json": "dde7266c8ef44ffbcad20dc67897baf5f3d95b895662ba26eaa404daf976317f",
+      "RESULT.md": "28e6448047902e395c08c0fc51a432e88958a8c06adb34c619b7c304bbdb7df9",
+      "amendment_001.json": "c7aff0b2c61f95a396646a7869f8269778b8ef04cdf4e3ccc8e60943a570d8cc",
+      "artifact_bundle.json": "043e1f4f015378a6626923b36d90b5d56c13396ab3b88275d6a193870318e697",
+      "attempt_authority.json": "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a",
+      "attempt_authority_consumption.json": "8d155b56440a4dfa25cbdfa400344a32b29e8d877cd39fa4f2c0612b4371b8aa",
+      "coverage.json": "569e45683e0d0667722d0aa4c6a748d56a6e2faddce376e8bfd6e23191e96c1c",
+      "dataset_lock.json": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+      "execution_ledger.head.json": "d89901abec03c460bdcdaa2985dc65d6d9a3b076c16100f56c1f3a4f1dc0665e",
+      "execution_ledger.jsonl": "cb4aaf5d1cdabc42db25883d9e0db448cd41df56dcc8ebfd12eb73143151b728",
+      "ingestion_receipt.json": "d549282400fae1d18a74f0a54106a9427de5cc8841c8291f16d63c0bb3442c44",
+      "model_evidence_manifest.jsonl": "111f068f08d0e09901c10cce35c877fb78a58ec95899911293d9347ecbec2d5c",
+      "readiness_report.json": "15a680d3c6b8f845277e5a6ade562fa542e37c2e555a3ff1771ad3ec50566b86",
+      "run_manifest.json": "b62cc847ac587c2361d1143ac201bb0316ae5aa13662d819658c2d30defa6ced",
+      "truth_manifest.jsonl": "bb9e80e3f72f6a2d54d68c9dcf6daf9aff9a3d7e545389505f625e7af85174fb"
+    },
+    "git_commit": "15cd75dd761a1c3f1d75994445a9ce702c58810a",
+    "git_subtree": "5ad82ba61c522fc3e292ab7ceed9f7085b556673",
+    "path": "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_001"
+  },
+  "resource_constraints": {
+    "cloud_jobs": 0,
+    "gpu_hours": 0,
+    "network_access": false,
+    "paid_calls": 0
+  },
+  "schema_version": "fieldtrue.iter000-verification-authority.v1",
+  "signer_anchor": {
+    "path": "protocol/trust/iter000_verification_signer_anchor.json",
+    "sha256": "4ffa65ae628aa6a7aa2bc8ab0d76ede63ce697eec73e6aba0a19e5184658faaa",
+    "signer_public_key": "4c67fd1a8cda703c589e8ee00963f5787be09c20ba86e0758eef37bb7878af05"
+  },
+  "trigger": {
+    "attempt_id": "attempt_001",
+    "authority_consumption": {
+      "path": "experiments/iter000_nasa_adapt_corpus_readiness/authority/attempt_001_consumption.json",
+      "sha256": "8d155b56440a4dfa25cbdfa400344a32b29e8d877cd39fa4f2c0612b4371b8aa"
+    },
+    "execution_authority": {
+      "path": "protocol/attempt_authorities/iter000_001.json",
+      "sha256": "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a"
+    },
+    "execution_commit": {
+      "git_commit": "ab20d41be48003c443a807c733c4c8ce43445e01",
+      "git_tree": "e3d8a8609e483b37c755b252e4f43b57b4731480"
+    },
+    "failure": {
+      "outer_error_type": "ExperimentFinalizationError",
+      "outer_message": "sealed iter000 proof bundle failed independent verification",
+      "verifier_check": "canonical_pretty_json",
+      "verifier_error_type": "ProofBundleVerificationError",
+      "verifier_message": "dataset lock is not canonical pretty JSON"
+    },
+    "original_verifier": {
+      "path": "src/fieldtrue/verification.py",
+      "sha256": "36a9b5fef440fc60fd8d70252db6454563f07ca9ed08887d18bc0255cf38d7e5"
+    }
+  },
+  "trust_model": {
+    "blocks": [
+      "ordinary_receipt_deletion",
+      "concurrent_local_replay",
+      "proof_local_authority_substitution"
+    ],
+    "does_not_block": [
+      "same_local_owner_deletes_receipt",
+      "same_local_owner_rolls_back_repository",
+      "same_local_owner_controls_local_git",
+      "verification_key_compromise"
+    ],
+    "external_timestamp": false,
+    "signature": "git_pinned_separate_local_ed25519"
+  }
+}
