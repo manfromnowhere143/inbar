@@ -1,0 +1,195 @@
+{
+  "$defs": {
+    "ExecutionAuthority": {
+      "enum": [
+        "replay",
+        "simulator",
+        "testbed"
+      ],
+      "title": "ExecutionAuthority",
+      "type": "string"
+    },
+    "JobResources": {
+      "additionalProperties": false,
+      "properties": {
+        "accelerator_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Accelerator Count",
+          "type": "integer"
+        },
+        "accelerator_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accelerator Type"
+        },
+        "cpu": {
+          "exclusiveMinimum": 0.0,
+          "title": "Cpu",
+          "type": "number"
+        },
+        "memory_gb": {
+          "exclusiveMinimum": 0.0,
+          "title": "Memory Gb",
+          "type": "number"
+        }
+      },
+      "required": [
+        "cpu",
+        "memory_gb"
+      ],
+      "title": "JobResources",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowlist_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Allowlist Id",
+      "type": "string"
+    },
+    "allowlist_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Allowlist Sha256",
+      "type": "string"
+    },
+    "approval_receipt_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Approval Receipt Hash",
+      "type": "string"
+    },
+    "artifact_prefix": {
+      "minLength": 1,
+      "title": "Artifact Prefix",
+      "type": "string"
+    },
+    "authority": {
+      "$ref": "#/$defs/ExecutionAuthority"
+    },
+    "budget_usd": {
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+      "title": "Budget Usd",
+      "type": "string"
+    },
+    "case_hashes": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Case Hashes",
+      "type": "array"
+    },
+    "command": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Command",
+      "type": "array"
+    },
+    "command_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Command Sha256",
+      "type": "string"
+    },
+    "cost_estimate_source": {
+      "minLength": 1,
+      "title": "Cost Estimate Source",
+      "type": "string"
+    },
+    "cost_estimate_usd": {
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+      "title": "Cost Estimate Usd",
+      "type": "string"
+    },
+    "cost_estimated_at": {
+      "format": "date-time",
+      "title": "Cost Estimated At",
+      "type": "string"
+    },
+    "dataset_hashes": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Dataset Hashes",
+      "type": "array"
+    },
+    "git_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Git Commit",
+      "type": "string"
+    },
+    "idempotency_key": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Idempotency Key",
+      "type": "string"
+    },
+    "job_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "max_runtime_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Runtime Seconds",
+      "type": "integer"
+    },
+    "oci_image_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Oci Image Digest",
+      "type": "string"
+    },
+    "resources": {
+      "$ref": "#/$defs/JobResources"
+    },
+    "schema_version": {
+      "const": "fieldtrue.job-spec.v1",
+      "default": "fieldtrue.job-spec.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "secret_references": {
+      "default": [],
+      "items": {
+        "pattern": "^secret://[A-Za-z0-9][A-Za-z0-9._/-]{1,255}@[A-Za-z0-9._-]+$",
+        "type": "string"
+      },
+      "title": "Secret References",
+      "type": "array"
+    }
+  },
+  "required": [
+    "job_id",
+    "git_commit",
+    "oci_image_digest",
+    "command",
+    "command_sha256",
+    "allowlist_id",
+    "allowlist_sha256",
+    "dataset_hashes",
+    "case_hashes",
+    "resources",
+    "max_runtime_seconds",
+    "idempotency_key",
+    "artifact_prefix",
+    "budget_usd",
+    "cost_estimate_usd",
+    "cost_estimate_source",
+    "cost_estimated_at",
+    "authority",
+    "approval_receipt_hash"
+  ],
+  "title": "JobSpec",
+  "type": "object"
+}

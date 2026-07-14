@@ -1,0 +1,69 @@
+{
+  "schema_version": "fieldtrue.gate-control-registry.v1",
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "controls": [
+    {
+      "gate_id": "source-integrity",
+      "failure_class": "invalid",
+      "positive_control": "tests/unit/test_readiness.py::test_source_integrity_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_source_integrity_negative_control"
+    },
+    {
+      "gate_id": "parser-integrity",
+      "failure_class": "invalid",
+      "positive_control": "tests/unit/test_readiness.py::test_parser_integrity_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_parser_integrity_negative_control"
+    },
+    {
+      "gate_id": "truth-separation",
+      "failure_class": "invalid",
+      "positive_control": "tests/unit/test_readiness.py::test_truth_separation_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_truth_separation_negative_control"
+    },
+    {
+      "gate_id": "minimum-count",
+      "failure_class": "blocked",
+      "positive_control": "tests/unit/test_readiness.py::test_minimum_count_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_minimum_count_negative_control"
+    },
+    {
+      "gate_id": "ambiguity",
+      "failure_class": "blocked",
+      "positive_control": "tests/unit/test_readiness.py::test_ambiguity_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_ambiguity_negative_control"
+    },
+    {
+      "gate_id": "discriminating-action",
+      "failure_class": "blocked",
+      "positive_control": "tests/unit/test_readiness.py::test_discriminating_action_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_discriminating_action_negative_control"
+    },
+    {
+      "gate_id": "transfer-support",
+      "failure_class": "blocked",
+      "positive_control": "tests/unit/test_readiness.py::test_transfer_support_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_transfer_support_negative_control"
+    },
+    {
+      "gate_id": "evidence-usefulness",
+      "failure_class": "blocked",
+      "positive_control": "tests/unit/test_readiness.py::test_evidence_usefulness_positive_control",
+      "negative_control": "tests/unit/test_readiness.py::test_evidence_usefulness_negative_control"
+    }
+  ],
+  "execution_seal": {
+    "schema_version": "fieldtrue.gate-control-execution-seal.v1",
+    "runner": "python -m pytest",
+    "expected_exit_code": 0,
+    "sealed_paths": [
+      "src/fieldtrue/adapters/adapt.py",
+      "src/fieldtrue/domain.py",
+      "src/fieldtrue/mission.py",
+      "src/fieldtrue/readiness.py",
+      "tests/helpers.py",
+      "tests/unit/test_readiness.py"
+    ],
+    "control_set_sha256": "57455339b2b61c0239196d5bf49c979bb9be5931f2ca1dc2f7e419fca0b37dd8",
+    "passing_result_sha256": "1f0f71b71f96cb017d0ddc95273c727ba9932917a99d832cde90f99d328be8fb"
+  }
+}

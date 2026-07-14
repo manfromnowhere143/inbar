@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "event_count": {
+      "minimum": 0,
+      "title": "Event Count",
+      "type": "integer"
+    },
+    "head_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Head Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.ledger-head.v1",
+      "default": "fieldtrue.ledger-head.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signature": {
+      "pattern": "^[0-9a-f]{128}$",
+      "title": "Signature",
+      "type": "string"
+    },
+    "signer_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Signer Public Key",
+      "type": "string"
+    },
+    "trust_level": {
+      "const": "local_ed25519_no_external_timestamp",
+      "default": "local_ed25519_no_external_timestamp",
+      "title": "Trust Level",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_count",
+    "head_hash",
+    "signer_public_key",
+    "signature"
+  ],
+  "title": "LedgerHead",
+  "type": "object"
+}

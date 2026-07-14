@@ -1,0 +1,145 @@
+{
+  "$defs": {
+    "CausalHypothesis": {
+      "additionalProperties": false,
+      "properties": {
+        "contradicting_evidence_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Contradicting Evidence Ids",
+          "type": "array"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "disposition": {
+          "default": "active",
+          "title": "Disposition",
+          "type": "string"
+        },
+        "hypothesis_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "mechanism_edges": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MechanismEdge"
+          },
+          "title": "Mechanism Edges",
+          "type": "array"
+        },
+        "prior": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Prior",
+          "type": "number"
+        },
+        "supporting_evidence_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Supporting Evidence Ids",
+          "type": "array"
+        },
+        "unknown": {
+          "default": false,
+          "title": "Unknown",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hypothesis_id",
+        "description",
+        "prior"
+      ],
+      "title": "CausalHypothesis",
+      "type": "object"
+    },
+    "MechanismEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "cause": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Cause",
+          "type": "string"
+        },
+        "effect": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Effect",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "lag_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lag Seconds"
+        },
+        "relation": {
+          "minLength": 1,
+          "title": "Relation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cause",
+        "effect",
+        "relation"
+      ],
+      "title": "MechanismEdge",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "hypotheses": {
+      "items": {
+        "$ref": "#/$defs/CausalHypothesis"
+      },
+      "minItems": 2,
+      "title": "Hypotheses",
+      "type": "array"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "proposer_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Proposer Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "hypotheses",
+    "proposer_id"
+  ],
+  "title": "HypothesisSet",
+  "type": "object"
+}

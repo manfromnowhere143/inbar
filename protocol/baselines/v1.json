@@ -1,5 +1,5 @@
 {
-  "schema_version": "acma.baseline-lock.v1",
+  "schema_version": "fieldtrue.baseline-lock.v1",
   "baseline_set_id": "cheap-first-v1",
   "order": [
     "existing_test_suite",

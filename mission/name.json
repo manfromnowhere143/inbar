@@ -1,0 +1,49 @@
+{
+  "schema_version": "fieldtrue.identity-decision.v1",
+  "canonical_name": "Fieldtrue",
+  "canonical_slug": "fieldtrue",
+  "pronunciation": "field true",
+  "descriptor": "Active Causal Mission Assurance",
+  "adopted_on": "2026-07-14",
+  "status": "internal_adoption_pending_professional_clearance",
+  "rationale": "A system becomes field-true only when its claimed objective survives independent intervention, physical execution, held-out transfer, and settled recovery. Benchmark success alone is insufficient.",
+  "portfolio_relationship": {
+    "Sentinel": "watches and intervenes",
+    "Telos": "verifies actual task completion",
+    "Fieldtrue": "requires a claimed objective to survive contact with physical reality"
+  },
+  "current_collision_audit": {
+    "performed_on": "2026-07-14",
+    "adjacent_sector_finding": "No exact AI, robotics, autonomy, aerospace, research-assurance, PyPI, npm, or GitHub repository match was found.",
+    "known_unrelated_exact_use": "fieldTRUE LLC is an established United States agriculture and farm-box business using fieldtrue.com.",
+    "legal_effect": "none",
+    "package_registry_http_status": {
+      "pypi": 404,
+      "npm": 404
+    },
+    "github_exact_repository_count": 0,
+    "sources": [
+      "https://www.fieldtrue.com/philosophy",
+      "https://www.linkedin.com/company/fieldtrue"
+    ]
+  },
+  "pre_publication_gate": [
+    "professional trademark knockout search",
+    "company and common-law registry search",
+    "domain and social handle verification",
+    "package and developer-ecosystem recheck",
+    "written identity disposition"
+  ],
+  "symbol_direction": "A measured field trajectory crosses an open verification plane, changes under intervention, and settles on a fixed datum. The geometry communicates evidence, challenge, and recovery without a literal shield.",
+  "symbol_constraints": [
+    "monochrome-first",
+    "legible as favicon, telemetry glyph, technical-document mark, and spacecraft stencil",
+    "no checkmark",
+    "no rocket",
+    "no eye",
+    "no brain",
+    "no atom",
+    "no forced monogram"
+  ],
+  "symbol_generation_status": "deferred_until_identity_clearance_and_first_scientific_gate_are_stable"
+}

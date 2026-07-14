@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "ExecutionAuthority": {
+      "enum": [
+        "replay",
+        "simulator",
+        "testbed"
+      ],
+      "title": "ExecutionAuthority",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "minLength": 1,
+      "title": "Action",
+      "type": "string"
+    },
+    "approval_receipt_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Receipt Hash"
+    },
+    "authority": {
+      "$ref": "#/$defs/ExecutionAuthority"
+    },
+    "expected_settled_state": {
+      "additionalProperties": true,
+      "minProperties": 1,
+      "title": "Expected Settled State",
+      "type": "object"
+    },
+    "hypothesis_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Hypothesis Id",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "proposer_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Proposer Id",
+      "type": "string"
+    },
+    "recovery_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "target": {
+      "minLength": 1,
+      "title": "Target",
+      "type": "string"
+    }
+  },
+  "required": [
+    "recovery_id",
+    "incident_id",
+    "hypothesis_id",
+    "proposer_id",
+    "action",
+    "target",
+    "expected_settled_state",
+    "authority"
+  ],
+  "title": "RecoveryPlan",
+  "type": "object"
+}

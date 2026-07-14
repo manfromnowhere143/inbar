@@ -1,13 +1,13 @@
 # Mission Agent Bootstrap
 
 Canonical workspace:
-`/Users/danielwahnich/workspace/active-causal-mission-assurance`.
+`/Users/danielwahnich/workspace/fieldtrue`.
 
 Run first:
 
 ```bash
-uv sync --all-extras
-uv run acma mission validate
+uv sync --group dev
+uv run fieldtrue mission validate
 uv run pytest --cov
 git status --short --branch
 ```
@@ -54,4 +54,3 @@ git status --short --branch
 - Per-iteration authority: `experiments/<id>/HYPOTHESIS.md`
 - Claims: `claims/registry.jsonl`
 - Dynamic handoff: `HANDOFF.md` (generated; never hand-edit)
-

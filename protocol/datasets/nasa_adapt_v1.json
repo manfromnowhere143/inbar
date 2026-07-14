@@ -1,5 +1,5 @@
 {
-  "schema_version": "acma.dataset-lock.v1",
+  "schema_version": "fieldtrue.dataset-lock.v1",
   "dataset_id": "nasa-adapt-public-v1",
   "source_authority": "NASA Open Data Portal / DASHlink",
   "landing_page": "https://data.nasa.gov/dataset/adapt-dataset",

@@ -1,0 +1,167 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "clock_domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clock Domain"
+        },
+        "license_ref": {
+          "minLength": 1,
+          "title": "License Ref",
+          "type": "string"
+        },
+        "lineage_sha256": {
+          "default": [],
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Lineage Sha256",
+          "type": "array"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "source_authority": {
+          "minLength": 1,
+          "title": "Source Authority",
+          "type": "string"
+        },
+        "uri": {
+          "minLength": 1,
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "uri",
+        "sha256",
+        "bytes",
+        "media_type",
+        "source_authority",
+        "license_ref"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ExecutionAuthority": {
+      "enum": [
+        "replay",
+        "simulator",
+        "testbed"
+      ],
+      "title": "ExecutionAuthority",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval_receipt_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Receipt Hash"
+    },
+    "authority": {
+      "$ref": "#/$defs/ExecutionAuthority"
+    },
+    "candidate_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Candidate Sha256",
+      "type": "string"
+    },
+    "executor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Executor Id",
+      "type": "string"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "observation_artifact": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "outcome_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Outcome Id",
+      "type": "string"
+    },
+    "safety_envelope_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Safety Envelope Id",
+      "type": "string"
+    },
+    "safety_envelope_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Safety Envelope Sha256",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "test_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Test Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "test_id",
+    "outcome_id",
+    "authority",
+    "executor_id",
+    "started_at",
+    "finished_at",
+    "observation_artifact",
+    "safety_envelope_id",
+    "candidate_sha256",
+    "safety_envelope_sha256"
+  ],
+  "title": "TestObservation",
+  "type": "object"
+}

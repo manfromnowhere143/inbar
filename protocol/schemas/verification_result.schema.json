@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "clock_domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clock Domain"
+        },
+        "license_ref": {
+          "minLength": 1,
+          "title": "License Ref",
+          "type": "string"
+        },
+        "lineage_sha256": {
+          "default": [],
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Lineage Sha256",
+          "type": "array"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "source_authority": {
+          "minLength": 1,
+          "title": "Source Authority",
+          "type": "string"
+        },
+        "uri": {
+          "minLength": 1,
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "uri",
+        "sha256",
+        "bytes",
+        "media_type",
+        "source_authority",
+        "license_ref"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "abstained": {
+      "title": "Abstained",
+      "type": "boolean"
+    },
+    "action_valid": {
+      "title": "Action Valid",
+      "type": "boolean"
+    },
+    "outcome_artifacts": {
+      "items": {
+        "$ref": "#/$defs/ArtifactRef"
+      },
+      "minItems": 1,
+      "title": "Outcome Artifacts",
+      "type": "array"
+    },
+    "proposer_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Proposer Id",
+      "type": "string"
+    },
+    "recovery_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "scope": {
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    },
+    "settled_success": {
+      "title": "Settled Success",
+      "type": "boolean"
+    },
+    "target_valid": {
+      "title": "Target Valid",
+      "type": "boolean"
+    },
+    "verification_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Verification Id",
+      "type": "string"
+    },
+    "verifier_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Verifier Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "verification_id",
+    "recovery_id",
+    "verifier_id",
+    "proposer_id",
+    "action_valid",
+    "target_valid",
+    "settled_success",
+    "abstained",
+    "outcome_artifacts",
+    "scope"
+  ],
+  "title": "VerificationResult",
+  "type": "object"
+}

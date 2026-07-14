@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "ResourceReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resource_id",
+        "filename",
+        "sha256",
+        "bytes",
+        "verified"
+      ],
+      "title": "ResourceReceipt",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "coverage_report_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Coverage Report Sha256",
+      "type": "string"
+    },
+    "dataset_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "dataset_lock_content_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dataset Lock Content Sha256",
+      "type": "string"
+    },
+    "derived_artifact_hashes": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Derived Artifact Hashes",
+      "type": "array"
+    },
+    "evidence_bundle_count": {
+      "title": "Evidence Bundle Count",
+      "type": "integer"
+    },
+    "evidence_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Evidence Manifest Sha256",
+      "type": "string"
+    },
+    "experiment_count": {
+      "title": "Experiment Count",
+      "type": "integer"
+    },
+    "resource_receipts": {
+      "items": {
+        "$ref": "#/$defs/ResourceReceipt"
+      },
+      "title": "Resource Receipts",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "fieldtrue.adapt-ingestion.v1",
+      "default": "fieldtrue.adapt-ingestion.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "truth_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Truth Manifest Sha256",
+      "type": "string"
+    },
+    "truth_record_count": {
+      "title": "Truth Record Count",
+      "type": "integer"
+    },
+    "truth_separation_passed": {
+      "title": "Truth Separation Passed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "dataset_id",
+    "dataset_lock_content_sha256",
+    "resource_receipts",
+    "experiment_count",
+    "evidence_bundle_count",
+    "truth_record_count",
+    "evidence_manifest_sha256",
+    "truth_manifest_sha256",
+    "coverage_report_sha256",
+    "truth_separation_passed",
+    "derived_artifact_hashes"
+  ],
+  "title": "AdaptIngestionReceipt",
+  "type": "object"
+}

@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "description": "Scoped evidence packet, not a regulatory or universal safety certificate.",
+  "properties": {
+    "certificate_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Certificate Id",
+      "type": "string"
+    },
+    "forbidden_claims": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Forbidden Claims",
+      "type": "array"
+    },
+    "hypothesis_set_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Hypothesis Set Hash",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "monitor_spec_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Monitor Spec Hash"
+    },
+    "observation_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Observation Hash",
+      "type": "string"
+    },
+    "recovery_plan_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Recovery Plan Hash",
+      "type": "string"
+    },
+    "scope": {
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    },
+    "selected_test_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Selected Test Hash",
+      "type": "string"
+    },
+    "verification_result_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Verification Result Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "certificate_id",
+    "incident_id",
+    "hypothesis_set_hash",
+    "selected_test_hash",
+    "observation_hash",
+    "recovery_plan_hash",
+    "verification_result_hash",
+    "scope",
+    "forbidden_claims"
+  ],
+  "title": "AssuranceCertificate",
+  "type": "object"
+}

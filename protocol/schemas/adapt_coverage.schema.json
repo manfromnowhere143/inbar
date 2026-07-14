@@ -1,0 +1,132 @@
+{
+  "$defs": {
+    "AdaptFileCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "antagonist_command_rows": {
+          "title": "Antagonist Command Rows",
+          "type": "integer"
+        },
+        "experiment_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Experiment Id",
+          "type": "string"
+        },
+        "fault_injection_rows": {
+          "title": "Fault Injection Rows",
+          "type": "integer"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        },
+        "nonempty_rows": {
+          "title": "Nonempty Rows",
+          "type": "integer"
+        },
+        "raw_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Raw Sha256",
+          "type": "string"
+        },
+        "row_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Row Counts",
+          "type": "object"
+        },
+        "sensor_count": {
+          "title": "Sensor Count",
+          "type": "integer"
+        },
+        "telemetry_rows": {
+          "title": "Telemetry Rows",
+          "type": "integer"
+        },
+        "user_command_rows": {
+          "title": "User Command Rows",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "filename",
+        "raw_sha256",
+        "experiment_id",
+        "sensor_count",
+        "telemetry_rows",
+        "user_command_rows",
+        "antagonist_command_rows",
+        "fault_injection_rows",
+        "nonempty_rows",
+        "row_counts"
+      ],
+      "title": "AdaptFileCoverage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "discovered_files": {
+      "title": "Discovered Files",
+      "type": "integer"
+    },
+    "exact_file_coverage": {
+      "title": "Exact File Coverage",
+      "type": "boolean"
+    },
+    "expected_files": {
+      "title": "Expected Files",
+      "type": "integer"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/AdaptFileCoverage"
+      },
+      "title": "Files",
+      "type": "array"
+    },
+    "leakage_markers_found": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Leakage Markers Found",
+      "type": "array"
+    },
+    "parsed_files": {
+      "title": "Parsed Files",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "fieldtrue.adapt-coverage.v1",
+      "default": "fieldtrue.adapt-coverage.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "total_fault_injection_rows": {
+      "title": "Total Fault Injection Rows",
+      "type": "integer"
+    },
+    "total_telemetry_rows": {
+      "title": "Total Telemetry Rows",
+      "type": "integer"
+    },
+    "total_user_command_rows": {
+      "title": "Total User Command Rows",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "expected_files",
+    "discovered_files",
+    "parsed_files",
+    "exact_file_coverage",
+    "total_telemetry_rows",
+    "total_user_command_rows",
+    "total_fault_injection_rows",
+    "files",
+    "leakage_markers_found"
+  ],
+  "title": "AdaptCoverageReport",
+  "type": "object"
+}

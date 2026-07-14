@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "ExecutionAuthority": {
+      "enum": [
+        "replay",
+        "simulator",
+        "testbed"
+      ],
+      "title": "ExecutionAuthority",
+      "type": "string"
+    },
+    "TestOutcomeModel": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Outcome Id",
+          "type": "string"
+        },
+        "probability_by_hypothesis": {
+          "patternProperties": {
+            "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$": {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            }
+          },
+          "title": "Probability By Hypothesis",
+          "type": "object"
+        }
+      },
+      "required": [
+        "outcome_id",
+        "probability_by_hypothesis"
+      ],
+      "title": "TestOutcomeModel",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval_receipt_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Receipt Hash"
+    },
+    "approved": {
+      "title": "Approved",
+      "type": "boolean"
+    },
+    "authority": {
+      "$ref": "#/$defs/ExecutionAuthority"
+    },
+    "cost_units": {
+      "minimum": 0.0,
+      "title": "Cost Units",
+      "type": "number"
+    },
+    "description": {
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "duration_seconds": {
+      "minimum": 0.0,
+      "title": "Duration Seconds",
+      "type": "number"
+    },
+    "outcome_model": {
+      "items": {
+        "$ref": "#/$defs/TestOutcomeModel"
+      },
+      "minItems": 1,
+      "title": "Outcome Model",
+      "type": "array"
+    },
+    "preconditions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "risk": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Risk",
+      "type": "number"
+    },
+    "test_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Test Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "test_id",
+    "description",
+    "authority",
+    "approved",
+    "cost_units",
+    "duration_seconds",
+    "risk",
+    "outcome_model"
+  ],
+  "title": "DiscriminatingTest",
+  "type": "object"
+}

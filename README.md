@@ -1,71 +1,90 @@
-# Active Causal Mission Assurance
+# Fieldtrue
 
-**Working research descriptor, not the final product name.**
+Active Causal Mission Assurance
 
-Can a system turn asynchronous multimodal incident evidence into competing physical fault
-mechanisms, select the safest and least expensive test that separates them, verify recovery
-through an independent execution authority, and compile the resolved mechanism into a calibrated
-monitor that transfers to unseen hardware?
+Fieldtrue is a research system for testing whether multimodal autonomy remains correct when its
+claims meet physical reality. Models propose causal hypotheses and recovery candidates. Approved
+interventions, independent execution, and settled outcomes determine what is accepted.
 
-This repository is the independent Daniel-owned mission and product seed. It is not an Aweb
-package, a Maestro subsystem, an anomaly dashboard, a generic root-cause chatbot, or the future
-general-purpose research engine.
+The name defines the target property. A system becomes field-true only when its claimed objective
+survives independent intervention, physical execution, held-out transfer, and recovery. Benchmark
+performance alone is insufficient.
 
-## Honest status
+## Research question
 
-The mission launched on 2026-07-14. Iteration 000 is a pre-registered corpus-readiness gate over
-NASA ADAPT. No model, active-diagnosis, recovery, safety, transfer, product, state-of-the-art, or
-economic claim exists yet. The first public corpus is expected to be useful for parser and
-evidence-plane validation but too small to satisfy the 30-incident scientific gate; the committed
-analyzer, not prose, owns that verdict.
+Can a system turn asynchronous multimodal incident evidence into competing physical mechanisms,
+select the safest cost-aware test that separates them, verify recovery through an independent
+outcome authority, and compile the resolved mechanism into a calibrated monitor that transfers to
+unseen hardware?
 
-## Product wedge
+## Current status
 
-The first product-shaped workflow is offline and read-only:
+The repository is at corpus qualification. Iteration 000 is a preregistered readiness adjudication
+over the public NASA ADAPT corpus. It is not a model benchmark. No diagnosis, recovery, safety,
+transfer, product-readiness, state-of-the-art, or economic-value claim is authorized.
 
-> Provide a spacecraft or robotic test-incident bundle; receive ranked falsifiable mechanisms,
-> missing evidence, the next preapproved safe discriminating test, and independently executed
-> evidence for or against a proposed recovery.
+The expected result is useful even if blocked: it determines whether the corpus can support the
+central experiment before model training or cloud spend begins.
 
-There is deliberately no live or flight command authority in v0.
+## Authority model
 
-## Architecture invariants
+1. Evidence: model-visible telemetry, commands, imagery, text, and provenance.
+2. Truth: separately committed adjudication records unavailable to proposers.
+3. Hypothesis: open-world causal candidates with an explicit unknown mechanism.
+4. Intervention: preapproved actions ranked by information, risk, cost, and duration.
+5. Outcome: independent execution evidence and a settled-state requirement.
+6. Claim: registered scope, uncertainty, falsifiers, and forbidden interpretations.
 
-- Model-visible evidence and adjudication truth are physically separate artifacts.
-- Every artifact, transition, hypothesis, test proposal, result, and claim is content-addressed.
-- Learned multimodal systems may propose hypotheses; they are never the safety authority.
-- Tests come only from an approved action set and carry explicit cost, duration, and risk.
-- The recovery proposer cannot be its sole verifier.
-- Unknown mechanisms and calibrated abstention are first-class outcomes.
-- Evaluation holds out hardware, vehicle, mission, and fault family, never random windows.
-- Aweb, Maestro, Google Cloud, and GPU runners are optional adapters behind typed ports.
-- Nulls, corrections, blocked gates, and cheap-baseline wins are publishable results.
+Learned systems never hold safety authority. Version 0 permits replay, simulation, and explicitly
+approved testbed execution. Flight, live spacecraft, live robot, destructive, financial, and
+deployment authority are forbidden.
 
-## Local verification
+## Engineering invariants
+
+1. Model-visible evidence and adjudication truth are separate artifacts.
+2. Artifacts, transitions, approvals, and claims are content-addressed.
+3. Every claim-bearing gate must reject a deliberately broken or placebo control.
+4. Recovery proposers cannot serve as their sole outcome verifier.
+5. Unknown mechanisms and calibrated abstention are first-class outcomes.
+6. Evaluation holds out connected hardware, mission, and fault groups rather than random windows.
+7. Null, blocked, invalid, interrupted, and correction results retain full evidentiary weight.
+8. Aweb, Maestro, cloud providers, and GPU runners remain optional adapters behind typed ports.
+9. A signed report is not scientific authority; the verifier recomputes its verdict from the
+   sealed evidence and truth planes.
+
+## Verification
 
 ```bash
-uv sync --all-extras
+uv sync
 uv run ruff check .
+uv run ruff format .
 uv run mypy src
-uv run pytest --cov
-uv run acma mission validate
+uv run coverage run -m pytest
+uv run coverage report
+uv run fieldtrue schemas check
+uv run fieldtrue mission validate
 ```
 
-The NASA ADAPT acquisition and readiness execution are documented in the frozen iteration-000
-hypothesis. Third-party dataset bytes are never committed.
+Third-party dataset bytes are not committed. The frozen iteration hypothesis defines acquisition,
+stop rules, verdict classes, expected proof artifacts, and forbidden claims.
+
+The iteration proof contains the exact dataset lock, ingestion receipt, coverage report,
+model-visible manifest, separately sealed truth manifest, machine-readable readiness report, and
+one authoritative human-readable result. Verification fails when the reported gates differ from
+proof-local recomputation, even when every producer artifact and ledger event is validly signed.
 
 ## Repository map
 
 ```text
-src/mission_assurance/     domain core, ports, adapters, application services, CLI
-mission/                   machine-readable contract and lifecycle state
-protocol/                  frozen datasets, baselines, schemas, and split policy
-experiments/               preregistration, proof, result, and learning record per iteration
-claims/                    machine-readable scoped claim registry
-docs/                      architecture, mathematics, threat model, and frontier boundary
-tests/                     unit, mutation, integration, placebo, and end-to-end guards
+src/fieldtrue/  Domain core, ports, adapters, services, verifier, and command line
+mission/        Machine-readable ownership, identity, lifecycle, and release gates
+protocol/       Frozen data, trust, baseline, split, and control contracts
+experiments/    Preregistration, proof bundle, result, and learning record per iteration
+claims/         Scoped machine-readable claim registry
+memory/         Append-only evidence for the future standalone research engine
+docs/           Architecture, mathematics, frontier review, and publication controls
+tests/          Unit, adversarial, placebo, integration, and end-to-end verification
 ```
 
-See [the architecture](docs/ARCHITECTURE.md), [master preregistration](PREREGISTRATION.md), and
-[claim boundaries](docs/CLAIM_BOUNDARIES.md) before interpreting any result.
-
+Read [Architecture](docs/ARCHITECTURE.md), [Preregistration](PREREGISTRATION.md), and
+[Claim Boundaries](docs/CLAIM_BOUNDARIES.md) before interpreting a result.

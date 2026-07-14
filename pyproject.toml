@@ -1,14 +1,27 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "active-causal-mission-assurance"
+name = "fieldtrue"
 version = "0.1.0"
 description = "Evidence-first active causal diagnosis and independently verified recovery for physical systems."
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 authors = [{ name = "Daniel Wahnich" }]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: Other/Proprietary License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
 dependencies = [
   "networkx>=3.4,<4",
   "numpy>=2.0,<3",
@@ -20,6 +33,9 @@ dependencies = [
 
 [project.optional-dependencies]
 data = ["pyarrow>=19,<24"]
+gpu = ["torch>=2.7,<3"]
+
+[dependency-groups]
 dev = [
   "hypothesis>=6.120,<7",
   "mypy>=1.14,<2",
@@ -27,13 +43,27 @@ dev = [
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
 ]
-gpu = ["torch>=2.7,<3"]
+release = [
+  "build>=1.3,<2",
+  "check-wheel-contents>=0.6,<1",
+  "twine>=6.2,<7",
+]
+security = ["pip-audit>=2.9,<3"]
 
 [project.scripts]
-acma = "mission_assurance.cli:main"
+fieldtrue = "fieldtrue.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mission_assurance"]
+packages = ["src/fieldtrue"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src/fieldtrue",
+  "/IP_NOTICE.md",
+  "/README.md",
+  "/pyproject.toml",
+]
+exclude = ["/.gitignore"]
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --strict-config"
@@ -41,7 +71,7 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["mission_assurance"]
+source = ["fieldtrue"]
 
 [tool.coverage.report]
 fail_under = 90
@@ -58,5 +88,4 @@ ignore = ["S101"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-packages = ["mission_assurance"]
-
+packages = ["fieldtrue"]

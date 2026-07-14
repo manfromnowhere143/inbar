@@ -1,0 +1,281 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "clock_domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clock Domain"
+        },
+        "license_ref": {
+          "minLength": 1,
+          "title": "License Ref",
+          "type": "string"
+        },
+        "lineage_sha256": {
+          "default": [],
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Lineage Sha256",
+          "type": "array"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "source_authority": {
+          "minLength": 1,
+          "title": "Source Authority",
+          "type": "string"
+        },
+        "uri": {
+          "minLength": 1,
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "uri",
+        "sha256",
+        "bytes",
+        "media_type",
+        "source_authority",
+        "license_ref"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ReviewAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "attestation_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Attestation Id",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "minItems": 1,
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/ReviewKind"
+        },
+        "method": {
+          "minLength": 1,
+          "title": "Method",
+          "type": "string"
+        },
+        "producer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Producer Id",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        },
+        "subject_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Subject Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "attestation_id",
+        "kind",
+        "producer_id",
+        "reviewer_id",
+        "subject_ids",
+        "method",
+        "scope",
+        "evidence_refs",
+        "reviewed_at"
+      ],
+      "title": "ReviewAttestation",
+      "type": "object"
+    },
+    "ReviewKind": {
+      "enum": [
+        "cause",
+        "ambiguity",
+        "safe_test"
+      ],
+      "title": "ReviewKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Adjudication-only record; never an input to a hypothesis engine.",
+  "properties": {
+    "cause_authority": {
+      "minLength": 1,
+      "title": "Cause Authority",
+      "type": "string"
+    },
+    "commitment_nonce": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Commitment Nonce",
+      "type": "string"
+    },
+    "competing_hypothesis_ids": {
+      "default": [],
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "title": "Competing Hypothesis Ids",
+      "type": "array"
+    },
+    "fault_family": {
+      "minLength": 1,
+      "title": "Fault Family",
+      "type": "string"
+    },
+    "hardware_family": {
+      "minLength": 1,
+      "title": "Hardware Family",
+      "type": "string"
+    },
+    "hardware_id": {
+      "minLength": 1,
+      "title": "Hardware Id",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "injection_method": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Injection Method"
+    },
+    "injection_times": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Injection Times",
+      "type": "array"
+    },
+    "mechanism_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Mechanism Ids",
+      "type": "array"
+    },
+    "notes": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "review_attestations": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ReviewAttestation"
+      },
+      "title": "Review Attestations",
+      "type": "array"
+    },
+    "safe_discriminating_test_ids": {
+      "default": [],
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "title": "Safe Discriminating Test Ids",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "fieldtrue.truth-record.v1",
+      "default": "fieldtrue.truth-record.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "settled_outcome_refs": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ArtifactRef"
+      },
+      "title": "Settled Outcome Refs",
+      "type": "array"
+    },
+    "verification_method": {
+      "minLength": 1,
+      "title": "Verification Method",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "commitment_nonce",
+    "hardware_family",
+    "hardware_id",
+    "fault_family",
+    "mechanism_ids",
+    "cause_authority",
+    "verification_method"
+  ],
+  "title": "TruthRecord",
+  "type": "object"
+}

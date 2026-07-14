@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "ApprovalSubjectKind": {
+      "enum": [
+        "test_execution",
+        "recovery_execution",
+        "remote_job"
+      ],
+      "title": "ApprovalSubjectKind",
+      "type": "string"
+    },
+    "ExecutionAuthority": {
+      "enum": [
+        "replay",
+        "simulator",
+        "testbed"
+      ],
+      "title": "ExecutionAuthority",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "authority": {
+      "$ref": "#/$defs/ExecutionAuthority"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "issuer_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Issuer Id",
+      "type": "string"
+    },
+    "max_cost_usd": {
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+      "title": "Max Cost Usd",
+      "type": "string"
+    },
+    "max_risk": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Max Risk",
+      "type": "number"
+    },
+    "nonce": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Nonce",
+      "type": "string"
+    },
+    "not_before": {
+      "format": "date-time",
+      "title": "Not Before",
+      "type": "string"
+    },
+    "receipt_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Receipt Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.approval-receipt.v1",
+      "default": "fieldtrue.approval-receipt.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    },
+    "signature": {
+      "pattern": "^[0-9a-f]{128}$",
+      "title": "Signature",
+      "type": "string"
+    },
+    "signer_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Signer Public Key",
+      "type": "string"
+    },
+    "subject_kind": {
+      "$ref": "#/$defs/ApprovalSubjectKind"
+    },
+    "subject_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Subject Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "approval_id",
+    "issuer_id",
+    "subject_kind",
+    "subject_sha256",
+    "authority",
+    "scope",
+    "max_risk",
+    "max_cost_usd",
+    "not_before",
+    "expires_at",
+    "nonce",
+    "signer_public_key",
+    "receipt_hash",
+    "signature"
+  ],
+  "title": "ApprovalReceipt",
+  "type": "object"
+}

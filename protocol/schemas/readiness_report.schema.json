@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "GateResult": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "minLength": 1,
+          "title": "Detail",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "gate_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Gate Id",
+          "type": "string"
+        },
+        "observed": {
+          "title": "Observed"
+        },
+        "requirement": {
+          "minLength": 1,
+          "title": "Requirement",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/GateStatus"
+        }
+      },
+      "required": [
+        "gate_id",
+        "status",
+        "observed",
+        "requirement",
+        "detail"
+      ],
+      "title": "GateResult",
+      "type": "object"
+    },
+    "GateStatus": {
+      "enum": [
+        "pass",
+        "blocked",
+        "invalid",
+        "not_run"
+      ],
+      "title": "GateStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "authorized_next_action": {
+      "title": "Authorized Next Action",
+      "type": "string"
+    },
+    "dataset_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "forbidden_next_actions": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Forbidden Next Actions",
+      "type": "array"
+    },
+    "gates": {
+      "items": {
+        "$ref": "#/$defs/GateResult"
+      },
+      "minItems": 1,
+      "title": "Gates",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "fieldtrue.corpus-readiness.v1",
+      "default": "fieldtrue.corpus-readiness.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "PASS",
+        "BLOCKED_EVIDENCE",
+        "INVALID"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "dataset_id",
+    "gates",
+    "verdict",
+    "authorized_next_action",
+    "forbidden_next_actions"
+  ],
+  "title": "ReadinessReport",
+  "type": "object"
+}

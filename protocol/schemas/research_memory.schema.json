@@ -1,0 +1,313 @@
+{
+  "$defs": {
+    "AccessClass": {
+      "enum": [
+        "public",
+        "internal",
+        "restricted"
+      ],
+      "title": "AccessClass",
+      "type": "string"
+    },
+    "EpistemicPhase": {
+      "enum": [
+        "prospective",
+        "exploratory",
+        "retrospective"
+      ],
+      "title": "EpistemicPhase",
+      "type": "string"
+    },
+    "LabelAccess": {
+      "enum": [
+        "none",
+        "development",
+        "sealed_heldout"
+      ],
+      "title": "LabelAccess",
+      "type": "string"
+    },
+    "MemoryActor": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "kind": {
+          "pattern": "^(human|agent|system)$",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "actor_id"
+      ],
+      "title": "MemoryActor",
+      "type": "object"
+    },
+    "MemoryEventType": {
+      "enum": [
+        "source",
+        "decision",
+        "protocol",
+        "execution",
+        "finding",
+        "failure",
+        "correction",
+        "resource",
+        "manual_work",
+        "handoff",
+        "naming"
+      ],
+      "title": "MemoryEventType",
+      "type": "string"
+    },
+    "MemoryEvidenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "$ref": "#/$defs/AccessClass"
+        },
+        "git_commit": {
+          "anyOf": [
+            {
+              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Git Commit"
+        },
+        "label_access": {
+          "$ref": "#/$defs/LabelAccess"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "role": {
+          "pattern": "^(input|raw|derived|verifier|source|approval)$",
+          "title": "Role",
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "uri": {
+          "minLength": 1,
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "uri",
+        "media_type",
+        "access",
+        "label_access"
+      ],
+      "title": "MemoryEvidenceRef",
+      "type": "object"
+    },
+    "MemoryStatus": {
+      "enum": [
+        "pending",
+        "recorded",
+        "pass",
+        "negative",
+        "null",
+        "blocked",
+        "invalid",
+        "void",
+        "interrupted",
+        "superseded"
+      ],
+      "title": "MemoryStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "access": {
+      "$ref": "#/$defs/AccessClass",
+      "default": "internal"
+    },
+    "actor": {
+      "$ref": "#/$defs/MemoryActor"
+    },
+    "corrects_event_id": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Corrects Event Id"
+    },
+    "cost_usd": {
+      "default": "0",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+      "title": "Cost Usd",
+      "type": "string"
+    },
+    "engine_requirement": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Engine Requirement"
+    },
+    "epistemic_phase": {
+      "$ref": "#/$defs/EpistemicPhase"
+    },
+    "event_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Event Hash",
+      "type": "string"
+    },
+    "event_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/MemoryEventType"
+    },
+    "evidence": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/MemoryEvidenceRef"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "links": {
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        }
+      },
+      "title": "Links",
+      "type": "object"
+    },
+    "manual_minutes": {
+      "default": 0.0,
+      "minimum": 0.0,
+      "title": "Manual Minutes",
+      "type": "number"
+    },
+    "mission_id": {
+      "const": "fieldtrue",
+      "default": "fieldtrue",
+      "title": "Mission Id",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "previous_event_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Previous Event Hash",
+      "type": "string"
+    },
+    "recorded_at": {
+      "format": "date-time",
+      "title": "Recorded At",
+      "type": "string"
+    },
+    "recurrence_key": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Recurrence Key"
+    },
+    "schema_version": {
+      "const": "daniel.research-memory.v1",
+      "default": "daniel.research-memory.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "source_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Source Commit",
+      "type": "string"
+    },
+    "stage": {
+      "minLength": 1,
+      "title": "Stage",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/MemoryStatus"
+    },
+    "summary": {
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sequence",
+    "event_id",
+    "occurred_at",
+    "recorded_at",
+    "stage",
+    "epistemic_phase",
+    "actor",
+    "event_type",
+    "status",
+    "summary",
+    "payload",
+    "source_commit",
+    "previous_event_hash",
+    "event_hash"
+  ],
+  "title": "ResearchMemoryRecord",
+  "type": "object"
+}

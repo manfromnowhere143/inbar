@@ -1,0 +1,123 @@
+{
+  "$defs": {
+    "AdaptResourceLock": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "media_type": {
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "filename",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "AdaptResourceLock",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed_model_visible_rows": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Model Visible Rows",
+      "type": "array"
+    },
+    "dataset_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Dataset Id",
+      "type": "string"
+    },
+    "expected_experiment_files": {
+      "exclusiveMinimum": 0,
+      "title": "Expected Experiment Files",
+      "type": "integer"
+    },
+    "landing_page": {
+      "title": "Landing Page",
+      "type": "string"
+    },
+    "license_status": {
+      "title": "License Status",
+      "type": "string"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "redistribution": {
+      "title": "Redistribution",
+      "type": "string"
+    },
+    "resources": {
+      "items": {
+        "$ref": "#/$defs/AdaptResourceLock"
+      },
+      "title": "Resources",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "fieldtrue.dataset-lock.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_authority": {
+      "title": "Source Authority",
+      "type": "string"
+    },
+    "truth_only_rows": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Truth Only Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "source_authority",
+    "landing_page",
+    "license_status",
+    "redistribution",
+    "resources",
+    "expected_experiment_files",
+    "allowed_model_visible_rows",
+    "truth_only_rows",
+    "limitations"
+  ],
+  "title": "AdaptDatasetLock",
+  "type": "object"
+}

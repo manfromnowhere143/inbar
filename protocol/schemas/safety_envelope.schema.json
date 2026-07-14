@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "ExecutionAuthority": {
+      "enum": [
+        "replay",
+        "simulator",
+        "testbed"
+      ],
+      "title": "ExecutionAuthority",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed_test_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Test Ids",
+      "type": "array"
+    },
+    "approval_receipt_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Receipt Hash"
+    },
+    "authority": {
+      "$ref": "#/$defs/ExecutionAuthority"
+    },
+    "envelope_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Envelope Id",
+      "type": "string"
+    },
+    "max_risk": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Max Risk",
+      "type": "number"
+    },
+    "satisfied_preconditions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Satisfied Preconditions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "envelope_id",
+    "authority",
+    "allowed_test_ids",
+    "max_risk"
+  ],
+  "title": "SafetyEnvelope",
+  "type": "object"
+}

@@ -1,7 +1,9 @@
 {
-  "schema_version": "acma.mission-contract.v1",
-  "mission_id": "active-causal-mission-assurance",
-  "working_descriptor": true,
+  "schema_version": "fieldtrue.mission-contract.v1",
+  "mission_id": "fieldtrue",
+  "name": "Fieldtrue",
+  "research_descriptor": "Active Causal Mission Assurance",
+  "name_status": "internally_adopted_pending_professional_clearance",
   "owner": "Daniel Wahnich",
   "launched_on": "2026-07-14",
   "objective": "Infer competing physical mechanisms from heterogeneous incident evidence, select safe discriminating tests, independently verify recovery, and compile calibrated transferable monitors.",
@@ -16,6 +18,7 @@
     "independent_recovery_verification",
     "group_heldout_transfer",
     "calibrated_abstention",
+    "claim_gates_require_executable_negative_controls",
     "nulls_and_corrections_at_full_weight"
   ],
   "execution_authorities": [
@@ -45,4 +48,3 @@
   "research_engine_policy": "deferred_to_separate_repository_after_multiple_complete_cycles",
   "operator_stop": "always_available"
 }
-

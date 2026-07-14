@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "command": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Command",
+      "type": "array"
+    },
+    "dirty_state_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dirty State Hash",
+      "type": "string"
+    },
+    "git_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Git Commit",
+      "type": "string"
+    },
+    "git_tree": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Git Tree",
+      "type": "string"
+    },
+    "lockfile_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Lockfile Hash",
+      "type": "string"
+    },
+    "platform": {
+      "title": "Platform",
+      "type": "string"
+    },
+    "python_version": {
+      "title": "Python Version",
+      "type": "string"
+    },
+    "repository_dirty": {
+      "title": "Repository Dirty",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "git_commit",
+    "git_tree",
+    "repository_dirty",
+    "dirty_state_hash",
+    "lockfile_hash",
+    "python_version",
+    "platform",
+    "command"
+  ],
+  "title": "RuntimeIdentity",
+  "type": "object"
+}

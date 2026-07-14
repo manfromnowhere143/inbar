@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "RuntimeIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Command",
+          "type": "array"
+        },
+        "dirty_state_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Dirty State Hash",
+          "type": "string"
+        },
+        "git_commit": {
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+          "title": "Git Commit",
+          "type": "string"
+        },
+        "git_tree": {
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+          "title": "Git Tree",
+          "type": "string"
+        },
+        "lockfile_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Lockfile Hash",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "python_version": {
+          "title": "Python Version",
+          "type": "string"
+        },
+        "repository_dirty": {
+          "title": "Repository Dirty",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "git_commit",
+        "git_tree",
+        "repository_dirty",
+        "dirty_state_hash",
+        "lockfile_hash",
+        "python_version",
+        "platform",
+        "command"
+      ],
+      "title": "RuntimeIdentity",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approval_receipt_hash": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approval Receipt Hash"
+    },
+    "event_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Event Hash",
+      "type": "string"
+    },
+    "event_type": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Event Type",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "payload_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Payload Hash",
+      "type": "string"
+    },
+    "previous_event_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Previous Event Hash",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "runtime": {
+      "$ref": "#/$defs/RuntimeIdentity"
+    },
+    "schema_version": {
+      "const": "fieldtrue.ledger-event.v1",
+      "default": "fieldtrue.ledger-event.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "signature": {
+      "pattern": "^[0-9a-f]{128}$",
+      "title": "Signature",
+      "type": "string"
+    },
+    "signer_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Signer Public Key",
+      "type": "string"
+    },
+    "timestamp": {
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sequence",
+    "timestamp",
+    "run_id",
+    "event_type",
+    "payload",
+    "payload_hash",
+    "previous_event_hash",
+    "runtime",
+    "signer_public_key",
+    "event_hash",
+    "signature"
+  ],
+  "title": "LedgerEvent",
+  "type": "object"
+}

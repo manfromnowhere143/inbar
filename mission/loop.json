@@ -1,6 +1,6 @@
 {
-  "schema_version": "acma.mission-loop.v1",
-  "mission_id": "active-causal-mission-assurance",
+  "schema_version": "fieldtrue.mission-loop.v1",
+  "mission_id": "fieldtrue",
   "current_stage": "corpus_qualification",
   "stages": [
     "registered",
@@ -37,9 +37,34 @@
     "published": [
       "claim_registry_updated",
       "independent_verification",
+      "gate_sensitivity_verified",
+      "independent_replication_or_declared_limitation",
+      "external_domain_review",
+      "venue_scope_review",
+      "manuscript_artifact_traceability",
       "adversarial_review",
+      "author_tool_disclosure",
+      "license_and_rights_review",
+      "conventional_journal_target_recorded",
       "handoff_refreshed"
     ]
+  },
+  "gate_falsification_policy": {
+    "scope": "every_claim_bearing_gate",
+    "requirements": [
+      "pre_registered_rejection_condition",
+      "positive_control",
+      "negative_control_or_placebo",
+      "executable_sensitivity_test",
+      "sealed_control_result"
+    ],
+    "rule": "A gate is invalid until a deliberately broken or placebo artifact is rejected."
+  },
+  "publication_transition": {
+    "status": "blocked",
+    "receipt_path": null,
+    "signer_anchor_path": null,
+    "block_reason": "No signed, Git-anchored publication evidence receipt has been authorized."
   },
   "terminal_verdicts": [
     "positive",
@@ -52,4 +77,3 @@
     "infrastructure_null"
   ]
 }
-

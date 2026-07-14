@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "SplitAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "component_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Component Id",
+          "type": "string"
+        },
+        "incident_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ],
+          "title": "Split",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "split",
+        "component_id"
+      ],
+      "title": "SplitAssignment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assignments": {
+      "items": {
+        "$ref": "#/$defs/SplitAssignment"
+      },
+      "title": "Assignments",
+      "type": "array"
+    },
+    "corpus_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Corpus Hash",
+      "type": "string"
+    },
+    "holdout_dimensions": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Holdout Dimensions",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "fieldtrue.split-lock.v1",
+      "default": "fieldtrue.split-lock.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "minLength": 1,
+      "title": "Seed",
+      "type": "string"
+    },
+    "split_counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "propertyNames": {
+        "enum": [
+          "train",
+          "validation",
+          "test"
+        ]
+      },
+      "title": "Split Counts",
+      "type": "object"
+    }
+  },
+  "required": [
+    "seed",
+    "holdout_dimensions",
+    "corpus_hash",
+    "assignments",
+    "split_counts"
+  ],
+  "title": "SplitLock",
+  "type": "object"
+}

@@ -74,6 +74,20 @@ Local Ed25519 signatures prove key possession, not historical immutability by th
 authorship requires an external timestamp or governed key anchor. Verification must state which
 trust level is present.
 
+## Proof adjudication
+
+Iteration proof bundles retain the exact data lock, signed resource receipts, coverage, the
+model-visible incident manifest, and the separately sealed truth manifest. Third-party raw bytes
+remain outside Git because redistribution rights are not established. Their exact hashes and byte
+counts remain frozen in the lock and receipts.
+
+The independent verifier does not accept the producer's gate states as authority. It validates the
+signed lifecycle and artifact graph, then recomputes source-receipt consistency, parser coverage,
+truth commitments, evidence/truth joins, leakage controls, construct counts, transfer support, and
+evidence usefulness from proof-local material. A signed report that differs from this recomputation
+is rejected. `proof/RESULT.md` and `proof/LEARNING.json` are the only authoritative rendered
+outputs; unauthenticated duplicates are not produced.
+
 ## Cloud boundary
 
 The core emits immutable `JobSpec` JSON. A valid spec binds an exact Git SHA, immutable OCI digest,
@@ -90,4 +104,3 @@ an end-to-end receipt and artifact-integrity test.
 The same contracts support offline incident replay, live shadow recommendations, approved test
 stands, fleet learning, recovery synthesis, and onboard monitor generation. Moving between those
 stages changes authority and evidence requirements, not scientific semantics.
-

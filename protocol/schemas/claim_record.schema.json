@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "ClaimStatus": {
+      "enum": [
+        "untested",
+        "supported",
+        "refuted",
+        "null",
+        "blocked",
+        "invalid",
+        "corrected"
+      ],
+      "title": "ClaimStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "claim_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Claim Id",
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Refs",
+      "type": "array"
+    },
+    "forbidden_wording": {
+      "minLength": 1,
+      "title": "Forbidden Wording",
+      "type": "string"
+    },
+    "next_falsifier": {
+      "minLength": 1,
+      "title": "Next Falsifier",
+      "type": "string"
+    },
+    "permitted_wording": {
+      "minLength": 1,
+      "title": "Permitted Wording",
+      "type": "string"
+    },
+    "scope": {
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/ClaimStatus"
+    },
+    "wording": {
+      "minLength": 1,
+      "title": "Wording",
+      "type": "string"
+    }
+  },
+  "required": [
+    "claim_id",
+    "status",
+    "wording",
+    "scope",
+    "evidence_refs",
+    "permitted_wording",
+    "forbidden_wording",
+    "next_falsifier"
+  ],
+  "title": "ClaimRecord",
+  "type": "object"
+}

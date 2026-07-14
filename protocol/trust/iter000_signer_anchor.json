@@ -1,0 +1,8 @@
+{
+  "anchor_id": "iter000-execution-ledger",
+  "ledger_scope": "iter000_nasa_adapt_corpus_readiness",
+  "mission_id": "fieldtrue",
+  "schema_version": "fieldtrue.signer-anchor.v1",
+  "signer_public_key": "0d5d5313b054a05978811e3f56195d4e806b50924af05cb9c811dca8c1767646",
+  "trust_basis": "git-preregistered-local-key"
+}
