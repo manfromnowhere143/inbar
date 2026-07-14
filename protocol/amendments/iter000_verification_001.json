@@ -1,0 +1,158 @@
+{
+  "amendment_document": {
+    "path": "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_001.md",
+    "sha256": "d472b8b594b2a278f095de50435df2dfed1e4b72a9b4b9bb53502283545c9048"
+  },
+  "amendment_id": "iter000_verification_001",
+  "authorized_correction": {
+    "administrative_paths": [
+      "CONTINUITY.md",
+      "HANDOFF.md",
+      "experiments/iter000_nasa_adapt_corpus_readiness/verification/attempt_001_correction_001.json",
+      "memory/research_engine_extraction.jsonl",
+      "protocol/amendments/iter000_verification_001.json",
+      "protocol/trust/iter000_verification_signer_anchor.json",
+      "protocol/verification_authorities/iter000_verification_001.json"
+    ],
+    "artifact_exception": {
+      "canonical_pretty_sha256": "5dd5875185f5a96e90dc31548d24318f8182e92fe34378dce05a2c5840a4fe88",
+      "path": "dataset_lock.json",
+      "protocol_path": "protocol/datasets/nasa_adapt_v1.json",
+      "raw_sha256": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+      "semantic_canonical_sha256": "5721cff5c79c34e4933724d607a2a48ed9fa8936ee0c453e5fc76f14bc46082f"
+    },
+    "correction_type": "verification_only",
+    "implementation_paths": [
+      "src/fieldtrue/cli.py",
+      "src/fieldtrue/mission.py",
+      "src/fieldtrue/verification.py"
+    ],
+    "maximum_corrected_verifications": 1,
+    "retained_controls": [
+      "regular_non_symlink_file",
+      "utf8_json_object",
+      "duplicate_key_rejection",
+      "strict_dataset_lock_model",
+      "raw_sha256_equals_signed_protocol_hash",
+      "source_event_binds_same_dataset_lock_hash",
+      "final_artifact_toctou_recheck",
+      "canonical_pretty_json_for_every_other_json_artifact"
+    ],
+    "test_paths": [
+      "tests/integration/test_experiment.py",
+      "tests/unit/test_cli.py",
+      "tests/unit/test_mission.py",
+      "tests/unit/test_verification.py"
+    ]
+  },
+  "forbidden_actions": [
+    "additional_scientific_execution",
+    "dataset_download",
+    "parser_execution",
+    "producer_execution",
+    "proof_mutation",
+    "ledger_append",
+    "signature_replacement",
+    "dataset_change",
+    "hypothesis_change",
+    "selection_rule_change",
+    "gate_change",
+    "threshold_change",
+    "claim_change",
+    "result_rewrite",
+    "network_access",
+    "canonicality_relaxation_for_any_other_artifact"
+  ],
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "outcome_blindness": {
+    "adjudication_payload_inspected": false,
+    "learning_inspected": false,
+    "readiness_report_inspected": false,
+    "result_inspected": false,
+    "safe_metadata_inspected": [
+      "artifact_names",
+      "artifact_byte_counts",
+      "artifact_sha256_digests",
+      "ledger_signature_checkpoint",
+      "model_evidence_manifest_first_line_metadata",
+      "verification_exception_chain"
+    ],
+    "verdict_inspected": false
+  },
+  "proof_binding": {
+    "artifact_count": 16,
+    "content_map_sha256": "bcc358bb5d2f837bb284970cfa686919fd91aa0864452e42c02f17c356556341",
+    "file_sha256": {
+      "AMENDMENT_001.md": "85ef78eab3bd9bff0507f855af1195ebab4753b0c77e1535e3345f7b4ba8536e",
+      "LEARNING.json": "dde7266c8ef44ffbcad20dc67897baf5f3d95b895662ba26eaa404daf976317f",
+      "RESULT.md": "28e6448047902e395c08c0fc51a432e88958a8c06adb34c619b7c304bbdb7df9",
+      "amendment_001.json": "c7aff0b2c61f95a396646a7869f8269778b8ef04cdf4e3ccc8e60943a570d8cc",
+      "artifact_bundle.json": "043e1f4f015378a6626923b36d90b5d56c13396ab3b88275d6a193870318e697",
+      "attempt_authority.json": "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a",
+      "attempt_authority_consumption.json": "8d155b56440a4dfa25cbdfa400344a32b29e8d877cd39fa4f2c0612b4371b8aa",
+      "coverage.json": "569e45683e0d0667722d0aa4c6a748d56a6e2faddce376e8bfd6e23191e96c1c",
+      "dataset_lock.json": "884c1ff5daf60323437ad1d16efb01acb3e769ce71eade62fcde966bfe0a4367",
+      "execution_ledger.head.json": "d89901abec03c460bdcdaa2985dc65d6d9a3b076c16100f56c1f3a4f1dc0665e",
+      "execution_ledger.jsonl": "cb4aaf5d1cdabc42db25883d9e0db448cd41df56dcc8ebfd12eb73143151b728",
+      "ingestion_receipt.json": "d549282400fae1d18a74f0a54106a9427de5cc8841c8291f16d63c0bb3442c44",
+      "model_evidence_manifest.jsonl": "111f068f08d0e09901c10cce35c877fb78a58ec95899911293d9347ecbec2d5c",
+      "readiness_report.json": "15a680d3c6b8f845277e5a6ade562fa542e37c2e555a3ff1771ad3ec50566b86",
+      "run_manifest.json": "b62cc847ac587c2361d1143ac201bb0316ae5aa13662d819658c2d30defa6ced",
+      "truth_manifest.jsonl": "bb9e80e3f72f6a2d54d68c9dcf6daf9aff9a3d7e545389505f625e7af85174fb"
+    },
+    "git_commit": "15cd75dd761a1c3f1d75994445a9ce702c58810a",
+    "git_subtree": "5ad82ba61c522fc3e292ab7ceed9f7085b556673",
+    "path": "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_001"
+  },
+  "schema_version": "fieldtrue.iter000-verification-amendment.v1",
+  "status": "authorized",
+  "trigger": {
+    "attempt_id": "attempt_001",
+    "authority_consumption": {
+      "path": "experiments/iter000_nasa_adapt_corpus_readiness/authority/attempt_001_consumption.json",
+      "sha256": "8d155b56440a4dfa25cbdfa400344a32b29e8d877cd39fa4f2c0612b4371b8aa"
+    },
+    "execution_authority": {
+      "path": "protocol/attempt_authorities/iter000_001.json",
+      "sha256": "ef480a24ebe7912523ba64642127971e56d96e66689d2c7f9cea39f3413bc99a"
+    },
+    "execution_commit": {
+      "git_commit": "ab20d41e77aba35f01352ca5cc379505205d32c8",
+      "git_tree": "e3d8a8609e483b37c755b252e4f43b57b4731480"
+    },
+    "failure": {
+      "outer_error_type": "ExperimentFinalizationError",
+      "outer_message": "sealed iter000 proof bundle failed independent verification",
+      "verifier_check": "canonical_pretty_json",
+      "verifier_error_type": "ProofBundleVerificationError",
+      "verifier_message": "dataset lock is not canonical pretty JSON"
+    },
+    "original_verifier": {
+      "path": "src/fieldtrue/verification.py",
+      "sha256": "36a9b5fef440fc60fd8d70252db6454563f07ca9ed08887d18bc0255cf38d7e5"
+    }
+  },
+  "trust_model": {
+    "external_timestamp": false,
+    "limitations": [
+      "outcome_blindness_is_a_chronological_declaration",
+      "same_local_owner_can_delete_or_roll_back_local_state",
+      "same_local_owner_controls_the_local_git_repository",
+      "local_verification_key_compromise"
+    ],
+    "required_verification_authority": {
+      "authorized_command": [
+        "fieldtrue",
+        "experiment",
+        "verify-iter000-amendment-001-correction-001"
+      ],
+      "consumption_timing": "before_outcome_artifact_interpretation",
+      "maximum_consumptions": 1,
+      "path": "protocol/verification_authorities/iter000_verification_001.json",
+      "proof_deletion_restores_authority": false,
+      "receipt_path": "experiments/iter000_nasa_adapt_corpus_readiness/verification/attempt_001_correction_001.json",
+      "separate_signer_anchor_path": "protocol/trust/iter000_verification_signer_anchor.json"
+    },
+    "signature": "git_pinned_separate_local_ed25519"
+  }
+}
