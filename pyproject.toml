@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "active-causal-mission-assurance"
+version = "0.1.0"
+description = "Evidence-first active causal diagnosis and independently verified recovery for physical systems."
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+authors = [{ name = "Daniel Wahnich" }]
+dependencies = [
+  "networkx>=3.4,<4",
+  "numpy>=2.0,<3",
+  "pydantic>=2.10,<3",
+  "pynacl>=1.5,<2",
+  "scikit-learn>=1.6,<2",
+  "scipy>=1.14,<2",
+]
+
+[project.optional-dependencies]
+data = ["pyarrow>=19,<24"]
+dev = [
+  "hypothesis>=6.120,<7",
+  "mypy>=1.14,<2",
+  "pytest>=8.3,<10",
+  "pytest-cov>=6,<8",
+  "ruff>=0.9,<1",
+]
+gpu = ["torch>=2.7,<3"]
+
+[project.scripts]
+acma = "mission_assurance.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mission_assurance"]
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers --strict-config"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["mission_assurance"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "DTZ", "PT", "RUF", "S", "SIM"]
+ignore = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["mission_assurance"]
+

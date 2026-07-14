@@ -1,0 +1,48 @@
+{
+  "schema_version": "acma.mission-contract.v1",
+  "mission_id": "active-causal-mission-assurance",
+  "working_descriptor": true,
+  "owner": "Daniel Wahnich",
+  "launched_on": "2026-07-14",
+  "objective": "Infer competing physical mechanisms from heterogeneous incident evidence, select safe discriminating tests, independently verify recovery, and compile calibrated transferable monitors.",
+  "initial_wedge": "offline_spacecraft_and_robotics_test_incident_replay",
+  "scientific_claim_unit": "integrated_evidence_to_verified_monitor_loop",
+  "core_invariants": [
+    "local_first_reproduction",
+    "evidence_truth_separation",
+    "content_addressed_artifacts",
+    "unknown_hypothesis_required",
+    "preapproved_test_action_set",
+    "independent_recovery_verification",
+    "group_heldout_transfer",
+    "calibrated_abstention",
+    "nulls_and_corrections_at_full_weight"
+  ],
+  "execution_authorities": [
+    "replay",
+    "simulator",
+    "testbed"
+  ],
+  "forbidden_authorities": [
+    "flight",
+    "live_spacecraft",
+    "live_robot",
+    "destructive_test",
+    "unapproved_cloud_or_gpu_spend"
+  ],
+  "external_system_policy": {
+    "aweb": "optional_adapter_only",
+    "maestro": "optional_adapter_only",
+    "google_cloud": "job_spec_adapter_only_until_approved",
+    "frontier_models": "proposal_generator_never_safety_authority"
+  },
+  "corpus_gate": {
+    "minimum_ambiguous_incidents": 30,
+    "verified_cause_required": true,
+    "safe_discriminating_test_required": true,
+    "multiple_hardware_families_required": true
+  },
+  "research_engine_policy": "deferred_to_separate_repository_after_multiple_complete_cycles",
+  "operator_stop": "always_available"
+}
+

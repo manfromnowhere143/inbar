@@ -1,0 +1,30 @@
+{
+  "schema_version": "acma.baseline-lock.v1",
+  "baseline_set_id": "cheap-first-v1",
+  "order": [
+    "existing_test_suite",
+    "limits_and_out_of_limit_rules",
+    "runbook_fmea_lookup",
+    "fault_tree",
+    "change_point_residual",
+    "observer_bank",
+    "bayesian_diagnoser",
+    "physics_only_simulator",
+    "retrieval_frontier_model",
+    "causal_physics_graph",
+    "learned_multimodal_system"
+  ],
+  "promotion_rule": "A more expensive baseline is ineligible until every cheaper applicable baseline has a recorded disposition.",
+  "controls": [
+    "task_or_configuration_id_only",
+    "random_id_embedding",
+    "learned_id_embedding",
+    "each_unimodal_input",
+    "modality_drop",
+    "modality_shuffle",
+    "clock_jitter",
+    "duplicate_noise_modality",
+    "compute_matched_placebo"
+  ]
+}
+

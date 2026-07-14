@@ -1,0 +1,21 @@
+.DS_Store
+.coverage
+.hypothesis/
+.local/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.egg-info/
+*.py[cod]
+build/
+dist/
+
+# Data are fetched from content-addressed locks. Do not commit third-party bytes.
+data/raw/
+data/derived/
+
+# Generated run material is promoted deliberately after review.
+runs/
+

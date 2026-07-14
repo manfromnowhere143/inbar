@@ -1,0 +1,55 @@
+{
+  "schema_version": "acma.mission-loop.v1",
+  "mission_id": "active-causal-mission-assurance",
+  "current_stage": "corpus_qualification",
+  "stages": [
+    "registered",
+    "corpus_qualification",
+    "baseline_qualification",
+    "evidence_ingested",
+    "diagnosed",
+    "test_selected",
+    "test_executed",
+    "recovery_proposed",
+    "recovery_verified",
+    "monitor_compiled",
+    "transfer_audited",
+    "adversarially_reviewed",
+    "published",
+    "learned"
+  ],
+  "transition_requirements": {
+    "baseline_qualification": [
+      "corpus_gate_pass",
+      "frozen_split_lock",
+      "frozen_baseline_lock"
+    ],
+    "test_executed": [
+      "preapproved_action",
+      "safety_envelope",
+      "execution_authority",
+      "approval_receipt"
+    ],
+    "recovery_verified": [
+      "independent_outcome_authority",
+      "settled_outcome_gate"
+    ],
+    "published": [
+      "claim_registry_updated",
+      "independent_verification",
+      "adversarial_review",
+      "handoff_refreshed"
+    ]
+  },
+  "terminal_verdicts": [
+    "positive",
+    "negative",
+    "null",
+    "blocked",
+    "invalid",
+    "void",
+    "interrupted",
+    "infrastructure_null"
+  ]
+}
+
