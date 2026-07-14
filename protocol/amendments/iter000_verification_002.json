@@ -1,0 +1,55 @@
+{
+  "amendment_document": {
+    "path": "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_002.md",
+    "sha256": "394815237a85354a4b8b93054dd57fe5c3fe537dd593a55464c887a92cba37ba"
+  },
+  "amendment_id": "iter000_verification_002",
+  "authorized_correction": {
+    "corrected_value": "ab20d41be48003c443a807c733c4c8ce43445e01",
+    "field": "trigger.execution_commit.git_commit",
+    "preserved_execution_tree": "e3d8a8609e483b37c755b252e4f43b57b4731480",
+    "prior_value": "ab20d41e77aba35f01352ca5cc379505205d32c8",
+    "scope": "clerical_git_object_identity_only"
+  },
+  "discovery": {
+    "authority_selected": false,
+    "git_command": [
+      "git",
+      "rev-parse",
+      "ab20d41"
+    ],
+    "result_accessed": false,
+    "verification_authority_consumed": false
+  },
+  "forbidden_changes": [
+    "proof_binding",
+    "proof_files",
+    "dataset_lock_exception",
+    "original_verifier_hash",
+    "outcome_blindness_declaration",
+    "maximum_corrected_verifications",
+    "prohibited_actions",
+    "resource_limits",
+    "trust_model"
+  ],
+  "iteration_id": "iter000_nasa_adapt_corpus_readiness",
+  "prior_amendment": {
+    "git_commit": "f9983e26e0e9d48c14016dfc4d897962767f8da8",
+    "git_tree": "552755b74e49ab7810df2e965519f556796ba604",
+    "path": "protocol/amendments/iter000_verification_001.json",
+    "sha256": "919df0feab263c52889964b728ddd296c8d585019a66fe3c01bd997fc893bfa9"
+  },
+  "required_git_validation": {
+    "ancestry_chain": [
+      "2fb078a1cac5f76f251ab49e0368ae0ea3e8da2e",
+      "ab20d41be48003c443a807c733c4c8ce43445e01",
+      "15cd75dd761a1c3f1d75994445a9ce702c58810a",
+      "f9983e26e0e9d48c14016dfc4d897962767f8da8"
+    ],
+    "disable_replace_objects": true,
+    "execution_commit_object_type": "commit",
+    "execution_tree": "e3d8a8609e483b37c755b252e4f43b57b4731480"
+  },
+  "schema_version": "fieldtrue.iter000-verification-amendment-correction.v1",
+  "status": "authorized"
+}
