@@ -22,15 +22,14 @@
 - The current matrix passes 216 tests with 91.29 percent branch-aware coverage on the primary
   environment. Python 3.11 through 3.14 compatibility suites pass, and the dependency audit is
   clean.
-- The prospective research-engine extraction ledger contains 13 verified events anchored to
-  foundation commit `1821d7c4c869b5b022297c0c975b857be67c6460`.
+- The research-engine extraction ledger contains 20 verified events. The Amendment 001 recovery
+  records are anchored to commit `7c053cf9876e5726118fe937c3d16ed65b75ef71`.
 - No scientific or product-performance claim is authorized.
 - No GPU, cloud job, paid provider, simulator, or hardware actuation has run.
 
 ## Immediate gate
 
-Commit the signed attempt-000 evidence and Amendment 001 implementation, append the failure and
-correction to Git-anchored research memory, confirm a clean mission preflight, and execute only
+Commit the appended recovery memory, confirm a clean mission preflight, and execute only
 `attempt_001`. The expected blocked-evidence verdict would authorize broader corpus acquisition,
 especially independently reviewed incidents from another hardware family. It would not authorize
 learned-model training.
