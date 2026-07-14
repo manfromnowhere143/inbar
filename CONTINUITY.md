@@ -13,16 +13,17 @@
   and a hardware-family mismatch.
 - The current matrix passes 181 tests with 90.47 percent branch-aware coverage on the primary
   environment. Python 3.11 and 3.14 compatibility suites pass, and the dependency audit is clean.
+- The prospective research-engine extraction ledger contains 13 verified events anchored to
+  foundation commit `1821d7c4c869b5b022297c0c975b857be67c6460`.
 - No scientific or product-performance claim is authorized.
 - No GPU, cloud job, paid provider, simulator, or hardware actuation has run.
 
 ## Immediate gate
 
-Complete a clean implementation commit, append the prospective Git-anchored research-memory
-record, and pass the full local and package verification matrix. Then execute iteration 000 exactly
-once from the clean committed tree. The expected blocked-evidence verdict would authorize broader
-corpus acquisition, especially independently reviewed incidents from another hardware family. It
-would not authorize learned-model training.
+Commit the prospective Git-anchored research-memory record, confirm a clean mission preflight,
+and execute iteration 000 exactly once from that committed tree. The expected blocked-evidence
+verdict would authorize broader corpus acquisition, especially independently reviewed incidents
+from another hardware family. It would not authorize learned-model training.
 
 ## Research-engine extraction ledger
 
