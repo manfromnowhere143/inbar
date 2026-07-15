@@ -32,6 +32,7 @@
     "retain_derived",
     "publish_metadata",
     "independent_review",
+    "redistribute_derived",
     "commercial_research"
   ],
   "trust_anchor_public_key": "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962",

@@ -399,6 +399,7 @@ def acquisition_contract(
             PermissionKind.RETAIN_DERIVED,
             PermissionKind.PUBLISH_METADATA,
             PermissionKind.INDEPENDENT_REVIEW,
+            PermissionKind.REDISTRIBUTE_DERIVED,
             PermissionKind.COMMERCIAL_RESEARCH,
         ),
         minimum_complete_physical_incidents=30,
@@ -441,6 +442,7 @@ def build_acquisition_tree(
     *,
     count: int = 30,
     blocked_permission: PermissionKind | None = None,
+    blocked_permission_decision: PermissionDecision = PermissionDecision.UNKNOWN,
     zero_information_test: bool = False,
 ) -> AcquisitionContract:
     terms = _write_bytes(root, "common/terms.txt", b"internal fixture terms\n", "text/plain")
@@ -498,7 +500,7 @@ def build_acquisition_tree(
         PermissionDisposition(
             kind=kind,
             decision=(
-                PermissionDecision.UNKNOWN
+                blocked_permission_decision
                 if kind == blocked_permission
                 else PermissionDecision.ALLOWED
             ),
@@ -1273,6 +1275,9 @@ def build_acquisition_tree(
                 "outcome_id": f"{incident_id}-outcome",
                 "incident_id": incident_id,
                 "recovery_id": recovery_id,
+                "selected_test_sha256": sha256_value(selected),
+                "test_observation_sha256": sha256_value(observation),
+                "diagnostic_execution_sha256": sha256_value(diagnostic_execution),
                 "recovery_execution_sha256": sha256_value(recovery_execution),
                 "outcome_authority_id": _actor_id(RoleKind.OUTCOME_VERIFIER),
                 "outcome_authority_independence_group": _actor_group(RoleKind.OUTCOME_VERIFIER),

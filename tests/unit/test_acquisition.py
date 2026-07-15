@@ -31,6 +31,7 @@ from fieldtrue.acquisition import (
     PlaneSeparationReceipt,
     RecoveryExecution,
     ResourceUsage,
+    ReviewPurpose,
     RoleKind,
     SettledOutcomeRecord,
     ShortcutBaselineReport,
@@ -385,6 +386,33 @@ def test_unknown_required_right_is_a_distinct_block(tmp_path: Path) -> None:
     assert len(report.eligible_incident_ids) == 30
     rights = next(gate for gate in report.gates if gate.gate_id == "source-rights")
     assert rights.observed["failures"] == ["physical-source:independent_review"]
+
+
+def test_unknown_derived_redistribution_right_blocks_admission(tmp_path: Path) -> None:
+    contract = build_acquisition_tree(
+        tmp_path,
+        blocked_permission=PermissionKind.REDISTRIBUTE_DERIVED,
+    )
+
+    report = audit_acquisition(contract, tmp_path)
+
+    assert report.verdict == "BLOCKED_RIGHTS"
+    rights = next(gate for gate in report.gates if gate.gate_id == "source-rights")
+    assert rights.observed["failures"] == ["physical-source:redistribute_derived"]
+
+
+def test_prohibited_derived_redistribution_right_blocks_admission(tmp_path: Path) -> None:
+    contract = build_acquisition_tree(
+        tmp_path,
+        blocked_permission=PermissionKind.REDISTRIBUTE_DERIVED,
+        blocked_permission_decision=PermissionDecision.PROHIBITED,
+    )
+
+    report = audit_acquisition(contract, tmp_path)
+
+    assert report.verdict == "BLOCKED_RIGHTS"
+    rights = next(gate for gate in report.gates if gate.gate_id == "source-rights")
+    assert rights.observed["failures"] == ["physical-source:redistribute_derived"]
 
 
 def test_resource_breach_is_invalid_even_when_corpus_is_complete(tmp_path: Path) -> None:
@@ -1051,6 +1079,39 @@ def test_truth_custody_opened_before_commitments_is_invalid(tmp_path: Path) -> N
     )
 
 
+def test_validly_resigned_post_outcome_ambiguity_review_is_invalid(tmp_path: Path) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    dossier_path = tmp_path / "dossiers" / "incident-000.json"
+    dossier = read_json(dossier_path)
+    reviewed_at = BASE + timedelta(minutes=94)
+    for index, review in enumerate(dossier["reviews"]):
+        if review["purpose"] != ReviewPurpose.AMBIGUITY.value:
+            continue
+        review_body = deepcopy(review)
+        review_body.pop("attestation")
+        review_body["reviewed_at"] = reviewed_at
+        signed_review = _signed_model(
+            BoundReview,
+            review_body,
+            subject_kind=AttestationSubjectKind.REVIEW,
+            signing_key=ACTOR_KEYS[RoleKind.MECHANISM_REVIEWER],
+            signer_id=f"actor-{RoleKind.MECHANISM_REVIEWER.value}",
+            attestation_id="negative-control-post-outcome-ambiguity-review",
+            issued_at=reviewed_at,
+        )
+        dossier["reviews"][index] = signed_review.model_dump(mode="json")
+        break
+    write_json(dossier_path, dossier)
+
+    report = audit_acquisition(contract, tmp_path)
+
+    assert report.verdict == "INVALID"
+    assert any(
+        "review and execution times do not match the frozen timeline" in item
+        for item in _integrity_failures(report)
+    )
+
+
 def test_known_only_hypothesis_set_is_invalid(tmp_path: Path) -> None:
     contract = build_acquisition_tree(tmp_path)
     dossier_path = tmp_path / "dossiers" / "incident-000.json"
@@ -1087,6 +1148,60 @@ def test_asserted_recovery_without_distinct_realization_is_invalid(tmp_path: Pat
 
     report = audit_acquisition(contract, tmp_path)
     record_control_observation(tmp_path, report)
+    assert report.verdict == "INVALID"
+    assert any(
+        "recovery and settled outcome are not cross-bound" in item
+        for item in _integrity_failures(report)
+    )
+
+
+def test_validly_resigned_settled_outcome_cannot_swap_diagnostic_chain(
+    tmp_path: Path,
+) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    dossier_path = tmp_path / "dossiers" / "incident-000.json"
+    other_dossier = read_json(tmp_path / "dossiers" / "incident-001.json")
+    swapped_hashes = {
+        "selected_test_sha256": other_dossier["selected_test"]["sha256"],
+        "test_observation_sha256": other_dossier["test_observation"]["sha256"],
+        "diagnostic_execution_sha256": other_dossier["diagnostic_execution"]["sha256"],
+    }
+    _rewrite_signed_bound_json(
+        tmp_path,
+        dossier_path,
+        "settled_outcome",
+        SettledOutcomeRecord,
+        subject_kind=AttestationSubjectKind.SETTLED_OUTCOME,
+        signer_role=RoleKind.OUTCOME_VERIFIER,
+        issued_at_field="attestation.issued_at",
+        mutate=lambda value: value.update(swapped_hashes),
+    )
+
+    dossier = read_json(dossier_path)
+    settled = SettledOutcomeRecord.model_validate(
+        read_json(tmp_path / dossier["settled_outcome"]["path"])
+    )
+    for index, review in enumerate(dossier["reviews"]):
+        if review["purpose"] != ReviewPurpose.SETTLED_OUTCOME.value:
+            continue
+        review_body = deepcopy(review)
+        review_body.pop("attestation")
+        review_body["subject_sha256"] = sha256_value(settled)
+        signed_review = _signed_model(
+            BoundReview,
+            review_body,
+            subject_kind=AttestationSubjectKind.REVIEW,
+            signing_key=ACTOR_KEYS[RoleKind.OUTCOME_VERIFIER],
+            signer_id=f"actor-{RoleKind.OUTCOME_VERIFIER.value}",
+            attestation_id="negative-control-swapped-diagnostic-chain-review",
+            issued_at=_aware(review_body["reviewed_at"]),
+        )
+        dossier["reviews"][index] = signed_review.model_dump(mode="json")
+        break
+    write_json(dossier_path, dossier)
+
+    report = audit_acquisition(contract, tmp_path)
+
     assert report.verdict == "INVALID"
     assert any(
         "recovery and settled outcome are not cross-bound" in item
@@ -1420,6 +1535,14 @@ def test_contract_and_report_cannot_change_frozen_authority(tmp_path: Path) -> N
     wrong_domains["required_domains"] = ["aerospace", "industrial"]
     with pytest.raises(ValidationError, match="domains are both required"):
         AcquisitionContract.model_validate(wrong_domains)
+    for field_name, changed_value in (
+        ("max_clock_alignment_error_ns", 99_999_999),
+        ("max_clock_missing_fraction", 0.049),
+    ):
+        changed_clock_contract = deepcopy(base)
+        changed_clock_contract[field_name] = changed_value
+        with pytest.raises(ValidationError, match=field_name):
+            AcquisitionContract.model_validate(changed_clock_contract)
     wrong_ceiling = deepcopy(base)
     wrong_ceiling["resource_ceiling"]["max_gpu_seconds"] = 1
     with pytest.raises(ValidationError, match="resource ceiling"):

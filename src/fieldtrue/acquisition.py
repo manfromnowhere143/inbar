@@ -898,6 +898,9 @@ class SettledOutcomeRecord(FrozenModel):
     outcome_id: Identifier
     incident_id: Identifier
     recovery_id: Identifier
+    selected_test_sha256: Sha256
+    test_observation_sha256: Sha256
+    diagnostic_execution_sha256: Sha256
     recovery_execution_sha256: Sha256
     outcome_authority_id: Identifier
     outcome_authority_independence_group: Identifier
@@ -1419,6 +1422,7 @@ class AcquisitionContract(FrozenModel):
             PermissionKind.RETAIN_DERIVED,
             PermissionKind.PUBLISH_METADATA,
             PermissionKind.INDEPENDENT_REVIEW,
+            PermissionKind.REDISTRIBUTE_DERIVED,
             PermissionKind.COMMERCIAL_RESEARCH,
         }
         exact = {
@@ -1434,10 +1438,12 @@ class AcquisitionContract(FrozenModel):
             "minimum_faults_per_system_family": 2,
             "minimum_system_families_per_fault": 2,
             "minimum_operational_modalities": 2,
+            "max_clock_alignment_error_ns": 100_000_000,
+            "max_clock_missing_fraction": 0.05,
         }
         for field_name, expected in exact.items():
             if getattr(self, field_name) != expected:
-                raise ValueError(f"{field_name} cannot weaken the preregistration")
+                raise ValueError(f"{field_name} cannot weaken or alter the frozen preregistration")
         if set(self.required_permissions) != required_permissions:
             raise ValueError("required permissions do not match the preregistration")
         if set(self.required_domains) != {SystemDomain.AEROSPACE, SystemDomain.ROBOTICS}:
@@ -2674,6 +2680,9 @@ def _verify_dossier(
         or recovery_execution.plan_sha256 != sha256_value(recovery_plan)
         or recovery_execution.authority != ExecutionAuthority.TESTBED
         or settled.recovery_id != recovery_plan.recovery_id
+        or settled.selected_test_sha256 != sha256_value(selected)
+        or settled.test_observation_sha256 != sha256_value(observation)
+        or settled.diagnostic_execution_sha256 != sha256_value(diagnostic_execution)
         or settled.recovery_execution_sha256 != sha256_value(recovery_execution)
         or verification.recovery_id != recovery_plan.recovery_id
         or verification.action_valid != settled.action_valid
@@ -2835,6 +2844,8 @@ def _verify_dossier(
         or settled.window_finished_at != timeline.settled_window_finished_at
         or reviews[ReviewPurpose.MECHANISM].reviewed_at > timeline.truth_committed_at
         or reviews[ReviewPurpose.AMBIGUITY].reviewed_at < timeline.hypothesis_committed_at
+        or reviews[ReviewPurpose.AMBIGUITY].reviewed_at
+        > reviews[ReviewPurpose.SAFE_TEST].reviewed_at
         or reviews[ReviewPurpose.SAFE_TEST].reviewed_at != timeline.safe_test_reviewed_at
         or reviews[ReviewPurpose.SAFE_TEST].reviewed_at >= observation.started_at
         or reviews[ReviewPurpose.RECOVERY].reviewed_at >= recovery_execution.started_at

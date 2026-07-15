@@ -130,6 +130,11 @@
       "title": "Constraints Satisfied",
       "type": "boolean"
     },
+    "diagnostic_execution_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Diagnostic Execution Sha256",
+      "type": "string"
+    },
     "incident_id": {
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
       "title": "Incident Id",
@@ -184,6 +189,11 @@
       "title": "Schema Version",
       "type": "string"
     },
+    "selected_test_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Selected Test Sha256",
+      "type": "string"
+    },
     "settled_predicate": {
       "$ref": "#/$defs/ArtifactBinding"
     },
@@ -194,6 +204,11 @@
     "target_valid": {
       "title": "Target Valid",
       "type": "boolean"
+    },
+    "test_observation_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Test Observation Sha256",
+      "type": "string"
     },
     "window_finished_at": {
       "format": "date-time",
@@ -210,6 +225,9 @@
     "outcome_id",
     "incident_id",
     "recovery_id",
+    "selected_test_sha256",
+    "test_observation_sha256",
+    "diagnostic_execution_sha256",
     "recovery_execution_sha256",
     "outcome_authority_id",
     "outcome_authority_independence_group",
