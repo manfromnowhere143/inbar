@@ -91,6 +91,37 @@ from fieldtrue.domain import (
 from fieldtrue.memory import ResearchMemoryRecord
 from fieldtrue.receipts import LedgerEvent, LedgerHead, PublicationSignerAnchor, SignerAnchor
 from fieldtrue.runtime import RuntimeIdentity
+from fieldtrue.shortcut_contracts import (
+    OwnerAmendmentApprovalReceipt,
+    ShortcutAttestation,
+)
+from fieldtrue.shortcut_v2_crossfit import (
+    CategoricalFittedState,
+    CategoricalHoldoutInput,
+    CategoricalPredictionManifest,
+    CategoricalTrainingExample,
+    CrossfitCensus,
+    CrossfitFold,
+    CrossfitFoldRegistry,
+    CrossfitJobIdentity,
+    FittedStateRootItem,
+    IncidentLocalHypothesisMap,
+    PredictionRootItem,
+    TreeFittedState,
+    TreePredictionManifest,
+)
+from fieldtrue.shortcut_v2_release import (
+    RegistryRecomputationAuthoritySubject,
+    RuleAxisFoldAuthoritySubject,
+    ShortcutReleaseContext,
+    TargetEnvelope,
+    X25519RecipientIdentity,
+)
+from fieldtrue.shortcut_v2_tree import (
+    DepthTwoExactGiniTree,
+    FeatureVector,
+    TreePrediction,
+)
 from fieldtrue.splits import SplitLock
 from fieldtrue.terminal_authority import (
     AcquisitionInputEntry,
@@ -171,6 +202,31 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "settled_outcome.schema.json": SettledOutcomeRecord,
     "shortcut_rule_result.schema.json": ShortcutRuleResult,
     "shortcut_baseline_report.schema.json": ShortcutBaselineReport,
+    "shortcut_owner_approval_receipt.schema.json": OwnerAmendmentApprovalReceipt,
+    "shortcut_attestation.schema.json": ShortcutAttestation,
+    "shortcut_v2_categorical_fitted_state.schema.json": CategoricalFittedState,
+    "shortcut_v2_categorical_holdout_input.schema.json": CategoricalHoldoutInput,
+    "shortcut_v2_categorical_prediction_manifest.schema.json": CategoricalPredictionManifest,
+    "shortcut_v2_categorical_training_example.schema.json": CategoricalTrainingExample,
+    "shortcut_v2_crossfit_census.schema.json": CrossfitCensus,
+    "shortcut_v2_crossfit_fold.schema.json": CrossfitFold,
+    "shortcut_v2_crossfit_fold_registry.schema.json": CrossfitFoldRegistry,
+    "shortcut_v2_crossfit_job_identity.schema.json": CrossfitJobIdentity,
+    "shortcut_v2_exact_gini_tree.schema.json": DepthTwoExactGiniTree,
+    "shortcut_v2_feature_vector.schema.json": FeatureVector,
+    "shortcut_v2_fitted_state_root_item.schema.json": FittedStateRootItem,
+    "shortcut_v2_local_hypothesis_map.schema.json": IncidentLocalHypothesisMap,
+    "shortcut_v2_prediction_root_item.schema.json": PredictionRootItem,
+    "shortcut_v2_registry_recomputation_subject.schema.json": (
+        RegistryRecomputationAuthoritySubject
+    ),
+    "shortcut_v2_release_context.schema.json": ShortcutReleaseContext,
+    "shortcut_v2_rule_axis_fold_subject.schema.json": RuleAxisFoldAuthoritySubject,
+    "shortcut_v2_target_envelope.schema.json": TargetEnvelope,
+    "shortcut_v2_tree_fitted_state.schema.json": TreeFittedState,
+    "shortcut_v2_tree_prediction.schema.json": TreePrediction,
+    "shortcut_v2_tree_prediction_manifest.schema.json": TreePredictionManifest,
+    "shortcut_v2_x25519_recipient_identity.schema.json": X25519RecipientIdentity,
     "signed_attestation.schema.json": SignedAttestation,
     "signer_anchor.schema.json": SignerAnchor,
     "split_lock.schema.json": SplitLock,

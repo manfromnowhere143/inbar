@@ -972,6 +972,92 @@ def test_unsigned_trust_registry_is_rejected_before_dossier_admission(tmp_path: 
         audit_acquisition(contract, tmp_path)
 
 
+def test_validly_resigned_trust_registry_cannot_postdate_governed_activity(
+    tmp_path: Path,
+) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    registry_path = tmp_path / "trust_registry.json"
+    registry = read_json(registry_path)
+    actors = tuple(TrustedActor.model_validate(actor) for actor in registry["actors"])
+    write_json(
+        registry_path,
+        issue_actor_trust_registry(
+            ANCHOR_KEY,
+            registry_id=registry["registry_id"],
+            issued_at=BASE + timedelta(days=1),
+            actors=actors,
+        ),
+    )
+
+    with pytest.raises(AcquisitionAuditError, match="trust or control authority is invalid"):
+        audit_acquisition(contract, tmp_path)
+
+
+def test_validly_resigned_protocol_reviews_cannot_postdate_physical_execution(
+    tmp_path: Path,
+) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    protocol_path = tmp_path / "protocol_reviews.json"
+    protocol = read_json(protocol_path)
+    reviewer_roles = {
+        "aerospace": RoleKind.MECHANISM_REVIEWER,
+        "robotics": RoleKind.SAFETY_REVIEWER,
+    }
+    reviewed_at = BASE + timedelta(minutes=60)
+    records: list[ProtocolReviewRecord] = []
+    for review in protocol["reviews"]:
+        body = {key: value for key, value in review.items() if key != "attestation"}
+        body["reviewed_at"] = reviewed_at
+        role = reviewer_roles[body["domain"]]
+        records.append(
+            _signed_model(
+                ProtocolReviewRecord,
+                body,
+                subject_kind=AttestationSubjectKind.PROTOCOL_REVIEW,
+                signing_key=ACTOR_KEYS[role],
+                signer_id=body["reviewer_id"],
+                attestation_id=f"negative-control-{body['domain']}-late-protocol-review",
+                issued_at=reviewed_at,
+            )
+        )
+    write_json(protocol_path, ProtocolReviewRegistry(reviews=tuple(records)))
+
+    report = audit_acquisition(contract, tmp_path)
+
+    assert report.verdict == "INVALID"
+    assert any(
+        "protocol review does not precede physical test execution" in failure
+        for failure in _integrity_failures(report)
+    )
+
+
+def test_validly_signed_projection_cannot_claim_pre_acquisition_authority(
+    tmp_path: Path,
+) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    dossier_path = tmp_path / "dossiers" / "incident-000.json"
+    _rewrite_signed_bound_json(
+        tmp_path,
+        dossier_path,
+        "model_visible_projection",
+        ModelVisibleProjection,
+        subject_kind=AttestationSubjectKind.MODEL_VISIBLE_PROJECTION,
+        signer_role=RoleKind.EVIDENCE_CURATOR,
+        issued_at_field="projected_at",
+        mutate=lambda value: value.update(
+            {"projected_at": (BASE - timedelta(minutes=1)).isoformat()}
+        ),
+    )
+
+    report = audit_acquisition(contract, tmp_path)
+
+    assert report.verdict == "INVALID"
+    assert any(
+        "model-visible projection is incomplete" in failure
+        for failure in _integrity_failures(report)
+    )
+
+
 def test_per_axis_split_leakage_is_rejected_with_structural_counts_intact(
     tmp_path: Path,
 ) -> None:

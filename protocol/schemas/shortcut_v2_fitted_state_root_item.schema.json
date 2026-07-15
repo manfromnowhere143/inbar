@@ -1,0 +1,47 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "axis": {
+      "enum": [
+        "hardware_family",
+        "hardware_identity",
+        "fault_family"
+      ],
+      "title": "Axis",
+      "type": "string"
+    },
+    "fitted_state_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Fitted State Artifact Sha256",
+      "type": "string"
+    },
+    "holdout_group": {
+      "title": "Holdout Group",
+      "type": "string"
+    },
+    "rule_id": {
+      "enum": [
+        "source-identity",
+        "task-identity",
+        "system-identity",
+        "site-identity",
+        "path-and-filename",
+        "timestamp",
+        "fault-label",
+        "annotation",
+        "random-identity-embedding",
+        "cheapest-deterministic-evidence-only"
+      ],
+      "title": "Rule Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "rule_id",
+    "axis",
+    "holdout_group",
+    "fitted_state_artifact_sha256"
+  ],
+  "title": "FittedStateRootItem",
+  "type": "object"
+}

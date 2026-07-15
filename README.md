@@ -62,14 +62,19 @@ tests, and deployment authority remain forbidden.
 
 ## Admission status
 
-Iteration 001 is preregistered and its bootstrap admission implementation has 22 exact outcome
-bound controls. The local matrix at the last reviewed checkpoint contained 331 passing tests with
-90.32 percent branch aware coverage.
+Iteration 001 is preregistered and its bootstrap admission implementation has executable positive,
+negative, and placebo controls. CI enforces at least 90 percent branch aware coverage on the quality
+plane and runs the test suite on Python 3.11 through 3.14 across Linux and macOS. Exact checkpoint
+metrics belong in the append only research ledger rather than in this overview.
 
 Canonical admission remains blocked. The control authority is intentionally marked `bootstrap`, no
 production receipt exists, and no pilot verdict has been issued. Release requires executable
-shortcut semantics, truth bound mechanism resolution, terminal signatures over complete inputs,
-reconstructible invalidity records, and opaque media leakage controls.
+Shortcut Authority V2 semantics, truth bound mechanism resolution, terminal signatures over
+complete inputs, reconstructible invalidity records, and opaque media leakage controls. The
+current implementation-only V2 checkpoint contains exact tree, cross-fit, and encrypted-envelope
+primitives, but it grants no data access, target release, execution, result, seal, or publication
+authority. Its current boundaries are recorded in
+[the implementation checkpoint](docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md).
 
 These blockers are preserved as blockers. CI accepts the checkpoint only when the mission validator
 reports the exact registered blocker set and no additional failure.

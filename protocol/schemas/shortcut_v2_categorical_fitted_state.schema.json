@@ -1,0 +1,181 @@
+{
+  "$defs": {
+    "CategoricalMode": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_reason": {
+          "anyOf": [
+            {
+              "const": "class_tie",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Abstention Reason"
+        },
+        "class_counts": {
+          "items": {
+            "$ref": "#/$defs/ClassCount"
+          },
+          "minItems": 1,
+          "title": "Class Counts",
+          "type": "array"
+        },
+        "prediction_key": {
+          "anyOf": [
+            {
+              "pattern": "^(?:unknown|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prediction Key"
+        },
+        "selector": {
+          "$ref": "#/$defs/SelectorValue"
+        }
+      },
+      "required": [
+        "selector",
+        "class_counts",
+        "prediction_key",
+        "abstention_reason"
+      ],
+      "title": "CategoricalMode",
+      "type": "object"
+    },
+    "ClassCount": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "exclusiveMinimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "prediction_key": {
+          "pattern": "^(?:unknown|[0-9a-f]{64})$",
+          "title": "Prediction Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prediction_key",
+        "count"
+      ],
+      "title": "ClassCount",
+      "type": "object"
+    },
+    "CrossfitJobIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "enum": [
+            "hardware_family",
+            "hardware_identity",
+            "fault_family"
+          ],
+          "title": "Axis",
+          "type": "string"
+        },
+        "holdout_group": {
+          "title": "Holdout Group",
+          "type": "string"
+        },
+        "recipient_stage": {
+          "enum": [
+            "train_prediction",
+            "holdout_evaluation"
+          ],
+          "title": "Recipient Stage",
+          "type": "string"
+        },
+        "rule_id": {
+          "enum": [
+            "source-identity",
+            "task-identity",
+            "system-identity",
+            "site-identity",
+            "path-and-filename",
+            "timestamp",
+            "fault-label",
+            "annotation",
+            "random-identity-embedding",
+            "cheapest-deterministic-evidence-only"
+          ],
+          "title": "Rule Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "axis",
+        "holdout_group",
+        "recipient_stage"
+      ],
+      "title": "CrossfitJobIdentity",
+      "type": "object"
+    },
+    "SelectorValue": {
+      "additionalProperties": false,
+      "description": "An immutable, exact canonical JSON encoding of one typed selector value.",
+      "properties": {
+        "canonical_json_text": {
+          "minLength": 1,
+          "title": "Canonical Json Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "canonical_json_text"
+      ],
+      "title": "SelectorValue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "job": {
+      "$ref": "#/$defs/CrossfitJobIdentity"
+    },
+    "modes": {
+      "items": {
+        "$ref": "#/$defs/CategoricalMode"
+      },
+      "minItems": 1,
+      "title": "Modes",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.categorical-train-mode-state.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "train_incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Train Incident Ids",
+      "type": "array"
+    },
+    "train_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Train Incident Ids Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "job",
+    "train_incident_ids",
+    "train_incident_ids_sha256",
+    "modes"
+  ],
+  "title": "CategoricalFittedState",
+  "type": "object"
+}

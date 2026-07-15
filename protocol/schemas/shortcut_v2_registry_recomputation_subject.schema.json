@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "incident_count": {
+      "minimum": 1,
+      "title": "Incident Count",
+      "type": "integer"
+    },
+    "incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Incident Ids Sha256",
+      "type": "string"
+    },
+    "kind": {
+      "const": "registry_recomputation",
+      "title": "Kind",
+      "type": "string"
+    },
+    "rule_registry_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Rule Registry Sha256",
+      "type": "string"
+    },
+    "scope": {
+      "const": "complete_registry",
+      "title": "Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "rule_registry_sha256",
+    "scope",
+    "incident_count",
+    "incident_ids_sha256"
+  ],
+  "title": "RegistryRecomputationAuthoritySubject",
+  "type": "object"
+}

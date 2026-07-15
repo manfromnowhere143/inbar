@@ -1,0 +1,255 @@
+{
+  "$defs": {
+    "EqualsBooleanPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "title": "Operand",
+          "type": "boolean"
+        },
+        "operator": {
+          "const": "equals_boolean",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "EqualsBooleanPredicate",
+      "type": "object"
+    },
+    "EqualsCategoricalPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "title": "Operand",
+          "type": "string"
+        },
+        "operator": {
+          "const": "equals_categorical",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "EqualsCategoricalPredicate",
+      "type": "object"
+    },
+    "IsMissingPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "title": "Operand",
+          "type": "null"
+        },
+        "operator": {
+          "const": "is_missing",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "IsMissingPredicate",
+      "type": "object"
+    },
+    "LessThanOrEqualNumericPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "Operand",
+          "type": "string"
+        },
+        "operator": {
+          "const": "less_than_or_equal_numeric",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "LessThanOrEqualNumericPredicate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "abstention_reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "class_tie",
+            "key_unavailable"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Abstention Reason"
+    },
+    "feature_keys_read": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 2,
+      "title": "Feature Keys Read",
+      "type": "array"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "leaf_depth": {
+      "maximum": 2,
+      "minimum": 0,
+      "title": "Leaf Depth",
+      "type": "integer"
+    },
+    "predicates_evaluated": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "equals_boolean": "#/$defs/EqualsBooleanPredicate",
+            "equals_categorical": "#/$defs/EqualsCategoricalPredicate",
+            "is_missing": "#/$defs/IsMissingPredicate",
+            "less_than_or_equal_numeric": "#/$defs/LessThanOrEqualNumericPredicate"
+          },
+          "propertyName": "operator"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/IsMissingPredicate"
+          },
+          {
+            "$ref": "#/$defs/EqualsBooleanPredicate"
+          },
+          {
+            "$ref": "#/$defs/EqualsCategoricalPredicate"
+          },
+          {
+            "$ref": "#/$defs/LessThanOrEqualNumericPredicate"
+          }
+        ]
+      },
+      "maxItems": 2,
+      "title": "Predicates Evaluated",
+      "type": "array"
+    },
+    "proposed_prediction_key": {
+      "anyOf": [
+        {
+          "pattern": "^(?:unknown|[0-9a-f]{64})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Proposed Prediction Key"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.tree-prediction.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_hypothesis_id": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Hypothesis Id"
+    },
+    "selected_prediction_key": {
+      "anyOf": [
+        {
+          "pattern": "^(?:unknown|[0-9a-f]{64})$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Prediction Key"
+    }
+  },
+  "required": [
+    "schema_version",
+    "incident_id",
+    "proposed_prediction_key",
+    "selected_prediction_key",
+    "selected_hypothesis_id",
+    "abstention_reason",
+    "predicates_evaluated",
+    "feature_keys_read",
+    "leaf_depth"
+  ],
+  "title": "TreePrediction",
+  "type": "object"
+}

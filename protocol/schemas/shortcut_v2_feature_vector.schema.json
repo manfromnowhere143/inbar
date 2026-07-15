@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "BooleanFeatureValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "boolean",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "BooleanFeatureValue",
+      "type": "object"
+    },
+    "CategoricalFeatureValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "categorical",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "CategoricalFeatureValue",
+      "type": "object"
+    },
+    "FeatureEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "value": {
+          "discriminator": {
+            "mapping": {
+              "boolean": "#/$defs/BooleanFeatureValue",
+              "categorical": "#/$defs/CategoricalFeatureValue",
+              "missing": "#/$defs/MissingFeatureValue",
+              "numeric": "#/$defs/NumericFeatureValue"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MissingFeatureValue"
+            },
+            {
+              "$ref": "#/$defs/BooleanFeatureValue"
+            },
+            {
+              "$ref": "#/$defs/NumericFeatureValue"
+            },
+            {
+              "$ref": "#/$defs/CategoricalFeatureValue"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "feature_key",
+        "value"
+      ],
+      "title": "FeatureEntry",
+      "type": "object"
+    },
+    "MissingFeatureValue": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_type": {
+          "enum": [
+            "boolean",
+            "numeric",
+            "categorical"
+          ],
+          "title": "Feature Type",
+          "type": "string"
+        },
+        "kind": {
+          "const": "missing",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "feature_type"
+      ],
+      "title": "MissingFeatureValue",
+      "type": "object"
+    },
+    "NumericFeatureValue": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "numeric",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "NumericFeatureValue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/FeatureEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "entries"
+  ],
+  "title": "FeatureVector",
+  "type": "object"
+}

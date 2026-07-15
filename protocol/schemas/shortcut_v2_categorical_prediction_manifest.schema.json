@@ -1,0 +1,173 @@
+{
+  "$defs": {
+    "CategoricalPrediction": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "class_tie",
+                "unseen_selector",
+                "key_unavailable"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Abstention Reason"
+        },
+        "incident_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "proposed_prediction_key": {
+          "anyOf": [
+            {
+              "pattern": "^(?:unknown|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposed Prediction Key"
+        },
+        "selected_hypothesis_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Hypothesis Id"
+        },
+        "selected_prediction_key": {
+          "anyOf": [
+            {
+              "pattern": "^(?:unknown|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Selected Prediction Key"
+        }
+      },
+      "required": [
+        "incident_id",
+        "proposed_prediction_key",
+        "selected_prediction_key",
+        "selected_hypothesis_id",
+        "abstention_reason"
+      ],
+      "title": "CategoricalPrediction",
+      "type": "object"
+    },
+    "CrossfitJobIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "enum": [
+            "hardware_family",
+            "hardware_identity",
+            "fault_family"
+          ],
+          "title": "Axis",
+          "type": "string"
+        },
+        "holdout_group": {
+          "title": "Holdout Group",
+          "type": "string"
+        },
+        "recipient_stage": {
+          "enum": [
+            "train_prediction",
+            "holdout_evaluation"
+          ],
+          "title": "Recipient Stage",
+          "type": "string"
+        },
+        "rule_id": {
+          "enum": [
+            "source-identity",
+            "task-identity",
+            "system-identity",
+            "site-identity",
+            "path-and-filename",
+            "timestamp",
+            "fault-label",
+            "annotation",
+            "random-identity-embedding",
+            "cheapest-deterministic-evidence-only"
+          ],
+          "title": "Rule Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "axis",
+        "holdout_group",
+        "recipient_stage"
+      ],
+      "title": "CrossfitJobIdentity",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "fitted_state_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Fitted State Artifact Sha256",
+      "type": "string"
+    },
+    "holdout_incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Holdout Incident Ids",
+      "type": "array"
+    },
+    "holdout_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Holdout Incident Ids Sha256",
+      "type": "string"
+    },
+    "job": {
+      "$ref": "#/$defs/CrossfitJobIdentity"
+    },
+    "predictions": {
+      "items": {
+        "$ref": "#/$defs/CategoricalPrediction"
+      },
+      "minItems": 1,
+      "title": "Predictions",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.categorical-prediction-manifest.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "job",
+    "fitted_state_artifact_sha256",
+    "holdout_incident_ids",
+    "holdout_incident_ids_sha256",
+    "predictions"
+  ],
+  "title": "CategoricalPredictionManifest",
+  "type": "object"
+}

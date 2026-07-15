@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "description": "Public identity for one isolated recipient job.\n\nPrivate keys are deliberately absent. Callers must supply private key objects\nexplicitly to the open operation.",
+  "properties": {
+    "isolated_execution_context_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Isolated Execution Context Id",
+      "type": "string"
+    },
+    "recipient_actor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Recipient Actor Id",
+      "type": "string"
+    },
+    "recipient_encryption_key_epoch": {
+      "minimum": 0,
+      "title": "Recipient Encryption Key Epoch",
+      "type": "integer"
+    },
+    "recipient_encryption_key_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Recipient Encryption Key Id",
+      "type": "string"
+    },
+    "recipient_x25519_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Recipient X25519 Public Key",
+      "type": "string"
+    },
+    "recipient_x25519_public_key_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Recipient X25519 Public Key Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.x25519-recipient-identity.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "recipient_actor_id",
+    "isolated_execution_context_id",
+    "recipient_encryption_key_id",
+    "recipient_encryption_key_epoch",
+    "recipient_x25519_public_key",
+    "recipient_x25519_public_key_sha256"
+  ],
+  "title": "X25519RecipientIdentity",
+  "type": "object"
+}

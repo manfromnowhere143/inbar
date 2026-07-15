@@ -1,0 +1,37 @@
+{
+  "$defs": {
+    "SelectorValue": {
+      "additionalProperties": false,
+      "description": "An immutable, exact canonical JSON encoding of one typed selector value.",
+      "properties": {
+        "canonical_json_text": {
+          "minLength": 1,
+          "title": "Canonical Json Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "canonical_json_text"
+      ],
+      "title": "SelectorValue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "selector": {
+      "$ref": "#/$defs/SelectorValue"
+    }
+  },
+  "required": [
+    "incident_id",
+    "selector"
+  ],
+  "title": "CategoricalHoldoutInput",
+  "type": "object"
+}

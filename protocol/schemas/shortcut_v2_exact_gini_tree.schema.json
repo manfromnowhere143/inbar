@@ -1,0 +1,565 @@
+{
+  "$defs": {
+    "ClassCount": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "exclusiveMinimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "prediction_key": {
+          "pattern": "^(?:unknown|[0-9a-f]{64})$",
+          "title": "Prediction Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prediction_key",
+        "count"
+      ],
+      "title": "ClassCount",
+      "type": "object"
+    },
+    "DepthOneTreeNode": {
+      "additionalProperties": false,
+      "properties": {
+        "class_counts": {
+          "items": {
+            "$ref": "#/$defs/ClassCount"
+          },
+          "minItems": 1,
+          "title": "Class Counts",
+          "type": "array"
+        },
+        "depth": {
+          "const": 1,
+          "title": "Depth",
+          "type": "integer"
+        },
+        "false_child": {
+          "$ref": "#/$defs/TreeLeaf"
+        },
+        "impurity": {
+          "$ref": "#/$defs/ExactRational"
+        },
+        "kind": {
+          "const": "node",
+          "title": "Kind",
+          "type": "string"
+        },
+        "predicate": {
+          "discriminator": {
+            "mapping": {
+              "equals_boolean": "#/$defs/EqualsBooleanPredicate",
+              "equals_categorical": "#/$defs/EqualsCategoricalPredicate",
+              "is_missing": "#/$defs/IsMissingPredicate",
+              "less_than_or_equal_numeric": "#/$defs/LessThanOrEqualNumericPredicate"
+            },
+            "propertyName": "operator"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IsMissingPredicate"
+            },
+            {
+              "$ref": "#/$defs/EqualsBooleanPredicate"
+            },
+            {
+              "$ref": "#/$defs/EqualsCategoricalPredicate"
+            },
+            {
+              "$ref": "#/$defs/LessThanOrEqualNumericPredicate"
+            }
+          ],
+          "title": "Predicate"
+        },
+        "split_impurity": {
+          "$ref": "#/$defs/ExactRational"
+        },
+        "train_incident_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Train Incident Ids",
+          "type": "array"
+        },
+        "train_incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Train Incident Ids Sha256",
+          "type": "string"
+        },
+        "true_child": {
+          "$ref": "#/$defs/TreeLeaf"
+        }
+      },
+      "required": [
+        "depth",
+        "train_incident_ids",
+        "train_incident_ids_sha256",
+        "class_counts",
+        "impurity",
+        "kind",
+        "predicate",
+        "split_impurity",
+        "false_child",
+        "true_child"
+      ],
+      "title": "DepthOneTreeNode",
+      "type": "object"
+    },
+    "EqualsBooleanPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "title": "Operand",
+          "type": "boolean"
+        },
+        "operator": {
+          "const": "equals_boolean",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "EqualsBooleanPredicate",
+      "type": "object"
+    },
+    "EqualsCategoricalPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "title": "Operand",
+          "type": "string"
+        },
+        "operator": {
+          "const": "equals_categorical",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "EqualsCategoricalPredicate",
+      "type": "object"
+    },
+    "ExactRational": {
+      "additionalProperties": false,
+      "properties": {
+        "denominator": {
+          "exclusiveMinimum": 0,
+          "title": "Denominator",
+          "type": "integer"
+        },
+        "numerator": {
+          "minimum": 0,
+          "title": "Numerator",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "numerator",
+        "denominator"
+      ],
+      "title": "ExactRational",
+      "type": "object"
+    },
+    "FeatureDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "feature_type": {
+          "enum": [
+            "boolean",
+            "numeric",
+            "categorical"
+          ],
+          "title": "Feature Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "feature_key",
+        "feature_type"
+      ],
+      "title": "FeatureDefinition",
+      "type": "object"
+    },
+    "IsMissingPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "title": "Operand",
+          "type": "null"
+        },
+        "operator": {
+          "const": "is_missing",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "IsMissingPredicate",
+      "type": "object"
+    },
+    "LessThanOrEqualNumericPredicate": {
+      "additionalProperties": false,
+      "properties": {
+        "feature_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Feature Key",
+          "type": "string"
+        },
+        "operand": {
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "Operand",
+          "type": "string"
+        },
+        "operator": {
+          "const": "less_than_or_equal_numeric",
+          "title": "Operator",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.tree-predicate.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "feature_key",
+        "operator",
+        "operand"
+      ],
+      "title": "LessThanOrEqualNumericPredicate",
+      "type": "object"
+    },
+    "TreeLeaf": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_reason": {
+          "anyOf": [
+            {
+              "const": "class_tie",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Abstention Reason"
+        },
+        "class_counts": {
+          "items": {
+            "$ref": "#/$defs/ClassCount"
+          },
+          "minItems": 1,
+          "title": "Class Counts",
+          "type": "array"
+        },
+        "depth": {
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Depth",
+          "type": "integer"
+        },
+        "impurity": {
+          "$ref": "#/$defs/ExactRational"
+        },
+        "kind": {
+          "const": "leaf",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prediction_key": {
+          "anyOf": [
+            {
+              "pattern": "^(?:unknown|[0-9a-f]{64})$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prediction Key"
+        },
+        "train_incident_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Train Incident Ids",
+          "type": "array"
+        },
+        "train_incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Train Incident Ids Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "depth",
+        "train_incident_ids",
+        "train_incident_ids_sha256",
+        "class_counts",
+        "impurity",
+        "kind",
+        "prediction_key",
+        "abstention_reason"
+      ],
+      "title": "TreeLeaf",
+      "type": "object"
+    },
+    "TreeRootNode": {
+      "additionalProperties": false,
+      "properties": {
+        "class_counts": {
+          "items": {
+            "$ref": "#/$defs/ClassCount"
+          },
+          "minItems": 1,
+          "title": "Class Counts",
+          "type": "array"
+        },
+        "depth": {
+          "const": 0,
+          "title": "Depth",
+          "type": "integer"
+        },
+        "false_child": {
+          "discriminator": {
+            "mapping": {
+              "leaf": "#/$defs/TreeLeaf",
+              "node": "#/$defs/DepthOneTreeNode"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TreeLeaf"
+            },
+            {
+              "$ref": "#/$defs/DepthOneTreeNode"
+            }
+          ],
+          "title": "False Child"
+        },
+        "impurity": {
+          "$ref": "#/$defs/ExactRational"
+        },
+        "kind": {
+          "const": "node",
+          "title": "Kind",
+          "type": "string"
+        },
+        "predicate": {
+          "discriminator": {
+            "mapping": {
+              "equals_boolean": "#/$defs/EqualsBooleanPredicate",
+              "equals_categorical": "#/$defs/EqualsCategoricalPredicate",
+              "is_missing": "#/$defs/IsMissingPredicate",
+              "less_than_or_equal_numeric": "#/$defs/LessThanOrEqualNumericPredicate"
+            },
+            "propertyName": "operator"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/IsMissingPredicate"
+            },
+            {
+              "$ref": "#/$defs/EqualsBooleanPredicate"
+            },
+            {
+              "$ref": "#/$defs/EqualsCategoricalPredicate"
+            },
+            {
+              "$ref": "#/$defs/LessThanOrEqualNumericPredicate"
+            }
+          ],
+          "title": "Predicate"
+        },
+        "split_impurity": {
+          "$ref": "#/$defs/ExactRational"
+        },
+        "train_incident_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Train Incident Ids",
+          "type": "array"
+        },
+        "train_incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Train Incident Ids Sha256",
+          "type": "string"
+        },
+        "true_child": {
+          "discriminator": {
+            "mapping": {
+              "leaf": "#/$defs/TreeLeaf",
+              "node": "#/$defs/DepthOneTreeNode"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TreeLeaf"
+            },
+            {
+              "$ref": "#/$defs/DepthOneTreeNode"
+            }
+          ],
+          "title": "True Child"
+        }
+      },
+      "required": [
+        "depth",
+        "train_incident_ids",
+        "train_incident_ids_sha256",
+        "class_counts",
+        "impurity",
+        "kind",
+        "predicate",
+        "split_impurity",
+        "false_child",
+        "true_child"
+      ],
+      "title": "TreeRootNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "algorithm": {
+      "const": "depth_two_exact_gini_tree",
+      "title": "Algorithm",
+      "type": "string"
+    },
+    "feature_definitions": {
+      "items": {
+        "$ref": "#/$defs/FeatureDefinition"
+      },
+      "title": "Feature Definitions",
+      "type": "array"
+    },
+    "feature_root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Feature Root Sha256",
+      "type": "string"
+    },
+    "maximum_depth": {
+      "const": 2,
+      "title": "Maximum Depth",
+      "type": "integer"
+    },
+    "minimum_child_incidents": {
+      "const": 2,
+      "title": "Minimum Child Incidents",
+      "type": "integer"
+    },
+    "root": {
+      "discriminator": {
+        "mapping": {
+          "leaf": "#/$defs/TreeLeaf",
+          "node": "#/$defs/TreeRootNode"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TreeLeaf"
+        },
+        {
+          "$ref": "#/$defs/TreeRootNode"
+        }
+      ],
+      "title": "Root"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.depth-two-exact-gini-tree.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "train_incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Train Incident Ids",
+      "type": "array"
+    },
+    "train_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Train Incident Ids Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "algorithm",
+    "maximum_depth",
+    "minimum_child_incidents",
+    "feature_definitions",
+    "feature_root_sha256",
+    "train_incident_ids",
+    "train_incident_ids_sha256",
+    "root"
+  ],
+  "title": "DepthTwoExactGiniTree",
+  "type": "object"
+}

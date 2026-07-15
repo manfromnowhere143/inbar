@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "LocalHypothesisAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "hypothesis_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "prediction_key": {
+          "pattern": "^(?:unknown|[0-9a-f]{64})$",
+          "title": "Prediction Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prediction_key",
+        "hypothesis_id"
+      ],
+      "title": "LocalHypothesisAssignment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assignments": {
+      "items": {
+        "$ref": "#/$defs/LocalHypothesisAssignment"
+      },
+      "title": "Assignments",
+      "type": "array"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "assignments"
+  ],
+  "title": "IncidentLocalHypothesisMap",
+  "type": "object"
+}

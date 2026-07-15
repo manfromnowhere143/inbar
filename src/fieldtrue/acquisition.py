@@ -1900,7 +1900,11 @@ def _verify_trust_registry(
     root: Path,
     registry: ActorTrustRegistry,
     contract: AcquisitionContract,
+    *,
+    no_later_than: datetime,
 ) -> dict[str, TrustedActor]:
+    if registry.issued_at > no_later_than:
+        raise AcquisitionAuditError("trust registry postdates governed acquisition activity")
     if registry.signer_public_key != contract.trust_anchor_public_key:
         raise AcquisitionAuditError("trust registry is not signed by the contract anchor")
     body = registry.model_dump(mode="json", exclude={"registry_hash", "signature"})
@@ -2318,6 +2322,7 @@ def _verify_dossier(
         or projection.leakage_detected
         or supplied_leakage_scan != recomputed_leakage_scan
         or supplied_leakage_scan.leakage_detected != projection.leakage_detected
+        or projection.projected_at < dossier.timeline.source_acquired_at
         or projection.projected_at > dossier.timeline.evidence_cutoff_at
         or projection.curator_id != roles[RoleKind.EVIDENCE_CURATOR].actor_id
         or projection.attestation.issued_at != projection.projected_at
@@ -2943,7 +2948,21 @@ def audit_acquisition(
     integrity_failures: list[str] = []
     rights_failures: list[str] = []
     try:
-        actors = _verify_trust_registry(input_root, trust_registry, contract)
+        registry_dependent_times = (
+            *(source.approved_at for source in sources),
+            candidate_registry.produced_at,
+            shortcut_report.evaluated_at,
+            comparator_registry.committed_at,
+            *(review.reviewed_at for review in protocol_reviews.reviews),
+            usage.measured_at,
+            *(dossier.timeline.source_acquired_at for dossier in dossiers),
+        )
+        actors = _verify_trust_registry(
+            input_root,
+            trust_registry,
+            contract,
+            no_later_than=min(registry_dependent_times),
+        )
         control_subject = _unsigned_subject(control_suite, exclude={"attestation"})
         if (
             sha256_value(control_suite) != contract.control_suite_sha256
@@ -3209,6 +3228,10 @@ def audit_acquisition(
 
     try:
         protocol_review_actors = [actors[review.reviewer_id] for review in protocol_reviews.reviews]
+        first_test_started_at = min(
+            (dossier.timeline.test_started_at for dossier in dossiers),
+            default=None,
+        )
         if (
             len({actor.actor_id for actor in protocol_review_actors}) != 2
             or len({actor.independence_group_id for actor in protocol_review_actors}) != 2
@@ -3233,6 +3256,10 @@ def audit_acquisition(
             )
             if review.attestation.issued_at != review.reviewed_at:
                 raise AcquisitionAuditError("protocol-review attestation time differs")
+            if first_test_started_at is not None and review.reviewed_at >= first_test_started_at:
+                raise AcquisitionAuditError(
+                    "protocol review does not precede physical test execution"
+                )
     except (AcquisitionAuditError, KeyError) as error:
         integrity_failures.append(f"protocol reviews: {error}")
 

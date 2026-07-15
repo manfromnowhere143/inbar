@@ -1,0 +1,62 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "axis": {
+      "enum": [
+        "hardware_family",
+        "hardware_identity",
+        "fault_family"
+      ],
+      "title": "Axis",
+      "type": "string"
+    },
+    "holdout_group": {
+      "title": "Holdout Group",
+      "type": "string"
+    },
+    "holdout_incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Holdout Incident Ids",
+      "type": "array"
+    },
+    "holdout_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Holdout Incident Ids Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.crossfit-fold.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "train_incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Train Incident Ids",
+      "type": "array"
+    },
+    "train_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Train Incident Ids Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "axis",
+    "holdout_group",
+    "train_incident_ids",
+    "holdout_incident_ids",
+    "train_incident_ids_sha256",
+    "holdout_incident_ids_sha256"
+  ],
+  "title": "CrossfitFold",
+  "type": "object"
+}

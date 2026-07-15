@@ -1,0 +1,323 @@
+{
+  "$defs": {
+    "RegistryRecomputationAuthoritySubject": {
+      "additionalProperties": false,
+      "properties": {
+        "incident_count": {
+          "minimum": 1,
+          "title": "Incident Count",
+          "type": "integer"
+        },
+        "incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Incident Ids Sha256",
+          "type": "string"
+        },
+        "kind": {
+          "const": "registry_recomputation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "rule_registry_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Rule Registry Sha256",
+          "type": "string"
+        },
+        "scope": {
+          "const": "complete_registry",
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "rule_registry_sha256",
+        "scope",
+        "incident_count",
+        "incident_ids_sha256"
+      ],
+      "title": "RegistryRecomputationAuthoritySubject",
+      "type": "object"
+    },
+    "RuleAxisFoldAuthoritySubject": {
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "enum": [
+            "hardware_family",
+            "hardware_identity",
+            "fault_family"
+          ],
+          "title": "Axis",
+          "type": "string"
+        },
+        "holdout_group": {
+          "minLength": 1,
+          "title": "Holdout Group",
+          "type": "string"
+        },
+        "incident_count": {
+          "minimum": 1,
+          "title": "Incident Count",
+          "type": "integer"
+        },
+        "incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Incident Ids Sha256",
+          "type": "string"
+        },
+        "kind": {
+          "const": "rule_axis_fold",
+          "title": "Kind",
+          "type": "string"
+        },
+        "recipient_stage": {
+          "enum": [
+            "train_prediction",
+            "holdout_evaluation"
+          ],
+          "title": "Recipient Stage",
+          "type": "string"
+        },
+        "rule_id": {
+          "enum": [
+            "source-identity",
+            "task-identity",
+            "system-identity",
+            "site-identity",
+            "path-and-filename",
+            "timestamp",
+            "fault-label",
+            "annotation",
+            "random-identity-embedding",
+            "cheapest-deterministic-evidence-only"
+          ],
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "rule_id",
+        "axis",
+        "holdout_group",
+        "recipient_stage",
+        "scope",
+        "incident_count",
+        "incident_ids_sha256"
+      ],
+      "title": "RuleAxisFoldAuthoritySubject",
+      "type": "object"
+    },
+    "ShortcutArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ShortcutArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "acquisition_session_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Acquisition Session Id",
+      "type": "string"
+    },
+    "amendment_document_artifact_sha256": {
+      "const": "9278eb33ef5a837c0ae043112f2fb041df4faa39cf34d26787a47f2326bf360c",
+      "title": "Amendment Document Artifact Sha256",
+      "type": "string"
+    },
+    "authority_subject": {
+      "discriminator": {
+        "mapping": {
+          "registry_recomputation": "#/$defs/RegistryRecomputationAuthoritySubject",
+          "rule_axis_fold": "#/$defs/RuleAxisFoldAuthoritySubject"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/RuleAxisFoldAuthoritySubject"
+        },
+        {
+          "$ref": "#/$defs/RegistryRecomputationAuthoritySubject"
+        }
+      ],
+      "title": "Authority Subject"
+    },
+    "canonical_acquisition_contract_binding": {
+      "$ref": "#/$defs/ShortcutArtifactBinding"
+    },
+    "domain": {
+      "const": "inbar.iter001.recipient-scoped-truth-release.v1",
+      "title": "Domain",
+      "type": "string"
+    },
+    "freeze_receipt_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Freeze Receipt Artifact Sha256",
+      "type": "string"
+    },
+    "isolated_execution_context_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Isolated Execution Context Id",
+      "type": "string"
+    },
+    "iteration_id": {
+      "const": "iter001_physical_causal_evidence_acquisition",
+      "title": "Iteration Id",
+      "type": "string"
+    },
+    "key_preflight_receipt_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Key Preflight Receipt Artifact Sha256",
+      "type": "string"
+    },
+    "machine_proposal_artifact_sha256": {
+      "const": "9c13ef9562f1842f238770fc3d2e3741a77b5db291b4a8cf6b3a66f2e218a76a",
+      "title": "Machine Proposal Artifact Sha256",
+      "type": "string"
+    },
+    "owner_approval_receipt_sha256": {
+      "const": "482575c10bb58da6b867ee60587cefa290512fa6f09529a324cea3002fd616c3",
+      "title": "Owner Approval Receipt Sha256",
+      "type": "string"
+    },
+    "phase_ordinal": {
+      "minimum": 0,
+      "title": "Phase Ordinal",
+      "type": "integer"
+    },
+    "prerequisite_artifacts": {
+      "additionalProperties": false,
+      "minProperties": 1,
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+      },
+      "title": "Prerequisite Artifacts",
+      "type": "object"
+    },
+    "previous_phase_completion_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Previous Phase Completion Sha256",
+      "type": "string"
+    },
+    "proposal_git_commit": {
+      "const": "551a4ffb8bad5f12312af4a074a467af6bc0ebc2",
+      "title": "Proposal Git Commit",
+      "type": "string"
+    },
+    "recipient_actor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Recipient Actor Id",
+      "type": "string"
+    },
+    "recipient_encryption_key_epoch": {
+      "minimum": 0,
+      "title": "Recipient Encryption Key Epoch",
+      "type": "integer"
+    },
+    "recipient_encryption_key_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Recipient Encryption Key Id",
+      "type": "string"
+    },
+    "recipient_x25519_public_key_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Recipient X25519 Public Key Sha256",
+      "type": "string"
+    },
+    "release_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Release Id",
+      "type": "string"
+    },
+    "release_plan_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Release Plan Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.shortcut-release-context.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "target_manifest_hiding_commitment_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Target Manifest Hiding Commitment Sha256",
+      "type": "string"
+    },
+    "trust_registry_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Trust Registry Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "domain",
+    "iteration_id",
+    "acquisition_session_id",
+    "proposal_git_commit",
+    "amendment_document_artifact_sha256",
+    "machine_proposal_artifact_sha256",
+    "owner_approval_receipt_sha256",
+    "canonical_acquisition_contract_binding",
+    "trust_registry_sha256",
+    "freeze_receipt_artifact_sha256",
+    "target_manifest_hiding_commitment_sha256",
+    "release_plan_sha256",
+    "release_id",
+    "phase_ordinal",
+    "previous_phase_completion_sha256",
+    "prerequisite_artifacts",
+    "recipient_actor_id",
+    "isolated_execution_context_id",
+    "recipient_encryption_key_id",
+    "recipient_encryption_key_epoch",
+    "recipient_x25519_public_key_sha256",
+    "key_preflight_receipt_artifact_sha256",
+    "authority_subject"
+  ],
+  "title": "ShortcutReleaseContext",
+  "type": "object"
+}

@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "CrossfitCensus": {
+      "additionalProperties": false,
+      "properties": {
+        "eligible_incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Eligible Incident Ids Sha256",
+          "type": "string"
+        },
+        "incidents": {
+          "items": {
+            "$ref": "#/$defs/EligibleIncident"
+          },
+          "minItems": 1,
+          "title": "Incidents",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.crossfit-census.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "incidents",
+        "eligible_incident_ids_sha256"
+      ],
+      "title": "CrossfitCensus",
+      "type": "object"
+    },
+    "CrossfitFold": {
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "enum": [
+            "hardware_family",
+            "hardware_identity",
+            "fault_family"
+          ],
+          "title": "Axis",
+          "type": "string"
+        },
+        "holdout_group": {
+          "title": "Holdout Group",
+          "type": "string"
+        },
+        "holdout_incident_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Holdout Incident Ids",
+          "type": "array"
+        },
+        "holdout_incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Holdout Incident Ids Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.crossfit-fold.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "train_incident_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Train Incident Ids",
+          "type": "array"
+        },
+        "train_incident_ids_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Train Incident Ids Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "axis",
+        "holdout_group",
+        "train_incident_ids",
+        "holdout_incident_ids",
+        "train_incident_ids_sha256",
+        "holdout_incident_ids_sha256"
+      ],
+      "title": "CrossfitFold",
+      "type": "object"
+    },
+    "EligibleIncident": {
+      "additionalProperties": false,
+      "properties": {
+        "fault_family": {
+          "title": "Fault Family",
+          "type": "string"
+        },
+        "hardware_family": {
+          "title": "Hardware Family",
+          "type": "string"
+        },
+        "hardware_identity": {
+          "title": "Hardware Identity",
+          "type": "string"
+        },
+        "incident_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Incident Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "hardware_family",
+        "hardware_identity",
+        "fault_family"
+      ],
+      "title": "EligibleIncident",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "census": {
+      "$ref": "#/$defs/CrossfitCensus"
+    },
+    "crossfit_fold_root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Crossfit Fold Root Sha256",
+      "type": "string"
+    },
+    "folds": {
+      "items": {
+        "$ref": "#/$defs/CrossfitFold"
+      },
+      "minItems": 1,
+      "title": "Folds",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.crossfit-fold-registry.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "census",
+    "folds",
+    "crossfit_fold_root_sha256"
+  ],
+  "title": "CrossfitFoldRegistry",
+  "type": "object"
+}

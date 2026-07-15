@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "axis": {
+      "enum": [
+        "hardware_family",
+        "hardware_identity",
+        "fault_family"
+      ],
+      "title": "Axis",
+      "type": "string"
+    },
+    "holdout_group": {
+      "minLength": 1,
+      "title": "Holdout Group",
+      "type": "string"
+    },
+    "incident_count": {
+      "minimum": 1,
+      "title": "Incident Count",
+      "type": "integer"
+    },
+    "incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Incident Ids Sha256",
+      "type": "string"
+    },
+    "kind": {
+      "const": "rule_axis_fold",
+      "title": "Kind",
+      "type": "string"
+    },
+    "recipient_stage": {
+      "enum": [
+        "train_prediction",
+        "holdout_evaluation"
+      ],
+      "title": "Recipient Stage",
+      "type": "string"
+    },
+    "rule_id": {
+      "enum": [
+        "source-identity",
+        "task-identity",
+        "system-identity",
+        "site-identity",
+        "path-and-filename",
+        "timestamp",
+        "fault-label",
+        "annotation",
+        "random-identity-embedding",
+        "cheapest-deterministic-evidence-only"
+      ],
+      "title": "Rule Id",
+      "type": "string"
+    },
+    "scope": {
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "rule_id",
+    "axis",
+    "holdout_group",
+    "recipient_stage",
+    "scope",
+    "incident_count",
+    "incident_ids_sha256"
+  ],
+  "title": "RuleAxisFoldAuthoritySubject",
+  "type": "object"
+}

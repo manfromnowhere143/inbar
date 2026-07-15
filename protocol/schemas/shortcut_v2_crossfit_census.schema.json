@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "EligibleIncident": {
+      "additionalProperties": false,
+      "properties": {
+        "fault_family": {
+          "title": "Fault Family",
+          "type": "string"
+        },
+        "hardware_family": {
+          "title": "Hardware Family",
+          "type": "string"
+        },
+        "hardware_identity": {
+          "title": "Hardware Identity",
+          "type": "string"
+        },
+        "incident_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Incident Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "hardware_family",
+        "hardware_identity",
+        "fault_family"
+      ],
+      "title": "EligibleIncident",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "eligible_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Eligible Incident Ids Sha256",
+      "type": "string"
+    },
+    "incidents": {
+      "items": {
+        "$ref": "#/$defs/EligibleIncident"
+      },
+      "minItems": 1,
+      "title": "Incidents",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.crossfit-census.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "incidents",
+    "eligible_incident_ids_sha256"
+  ],
+  "title": "CrossfitCensus",
+  "type": "object"
+}
