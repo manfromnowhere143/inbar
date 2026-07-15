@@ -106,6 +106,7 @@ def _eligible(
     approval_receipt: ApprovalReceipt | None,
     expected_approval_signer: str | None,
     approval_time: datetime | None,
+    approval_subject_extension: Mapping[str, object] | None,
 ) -> bool:
     ordinary_checks = (
         test.approved
@@ -124,12 +125,15 @@ def _eligible(
         return True
     if approval_receipt is None or expected_approval_signer is None:
         return False
+    subject: dict[str, object] = {
+        "candidate": test.model_dump(mode="json", exclude={"approval_receipt_hash"}),
+        "safety_envelope": envelope.model_dump(mode="json", exclude={"approval_receipt_hash"}),
+    }
+    if approval_subject_extension is not None:
+        subject.update(approval_subject_extension)
     subject_hash = authorization_subject_hash(
         ApprovalSubjectKind.TEST_EXECUTION,
-        {
-            "candidate": test.model_dump(mode="json", exclude={"approval_receipt_hash"}),
-            "safety_envelope": envelope.model_dump(mode="json", exclude={"approval_receipt_hash"}),
-        },
+        subject,
     )
     try:
         verified = verify_approval(
@@ -159,6 +163,7 @@ def select_discriminating_test(
     approval_receipt: ApprovalReceipt | None = None,
     expected_approval_signer: str | None = None,
     approval_time: datetime | None = None,
+    approval_subject_extension: Mapping[str, object] | None = None,
 ) -> SelectedTest:
     planner_weights = weights or PlannerWeights()
     posterior = {item.hypothesis_id: item.prior for item in hypotheses.hypotheses}
@@ -170,6 +175,7 @@ def select_discriminating_test(
             approval_receipt=approval_receipt,
             expected_approval_signer=expected_approval_signer,
             approval_time=approval_time,
+            approval_subject_extension=approval_subject_extension,
         ):
             continue
         gain = expected_information_gain_bits(posterior, candidate)

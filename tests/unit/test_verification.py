@@ -615,6 +615,16 @@ def test_verification_authority_binds_external_signer_code_tests_and_protocol(
     }
     authority_path = tmp_path / verification_module._VERIFICATION_AUTHORITY_PATH
     _write_json(authority_path, authority)
+    implementation_paths = {
+        source_path,
+        test_path,
+        *protocol_paths,
+        "pyproject.toml",
+        "uv.lock",
+    }
+    committed_blobs = {
+        relative: (tmp_path / relative).read_bytes() for relative in implementation_paths
+    }
     expected_selection_changes = "\n".join(
         (
             verification_module._VERIFICATION_AUTHORITY_PATH,
@@ -636,11 +646,13 @@ def test_verification_authority_binds_external_signer_code_tests_and_protocol(
         raise AssertionError(arguments)
 
     monkeypatch.setattr(verification_module, "_git_text", git_text)
-    monkeypatch.setattr(
-        verification_module,
-        "_git_blob",
-        lambda repo, _commit, relative: (repo / relative).read_bytes(),
-    )
+
+    def git_blob(repo: Path, selected_commit: str, relative: str) -> bytes:
+        if selected_commit == commit:
+            return committed_blobs[relative]
+        return (repo / relative).read_bytes()
+
+    monkeypatch.setattr(verification_module, "_git_blob", git_blob)
     monkeypatch.setattr(
         verification_module,
         "_git_file_set",
@@ -660,6 +672,39 @@ def test_verification_authority_binds_external_signer_code_tests_and_protocol(
     assert loaded == authority
     assert loaded_data == authority_path.read_bytes()
     assert loaded_anchor == anchor
+
+    original_source = (tmp_path / source_path).read_bytes()
+    original_pyproject = (tmp_path / "pyproject.toml").read_bytes()
+    (tmp_path / source_path).write_text("future iteration source\n")
+    (tmp_path / "pyproject.toml").write_text("future iteration dependencies\n")
+    git_state["selection_changes"] = expected_selection_changes + "\nREADME.md"
+    verification_module._load_verification_authority(
+        tmp_path,
+        authority_path,
+        amendment=amendment,
+        strict_selection_head=False,
+    )
+    with pytest.raises(ProofBundleVerificationError, match="working hash differs"):
+        verification_module._load_verification_authority(
+            tmp_path,
+            authority_path,
+            amendment=amendment,
+        )
+    (tmp_path / source_path).write_bytes(original_source)
+    (tmp_path / "pyproject.toml").write_bytes(original_pyproject)
+    git_state["selection_changes"] = expected_selection_changes
+
+    protected_protocol = tmp_path / verification_module._HYPOTHESIS_PATH
+    original_protocol = protected_protocol.read_bytes()
+    protected_protocol.write_text("tampered historical protocol\n")
+    with pytest.raises(ProofBundleVerificationError, match="working hash differs"):
+        verification_module._load_verification_authority(
+            tmp_path,
+            authority_path,
+            amendment=amendment,
+            strict_selection_head=False,
+        )
+    protected_protocol.write_bytes(original_protocol)
 
     def assert_authority_rejected(
         candidate: dict[str, Any],

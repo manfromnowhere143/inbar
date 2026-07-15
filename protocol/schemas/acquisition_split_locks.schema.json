@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "fault_family": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "hardware_family": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "hardware_identity": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "schema_version": {
+      "const": "fieldtrue.acquisition-split-locks.v1",
+      "default": "fieldtrue.acquisition-split-locks.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "hardware_family",
+    "hardware_identity",
+    "fault_family"
+  ],
+  "title": "AcquisitionSplitLocks",
+  "type": "object"
+}

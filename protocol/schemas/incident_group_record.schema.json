@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "Physicality": {
+      "enum": [
+        "physical",
+        "simulated",
+        "synthetic",
+        "hand_drawn"
+      ],
+      "title": "Physicality",
+      "type": "string"
+    },
+    "SystemDomain": {
+      "enum": [
+        "aerospace",
+        "robotics",
+        "industrial",
+        "other"
+      ],
+      "title": "SystemDomain",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "acquisition_lineage_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Acquisition Lineage Id",
+      "type": "string"
+    },
+    "acquisition_session_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Acquisition Session Id",
+      "type": "string"
+    },
+    "claim_bearing": {
+      "title": "Claim Bearing",
+      "type": "boolean"
+    },
+    "configuration_id": {
+      "minLength": 1,
+      "title": "Configuration Id",
+      "type": "string"
+    },
+    "environment_id": {
+      "minLength": 1,
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "fault_family": {
+      "minLength": 1,
+      "title": "Fault Family",
+      "type": "string"
+    },
+    "hardware_id": {
+      "minLength": 1,
+      "title": "Hardware Id",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "independence_group_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Independence Group Id",
+      "type": "string"
+    },
+    "mission_id": {
+      "minLength": 1,
+      "title": "Mission Id",
+      "type": "string"
+    },
+    "physicality": {
+      "$ref": "#/$defs/Physicality"
+    },
+    "root_incident_group_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Root Incident Group Id",
+      "type": "string"
+    },
+    "site_id": {
+      "minLength": 1,
+      "title": "Site Id",
+      "type": "string"
+    },
+    "system_domain": {
+      "$ref": "#/$defs/SystemDomain"
+    },
+    "system_family": {
+      "minLength": 1,
+      "title": "System Family",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "root_incident_group_id",
+    "acquisition_session_id",
+    "independence_group_id",
+    "physicality",
+    "system_domain",
+    "system_family",
+    "hardware_id",
+    "fault_family",
+    "configuration_id",
+    "environment_id",
+    "acquisition_lineage_id",
+    "mission_id",
+    "site_id",
+    "claim_bearing"
+  ],
+  "title": "IncidentGroupRecord",
+  "type": "object"
+}

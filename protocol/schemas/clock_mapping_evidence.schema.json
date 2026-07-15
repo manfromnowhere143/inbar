@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "ClockCalibrationPair": {
+      "additionalProperties": false,
+      "properties": {
+        "reference_ns": {
+          "title": "Reference Ns",
+          "type": "integer"
+        },
+        "source_value": {
+          "title": "Source Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "source_value",
+        "reference_ns"
+      ],
+      "title": "ClockCalibrationPair",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "calibration_pairs": {
+      "items": {
+        "$ref": "#/$defs/ClockCalibrationPair"
+      },
+      "minItems": 2,
+      "title": "Calibration Pairs",
+      "type": "array"
+    },
+    "clock_domain": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Clock Domain",
+      "type": "string"
+    },
+    "expected_samples": {
+      "exclusiveMinimum": 0,
+      "title": "Expected Samples",
+      "type": "integer"
+    },
+    "method": {
+      "minLength": 1,
+      "title": "Method",
+      "type": "string"
+    },
+    "observed_samples": {
+      "minimum": 0,
+      "title": "Observed Samples",
+      "type": "integer"
+    },
+    "reference_clock_domain": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Reference Clock Domain",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.clock-mapping-evidence.v1",
+      "default": "fieldtrue.clock-mapping-evidence.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "clock_domain",
+    "reference_clock_domain",
+    "calibration_pairs",
+    "expected_samples",
+    "observed_samples",
+    "method"
+  ],
+  "title": "ClockMappingEvidence",
+  "type": "object"
+}

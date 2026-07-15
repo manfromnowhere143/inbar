@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "clock_domain": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Clock Domain",
+      "type": "string"
+    },
+    "evidence_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "normalized_end_ns": {
+      "title": "Normalized End Ns",
+      "type": "integer"
+    },
+    "normalized_start_ns": {
+      "title": "Normalized Start Ns",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "clock_domain",
+    "normalized_start_ns",
+    "normalized_end_ns"
+  ],
+  "title": "EvidenceTimeBinding",
+  "type": "object"
+}

@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "Physicality": {
+      "enum": [
+        "physical",
+        "simulated",
+        "synthetic",
+        "hand_drawn"
+      ],
+      "title": "Physicality",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "discovered_at": {
+      "format": "date-time",
+      "title": "Discovered At",
+      "type": "string"
+    },
+    "discovery_evidence": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "physicality": {
+      "$ref": "#/$defs/Physicality"
+    },
+    "root_incident_group_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Root Incident Group Id",
+      "type": "string"
+    },
+    "source_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Source Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "root_incident_group_id",
+    "source_id",
+    "physicality",
+    "discovered_at",
+    "discovery_evidence"
+  ],
+  "title": "CandidateIncidentRoot",
+  "type": "object"
+}

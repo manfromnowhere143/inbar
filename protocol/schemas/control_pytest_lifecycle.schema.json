@@ -1,0 +1,77 @@
+{
+  "$defs": {
+    "PytestPhase": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "skipped"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "was_xfail": {
+          "title": "Was Xfail",
+          "type": "boolean"
+        },
+        "when": {
+          "enum": [
+            "setup",
+            "call",
+            "teardown"
+          ],
+          "title": "When",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "outcome",
+        "was_xfail"
+      ],
+      "title": "PytestPhase",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "collected_node_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Collected Node Ids",
+      "type": "array"
+    },
+    "exit_status": {
+      "title": "Exit Status",
+      "type": "integer"
+    },
+    "phases": {
+      "items": {
+        "$ref": "#/$defs/PytestPhase"
+      },
+      "title": "Phases",
+      "type": "array"
+    },
+    "requested_node_id": {
+      "title": "Requested Node Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.pytest-control-lifecycle.v1",
+      "default": "fieldtrue.pytest-control-lifecycle.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "requested_node_id",
+    "collected_node_ids",
+    "phases",
+    "exit_status"
+  ],
+  "title": "PytestLifecycle",
+  "type": "object"
+}

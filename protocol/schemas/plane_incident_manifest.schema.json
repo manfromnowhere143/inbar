@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Incident Ids",
+      "type": "array"
+    },
+    "plane": {
+      "enum": [
+        "model_visible",
+        "truth_only"
+      ],
+      "title": "Plane",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.plane-incident-manifest.v1",
+      "default": "fieldtrue.plane-incident-manifest.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plane",
+    "incident_ids"
+  ],
+  "title": "PlaneIncidentManifest",
+  "type": "object"
+}

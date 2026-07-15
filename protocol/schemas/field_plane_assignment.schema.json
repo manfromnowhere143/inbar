@@ -1,0 +1,36 @@
+{
+  "$defs": {
+    "EvidencePlane": {
+      "enum": [
+        "model_visible",
+        "truth_only",
+        "excluded"
+      ],
+      "title": "EvidencePlane",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "field_name": {
+      "minLength": 1,
+      "title": "Field Name",
+      "type": "string"
+    },
+    "plane": {
+      "$ref": "#/$defs/EvidencePlane"
+    },
+    "rationale": {
+      "minLength": 1,
+      "title": "Rationale",
+      "type": "string"
+    }
+  },
+  "required": [
+    "field_name",
+    "plane",
+    "rationale"
+  ],
+  "title": "FieldPlaneAssignment",
+  "type": "object"
+}

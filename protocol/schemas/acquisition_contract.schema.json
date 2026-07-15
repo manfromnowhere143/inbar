@@ -1,0 +1,277 @@
+{
+  "$defs": {
+    "PermissionKind": {
+      "enum": [
+        "acquire",
+        "process",
+        "retain_raw",
+        "retain_derived",
+        "publish_metadata",
+        "independent_review",
+        "redistribute_raw",
+        "redistribute_derived",
+        "commercial_research"
+      ],
+      "title": "PermissionKind",
+      "type": "string"
+    },
+    "ResourceCeiling": {
+      "additionalProperties": false,
+      "properties": {
+        "max_cloud_jobs": {
+          "minimum": 0,
+          "title": "Max Cloud Jobs",
+          "type": "integer"
+        },
+        "max_cost_usd": {
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+          "title": "Max Cost Usd",
+          "type": "string"
+        },
+        "max_cpu_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Max Cpu Seconds",
+          "type": "number"
+        },
+        "max_derived_bytes": {
+          "minimum": 0,
+          "title": "Max Derived Bytes",
+          "type": "integer"
+        },
+        "max_downloaded_bytes": {
+          "minimum": 0,
+          "title": "Max Downloaded Bytes",
+          "type": "integer"
+        },
+        "max_gpu_seconds": {
+          "minimum": 0,
+          "title": "Max Gpu Seconds",
+          "type": "number"
+        },
+        "max_paid_calls": {
+          "minimum": 0,
+          "title": "Max Paid Calls",
+          "type": "integer"
+        },
+        "max_peak_memory_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Max Peak Memory Bytes",
+          "type": "integer"
+        },
+        "max_peak_staged_bytes": {
+          "minimum": 0,
+          "title": "Max Peak Staged Bytes",
+          "type": "integer"
+        },
+        "max_wall_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Max Wall Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "max_cpu_seconds",
+        "max_wall_seconds",
+        "max_peak_memory_bytes",
+        "max_downloaded_bytes",
+        "max_peak_staged_bytes",
+        "max_derived_bytes",
+        "max_gpu_seconds",
+        "max_cloud_jobs",
+        "max_paid_calls",
+        "max_cost_usd"
+      ],
+      "title": "ResourceCeiling",
+      "type": "object"
+    },
+    "SystemDomain": {
+      "enum": [
+        "aerospace",
+        "robotics",
+        "industrial",
+        "other"
+      ],
+      "title": "SystemDomain",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "authority_profile": {
+      "enum": [
+        "canonical",
+        "test_fixture"
+      ],
+      "title": "Authority Profile",
+      "type": "string"
+    },
+    "control_authority_status": {
+      "enum": [
+        "bootstrap",
+        "sealed",
+        "test_fixture"
+      ],
+      "title": "Control Authority Status",
+      "type": "string"
+    },
+    "control_suite_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Control Suite Sha256",
+      "type": "string"
+    },
+    "dependency_lock_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dependency Lock Sha256",
+      "type": "string"
+    },
+    "iteration_id": {
+      "const": "iter001_physical_causal_evidence_acquisition",
+      "title": "Iteration Id",
+      "type": "string"
+    },
+    "max_clock_alignment_error_ns": {
+      "minimum": 0,
+      "title": "Max Clock Alignment Error Ns",
+      "type": "integer"
+    },
+    "max_clock_missing_fraction": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Max Clock Missing Fraction",
+      "type": "number"
+    },
+    "maximum_family_share": {
+      "title": "Maximum Family Share",
+      "type": "number"
+    },
+    "minimum_complete_physical_incidents": {
+      "title": "Minimum Complete Physical Incidents",
+      "type": "integer"
+    },
+    "minimum_fault_families": {
+      "title": "Minimum Fault Families",
+      "type": "integer"
+    },
+    "minimum_faults_per_system_family": {
+      "title": "Minimum Faults Per System Family",
+      "type": "integer"
+    },
+    "minimum_hardware_identities": {
+      "title": "Minimum Hardware Identities",
+      "type": "integer"
+    },
+    "minimum_identities_per_system_family": {
+      "title": "Minimum Identities Per System Family",
+      "type": "integer"
+    },
+    "minimum_incidents_per_fault_family": {
+      "title": "Minimum Incidents Per Fault Family",
+      "type": "integer"
+    },
+    "minimum_incidents_per_hardware_identity": {
+      "title": "Minimum Incidents Per Hardware Identity",
+      "type": "integer"
+    },
+    "minimum_incidents_per_system_family": {
+      "title": "Minimum Incidents Per System Family",
+      "type": "integer"
+    },
+    "minimum_operational_modalities": {
+      "title": "Minimum Operational Modalities",
+      "type": "integer"
+    },
+    "minimum_system_families": {
+      "title": "Minimum System Families",
+      "type": "integer"
+    },
+    "minimum_system_families_per_fault": {
+      "title": "Minimum System Families Per Fault",
+      "type": "integer"
+    },
+    "preregistration_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Preregistration Commit",
+      "type": "string"
+    },
+    "preregistration_path": {
+      "const": "experiments/iter001_physical_causal_evidence_acquisition/HYPOTHESIS.md",
+      "title": "Preregistration Path",
+      "type": "string"
+    },
+    "preregistration_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Preregistration Sha256",
+      "type": "string"
+    },
+    "required_domains": {
+      "items": {
+        "$ref": "#/$defs/SystemDomain"
+      },
+      "title": "Required Domains",
+      "type": "array"
+    },
+    "required_permissions": {
+      "items": {
+        "$ref": "#/$defs/PermissionKind"
+      },
+      "title": "Required Permissions",
+      "type": "array"
+    },
+    "resource_ceiling": {
+      "$ref": "#/$defs/ResourceCeiling"
+    },
+    "schema_version": {
+      "const": "fieldtrue.acquisition-contract.v1",
+      "default": "fieldtrue.acquisition-contract.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "trust_anchor_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Trust Anchor Public Key",
+      "type": "string"
+    },
+    "validator_git_blob": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Validator Git Blob",
+      "type": "string"
+    },
+    "validator_source_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Validator Source Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "authority_profile",
+    "control_authority_status",
+    "iteration_id",
+    "preregistration_path",
+    "preregistration_commit",
+    "preregistration_sha256",
+    "required_permissions",
+    "minimum_complete_physical_incidents",
+    "minimum_system_families",
+    "minimum_hardware_identities",
+    "minimum_identities_per_system_family",
+    "minimum_fault_families",
+    "minimum_incidents_per_system_family",
+    "minimum_incidents_per_fault_family",
+    "minimum_incidents_per_hardware_identity",
+    "maximum_family_share",
+    "minimum_faults_per_system_family",
+    "minimum_system_families_per_fault",
+    "required_domains",
+    "minimum_operational_modalities",
+    "max_clock_alignment_error_ns",
+    "max_clock_missing_fraction",
+    "trust_anchor_public_key",
+    "validator_git_blob",
+    "validator_source_sha256",
+    "dependency_lock_sha256",
+    "control_suite_sha256",
+    "resource_ceiling"
+  ],
+  "title": "AcquisitionContract",
+  "type": "object"
+}

@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "control_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Control Id",
+      "type": "string"
+    },
+    "evidence": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "expected_failure_code": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Expected Failure Code"
+    },
+    "expected_gate_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Expected Gate Id",
+      "type": "string"
+    },
+    "expected_verdict": {
+      "enum": [
+        "PASS_PILOT",
+        "BLOCKED_ACQUISITION",
+        "BLOCKED_RIGHTS",
+        "INVALID",
+        "KILL_CONSTRUCT"
+      ],
+      "title": "Expected Verdict",
+      "type": "string"
+    },
+    "fixture_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Fixture Sha256",
+      "type": "string"
+    },
+    "observed_failure_code": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Observed Failure Code"
+    },
+    "observed_gate_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Observed Gate Id",
+      "type": "string"
+    },
+    "observed_verdict": {
+      "enum": [
+        "PASS_PILOT",
+        "BLOCKED_ACQUISITION",
+        "BLOCKED_RIGHTS",
+        "INVALID",
+        "KILL_CONSTRUCT"
+      ],
+      "title": "Observed Verdict",
+      "type": "string"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "pytest_node_id": {
+      "pattern": "^tests/unit/test_acquisition\\.py::test_[a-z0-9_]+$",
+      "title": "Pytest Node Id",
+      "type": "string"
+    },
+    "report_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Report Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "control_id",
+    "fixture_sha256",
+    "report_sha256",
+    "evidence",
+    "pytest_node_id",
+    "expected_verdict",
+    "observed_verdict",
+    "expected_gate_id",
+    "observed_gate_id",
+    "expected_failure_code",
+    "observed_failure_code",
+    "passed"
+  ],
+  "title": "AdmissionControlResult",
+  "type": "object"
+}

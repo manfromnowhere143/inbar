@@ -1,0 +1,27 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "bytes": {
+      "minimum": 0,
+      "title": "Bytes",
+      "type": "integer"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "sha256",
+    "bytes"
+  ],
+  "title": "FixtureFile",
+  "type": "object"
+}

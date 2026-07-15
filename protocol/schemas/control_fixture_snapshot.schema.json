@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "FixtureFile": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes"
+      ],
+      "title": "FixtureFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "algorithm": {
+      "const": "fieldtrue.fixture-tree.v1",
+      "default": "fieldtrue.fixture-tree.v1",
+      "title": "Algorithm",
+      "type": "string"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/FixtureFile"
+      },
+      "minItems": 1,
+      "title": "Files",
+      "type": "array"
+    },
+    "root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Root Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "files",
+    "root_sha256"
+  ],
+  "title": "FixtureSnapshot",
+  "type": "object"
+}

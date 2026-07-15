@@ -1,0 +1,231 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "AttestationSubjectKind": {
+      "enum": [
+        "source_rights",
+        "physical_provenance",
+        "mechanism_truth",
+        "review",
+        "diagnostic_execution",
+        "recovery_execution",
+        "settled_outcome",
+        "protocol_review",
+        "shortcut_baseline",
+        "control_suite",
+        "model_visible_projection",
+        "resource_usage",
+        "truth_custody",
+        "comparator_registry",
+        "candidate_registry",
+        "evidence_sequence"
+      ],
+      "title": "AttestationSubjectKind",
+      "type": "string"
+    },
+    "SignedAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "attestation_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Attestation Hash",
+          "type": "string"
+        },
+        "attestation_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Attestation Id",
+          "type": "string"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "fieldtrue.signed-attestation.v1",
+          "default": "fieldtrue.signed-attestation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[0-9a-f]{128}$",
+          "title": "Signature",
+          "type": "string"
+        },
+        "signer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Signer Id",
+          "type": "string"
+        },
+        "signer_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signer Public Key",
+          "type": "string"
+        },
+        "subject_kind": {
+          "$ref": "#/$defs/AttestationSubjectKind"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attestation_id",
+        "signer_id",
+        "subject_kind",
+        "subject_sha256",
+        "issued_at",
+        "signer_public_key",
+        "attestation_hash",
+        "signature"
+      ],
+      "title": "SignedAttestation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action_valid": {
+      "title": "Action Valid",
+      "type": "boolean"
+    },
+    "attestation": {
+      "$ref": "#/$defs/SignedAttestation"
+    },
+    "constraints_satisfied": {
+      "title": "Constraints Satisfied",
+      "type": "boolean"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "outcome_artifacts": {
+      "items": {
+        "$ref": "#/$defs/ArtifactBinding"
+      },
+      "minItems": 1,
+      "title": "Outcome Artifacts",
+      "type": "array"
+    },
+    "outcome_authority_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Outcome Authority Id",
+      "type": "string"
+    },
+    "outcome_authority_independence_group": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Outcome Authority Independence Group",
+      "type": "string"
+    },
+    "outcome_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Outcome Id",
+      "type": "string"
+    },
+    "predicate_evaluation": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "recovery_execution_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Recovery Execution Sha256",
+      "type": "string"
+    },
+    "recovery_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Recovery Id",
+      "type": "string"
+    },
+    "recurrence_checked": {
+      "title": "Recurrence Checked",
+      "type": "boolean"
+    },
+    "recurrence_evidence": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "schema_version": {
+      "const": "fieldtrue.settled-outcome.v1",
+      "default": "fieldtrue.settled-outcome.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "settled_predicate": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "settled_success": {
+      "title": "Settled Success",
+      "type": "boolean"
+    },
+    "target_valid": {
+      "title": "Target Valid",
+      "type": "boolean"
+    },
+    "window_finished_at": {
+      "format": "date-time",
+      "title": "Window Finished At",
+      "type": "string"
+    },
+    "window_started_at": {
+      "format": "date-time",
+      "title": "Window Started At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "outcome_id",
+    "incident_id",
+    "recovery_id",
+    "recovery_execution_sha256",
+    "outcome_authority_id",
+    "outcome_authority_independence_group",
+    "settled_predicate",
+    "predicate_evaluation",
+    "recurrence_evidence",
+    "window_started_at",
+    "window_finished_at",
+    "recurrence_checked",
+    "constraints_satisfied",
+    "action_valid",
+    "target_valid",
+    "settled_success",
+    "outcome_artifacts",
+    "attestation"
+  ],
+  "title": "SettledOutcomeRecord",
+  "type": "object"
+}

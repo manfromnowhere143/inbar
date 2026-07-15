@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "bytes": {
+      "minimum": 0,
+      "title": "Bytes",
+      "type": "integer"
+    },
+    "media_type": {
+      "minLength": 1,
+      "title": "Media Type",
+      "type": "string"
+    },
+    "path": {
+      "minLength": 1,
+      "title": "Path",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "sha256",
+    "bytes",
+    "media_type"
+  ],
+  "title": "ArtifactBinding",
+  "type": "object"
+}

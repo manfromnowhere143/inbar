@@ -1,0 +1,184 @@
+{
+  "$defs": {
+    "AcquisitionGateResult": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "minLength": 1,
+          "title": "Detail",
+          "type": "string"
+        },
+        "gate_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Gate Id",
+          "type": "string"
+        },
+        "observed": {
+          "title": "Observed"
+        },
+        "requirement": {
+          "minLength": 1,
+          "title": "Requirement",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "blocked",
+            "invalid"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "gate_id",
+        "status",
+        "observed",
+        "requirement",
+        "detail"
+      ],
+      "title": "AcquisitionGateResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "authority_profile": {
+      "enum": [
+        "canonical",
+        "test_fixture"
+      ],
+      "title": "Authority Profile",
+      "type": "string"
+    },
+    "authorized_next_action": {
+      "title": "Authorized Next Action",
+      "type": "string"
+    },
+    "candidate_incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "title": "Candidate Incident Ids",
+      "type": "array"
+    },
+    "candidate_registry_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Candidate Registry Sha256",
+      "type": "string"
+    },
+    "comparator_registry_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Comparator Registry Sha256",
+      "type": "string"
+    },
+    "contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Contract Sha256",
+      "type": "string"
+    },
+    "control_suite_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Control Suite Sha256",
+      "type": "string"
+    },
+    "corpus_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Corpus Sha256",
+      "type": "string"
+    },
+    "eligible_incident_ids": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+        "type": "string"
+      },
+      "title": "Eligible Incident Ids",
+      "type": "array"
+    },
+    "forbidden_next_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Forbidden Next Actions",
+      "type": "array"
+    },
+    "gates": {
+      "items": {
+        "$ref": "#/$defs/AcquisitionGateResult"
+      },
+      "title": "Gates",
+      "type": "array"
+    },
+    "iteration_id": {
+      "const": "iter001_physical_causal_evidence_acquisition",
+      "title": "Iteration Id",
+      "type": "string"
+    },
+    "resource_usage_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Resource Usage Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.acquisition-admission-report.v1",
+      "default": "fieldtrue.acquisition-admission-report.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "split_locks_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Split Locks Sha256",
+      "type": "string"
+    },
+    "trust_registry_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Trust Registry Sha256",
+      "type": "string"
+    },
+    "validator_git_blob": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Validator Git Blob",
+      "type": "string"
+    },
+    "validator_source_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Validator Source Sha256",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "PASS_PILOT",
+        "BLOCKED_ACQUISITION",
+        "BLOCKED_RIGHTS",
+        "KILL_CONSTRUCT",
+        "INVALID"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "authority_profile",
+    "iteration_id",
+    "contract_sha256",
+    "validator_git_blob",
+    "validator_source_sha256",
+    "trust_registry_sha256",
+    "control_suite_sha256",
+    "candidate_registry_sha256",
+    "comparator_registry_sha256",
+    "split_locks_sha256",
+    "corpus_sha256",
+    "resource_usage_sha256",
+    "candidate_incident_ids",
+    "eligible_incident_ids",
+    "gates",
+    "verdict",
+    "authorized_next_action",
+    "forbidden_next_actions"
+  ],
+  "title": "AcquisitionAdmissionReport",
+  "type": "object"
+}

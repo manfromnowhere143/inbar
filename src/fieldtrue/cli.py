@@ -8,10 +8,18 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
+from fieldtrue.acquisition import (
+    AcquisitionAuditError,
+    audit_acquisition,
+    load_acquisition_contract,
+    verify_preregistration_binding,
+    write_admission_output,
+)
 from fieldtrue.adapters.adapt import (
     fetch_adapt_dataset,
     load_adapt_lock,
 )
+from fieldtrue.control_authority import ControlAuthorityError, verify_admission_control_bundle
 from fieldtrue.experiment import run_iter000, run_iter000_amendment_001
 from fieldtrue.memory import verify_memory, verify_memory_prefix
 from fieldtrue.mission import validate_mission
@@ -77,6 +85,12 @@ def _parser() -> argparse.ArgumentParser:
     datasets = groups.add_parser("datasets")
     fetch = datasets.add_subparsers(dest="action", required=True).add_parser("fetch-adapt")
     fetch.add_argument("--raw-root")
+
+    acquisition = groups.add_parser("acquisition")
+    acquisition_audit = acquisition.add_subparsers(dest="action", required=True).add_parser("audit")
+    acquisition_audit.add_argument("--contract", required=True)
+    acquisition_audit.add_argument("--input-root", required=True)
+    acquisition_audit.add_argument("--output-root", required=True)
 
     experiment = groups.add_parser("experiment")
     experiment_actions = experiment.add_subparsers(dest="action", required=True)
@@ -153,6 +167,35 @@ def main(argv: list[str] | None = None) -> int:
         receipts = fetch_adapt_dataset(lock, raw_root)
         print(json.dumps([item.model_dump(mode="json") for item in receipts], indent=2))
         return 0
+    if arguments.group == "acquisition" and arguments.action == "audit":
+        contract_path = Path(arguments.contract)
+        input_root = Path(arguments.input_root)
+        output_root = Path(arguments.output_root)
+        contract_path = contract_path if contract_path.is_absolute() else repo / contract_path
+        input_root = input_root if input_root.is_absolute() else repo / input_root
+        output_root = output_root if output_root.is_absolute() else repo / output_root
+        try:
+            contract = load_acquisition_contract(contract_path.resolve())
+            verify_preregistration_binding(repo, contract)
+            resolved_input = input_root.resolve()
+            resolved_output = output_root.resolve()
+            verify_admission_control_bundle(repo, resolved_input, contract)
+            if resolved_output.is_relative_to(resolved_input):
+                raise AcquisitionAuditError("output root cannot be inside the acquisition input")
+            admission = audit_acquisition(contract, resolved_input)
+            write_admission_output(resolved_output, admission)
+        except (AcquisitionAuditError, ControlAuthorityError, OSError) as error:
+            _fail(str(error), 3)
+        print(json.dumps(admission.model_dump(mode="json"), indent=2, sort_keys=True))
+        if admission.verdict == "PASS_PILOT":
+            return 0
+        if admission.verdict in {
+            "BLOCKED_ACQUISITION",
+            "BLOCKED_RIGHTS",
+            "KILL_CONSTRUCT",
+        }:
+            return 2
+        return 3
     if arguments.group == "experiment" and arguments.action == "iter000":
         command = tuple(
             ["fieldtrue", "experiment", "iter000"] if argv is None else ["fieldtrue", *argv]

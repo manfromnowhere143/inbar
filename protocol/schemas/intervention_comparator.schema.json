@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "evaluation_plan": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "implementation": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "included": {
+      "title": "Included",
+      "type": "boolean"
+    },
+    "kind": {
+      "enum": [
+        "no_op",
+        "random_safe",
+        "cheapest_safe",
+        "wrong_safe"
+      ],
+      "title": "Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "implementation",
+    "evaluation_plan",
+    "included"
+  ],
+  "title": "InterventionComparator",
+  "type": "object"
+}

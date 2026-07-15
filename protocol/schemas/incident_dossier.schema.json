@@ -1,0 +1,708 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "AttestationSubjectKind": {
+      "enum": [
+        "source_rights",
+        "physical_provenance",
+        "mechanism_truth",
+        "review",
+        "diagnostic_execution",
+        "recovery_execution",
+        "settled_outcome",
+        "protocol_review",
+        "shortcut_baseline",
+        "control_suite",
+        "model_visible_projection",
+        "resource_usage",
+        "truth_custody",
+        "comparator_registry",
+        "candidate_registry",
+        "evidence_sequence"
+      ],
+      "title": "AttestationSubjectKind",
+      "type": "string"
+    },
+    "BoundReview": {
+      "additionalProperties": false,
+      "properties": {
+        "attestation": {
+          "$ref": "#/$defs/SignedAttestation"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/ArtifactBinding"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "producer_role": {
+          "$ref": "#/$defs/RoleKind"
+        },
+        "purpose": {
+          "$ref": "#/$defs/ReviewPurpose"
+        },
+        "review_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Review Id",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "format": "date-time",
+          "title": "Reviewed At",
+          "type": "string"
+        },
+        "reviewer_role": {
+          "$ref": "#/$defs/RoleKind"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "review_id",
+        "purpose",
+        "subject_sha256",
+        "producer_role",
+        "reviewer_role",
+        "reviewed_at",
+        "evidence",
+        "attestation"
+      ],
+      "title": "BoundReview",
+      "type": "object"
+    },
+    "ClockMap": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_domain": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Clock Domain",
+          "type": "string"
+        },
+        "mapping_artifact": {
+          "$ref": "#/$defs/ArtifactBinding"
+        },
+        "max_alignment_error_ns": {
+          "minimum": 0,
+          "title": "Max Alignment Error Ns",
+          "type": "integer"
+        },
+        "missing_fraction": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Missing Fraction",
+          "type": "number"
+        },
+        "offset_ns": {
+          "title": "Offset Ns",
+          "type": "integer"
+        },
+        "origin": {
+          "minLength": 1,
+          "title": "Origin",
+          "type": "string"
+        },
+        "reference_clock_domain": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Reference Clock Domain",
+          "type": "string"
+        },
+        "scale_to_reference": {
+          "exclusiveMinimum": 0,
+          "title": "Scale To Reference",
+          "type": "number"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clock_domain",
+        "unit",
+        "origin",
+        "reference_clock_domain",
+        "scale_to_reference",
+        "offset_ns",
+        "max_alignment_error_ns",
+        "missing_fraction",
+        "mapping_artifact"
+      ],
+      "title": "ClockMap",
+      "type": "object"
+    },
+    "EvidenceTimeBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "clock_domain": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Clock Domain",
+          "type": "string"
+        },
+        "evidence_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "normalized_end_ns": {
+          "title": "Normalized End Ns",
+          "type": "integer"
+        },
+        "normalized_start_ns": {
+          "title": "Normalized Start Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "clock_domain",
+        "normalized_start_ns",
+        "normalized_end_ns"
+      ],
+      "title": "EvidenceTimeBinding",
+      "type": "object"
+    },
+    "EvidenceTrack": {
+      "enum": [
+        "physical_admission",
+        "causal_laboratory",
+        "reality_control"
+      ],
+      "title": "EvidenceTrack",
+      "type": "string"
+    },
+    "IncidentGroupRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "acquisition_lineage_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Acquisition Lineage Id",
+          "type": "string"
+        },
+        "acquisition_session_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Acquisition Session Id",
+          "type": "string"
+        },
+        "claim_bearing": {
+          "title": "Claim Bearing",
+          "type": "boolean"
+        },
+        "configuration_id": {
+          "minLength": 1,
+          "title": "Configuration Id",
+          "type": "string"
+        },
+        "environment_id": {
+          "minLength": 1,
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "fault_family": {
+          "minLength": 1,
+          "title": "Fault Family",
+          "type": "string"
+        },
+        "hardware_id": {
+          "minLength": 1,
+          "title": "Hardware Id",
+          "type": "string"
+        },
+        "incident_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "independence_group_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Independence Group Id",
+          "type": "string"
+        },
+        "mission_id": {
+          "minLength": 1,
+          "title": "Mission Id",
+          "type": "string"
+        },
+        "physicality": {
+          "$ref": "#/$defs/Physicality"
+        },
+        "root_incident_group_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Root Incident Group Id",
+          "type": "string"
+        },
+        "site_id": {
+          "minLength": 1,
+          "title": "Site Id",
+          "type": "string"
+        },
+        "system_domain": {
+          "$ref": "#/$defs/SystemDomain"
+        },
+        "system_family": {
+          "minLength": 1,
+          "title": "System Family",
+          "type": "string"
+        }
+      },
+      "required": [
+        "incident_id",
+        "root_incident_group_id",
+        "acquisition_session_id",
+        "independence_group_id",
+        "physicality",
+        "system_domain",
+        "system_family",
+        "hardware_id",
+        "fault_family",
+        "configuration_id",
+        "environment_id",
+        "acquisition_lineage_id",
+        "mission_id",
+        "site_id",
+        "claim_bearing"
+      ],
+      "title": "IncidentGroupRecord",
+      "type": "object"
+    },
+    "IncidentTimeline": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_cutoff_at": {
+          "format": "date-time",
+          "title": "Evidence Cutoff At",
+          "type": "string"
+        },
+        "hypothesis_committed_at": {
+          "format": "date-time",
+          "title": "Hypothesis Committed At",
+          "type": "string"
+        },
+        "model_visible_cutoff_ns": {
+          "title": "Model Visible Cutoff Ns",
+          "type": "integer"
+        },
+        "outcome_verified_at": {
+          "format": "date-time",
+          "title": "Outcome Verified At",
+          "type": "string"
+        },
+        "recovery_finished_at": {
+          "format": "date-time",
+          "title": "Recovery Finished At",
+          "type": "string"
+        },
+        "recovery_plan_committed_at": {
+          "format": "date-time",
+          "title": "Recovery Plan Committed At",
+          "type": "string"
+        },
+        "recovery_started_at": {
+          "format": "date-time",
+          "title": "Recovery Started At",
+          "type": "string"
+        },
+        "safe_test_reviewed_at": {
+          "format": "date-time",
+          "title": "Safe Test Reviewed At",
+          "type": "string"
+        },
+        "settled_window_finished_at": {
+          "format": "date-time",
+          "title": "Settled Window Finished At",
+          "type": "string"
+        },
+        "settled_window_started_at": {
+          "format": "date-time",
+          "title": "Settled Window Started At",
+          "type": "string"
+        },
+        "source_acquired_at": {
+          "format": "date-time",
+          "title": "Source Acquired At",
+          "type": "string"
+        },
+        "test_finished_at": {
+          "format": "date-time",
+          "title": "Test Finished At",
+          "type": "string"
+        },
+        "test_started_at": {
+          "format": "date-time",
+          "title": "Test Started At",
+          "type": "string"
+        },
+        "truth_committed_at": {
+          "format": "date-time",
+          "title": "Truth Committed At",
+          "type": "string"
+        },
+        "truth_unsealed_at": {
+          "format": "date-time",
+          "title": "Truth Unsealed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_acquired_at",
+        "truth_committed_at",
+        "evidence_cutoff_at",
+        "model_visible_cutoff_ns",
+        "hypothesis_committed_at",
+        "safe_test_reviewed_at",
+        "test_started_at",
+        "test_finished_at",
+        "recovery_plan_committed_at",
+        "recovery_started_at",
+        "recovery_finished_at",
+        "settled_window_started_at",
+        "settled_window_finished_at",
+        "outcome_verified_at",
+        "truth_unsealed_at"
+      ],
+      "title": "IncidentTimeline",
+      "type": "object"
+    },
+    "Physicality": {
+      "enum": [
+        "physical",
+        "simulated",
+        "synthetic",
+        "hand_drawn"
+      ],
+      "title": "Physicality",
+      "type": "string"
+    },
+    "ReviewPurpose": {
+      "enum": [
+        "mechanism",
+        "ambiguity",
+        "safe_test",
+        "recovery",
+        "settled_outcome"
+      ],
+      "title": "ReviewPurpose",
+      "type": "string"
+    },
+    "RoleAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "approval_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Approval Public Key",
+          "type": "string"
+        },
+        "conflict_disclosure": {
+          "$ref": "#/$defs/ArtifactBinding"
+        },
+        "independence_group_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Independence Group Id",
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/RoleKind"
+        }
+      },
+      "required": [
+        "role",
+        "actor_id",
+        "independence_group_id",
+        "conflict_disclosure",
+        "approval_public_key"
+      ],
+      "title": "RoleAssignment",
+      "type": "object"
+    },
+    "RoleKind": {
+      "enum": [
+        "source_steward",
+        "rights_reviewer",
+        "evidence_curator",
+        "truth_producer",
+        "mechanism_reviewer",
+        "hypothesis_proposer",
+        "test_proposer",
+        "safety_reviewer",
+        "test_selector",
+        "test_executor",
+        "recovery_proposer",
+        "recovery_executor",
+        "outcome_verifier",
+        "statistician"
+      ],
+      "title": "RoleKind",
+      "type": "string"
+    },
+    "SignedAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "attestation_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Attestation Hash",
+          "type": "string"
+        },
+        "attestation_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Attestation Id",
+          "type": "string"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "fieldtrue.signed-attestation.v1",
+          "default": "fieldtrue.signed-attestation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[0-9a-f]{128}$",
+          "title": "Signature",
+          "type": "string"
+        },
+        "signer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Signer Id",
+          "type": "string"
+        },
+        "signer_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signer Public Key",
+          "type": "string"
+        },
+        "subject_kind": {
+          "$ref": "#/$defs/AttestationSubjectKind"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attestation_id",
+        "signer_id",
+        "subject_kind",
+        "subject_sha256",
+        "issued_at",
+        "signer_public_key",
+        "attestation_hash",
+        "signature"
+      ],
+      "title": "SignedAttestation",
+      "type": "object"
+    },
+    "SystemDomain": {
+      "enum": [
+        "aerospace",
+        "robotics",
+        "industrial",
+        "other"
+      ],
+      "title": "SystemDomain",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "clocks": {
+      "items": {
+        "$ref": "#/$defs/ClockMap"
+      },
+      "minItems": 1,
+      "title": "Clocks",
+      "type": "array"
+    },
+    "diagnostic_execution": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "discriminating_test": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "dossier_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Dossier Id",
+      "type": "string"
+    },
+    "evidence_bundle": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "evidence_sequence": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "evidence_times": {
+      "items": {
+        "$ref": "#/$defs/EvidenceTimeBinding"
+      },
+      "minItems": 1,
+      "title": "Evidence Times",
+      "type": "array"
+    },
+    "evidence_track": {
+      "$ref": "#/$defs/EvidenceTrack"
+    },
+    "group": {
+      "$ref": "#/$defs/IncidentGroupRecord"
+    },
+    "hypothesis_set": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "incident_resource_plane": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "model_visible_projection": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "physical_provenance": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "plane_separation_receipt": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "recovery_approval": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "recovery_execution": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "recovery_plan": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "reviews": {
+      "items": {
+        "$ref": "#/$defs/BoundReview"
+      },
+      "title": "Reviews",
+      "type": "array"
+    },
+    "roles": {
+      "items": {
+        "$ref": "#/$defs/RoleAssignment"
+      },
+      "title": "Roles",
+      "type": "array"
+    },
+    "safety_envelope": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "schema_version": {
+      "const": "fieldtrue.incident-dossier.v1",
+      "default": "fieldtrue.incident-dossier.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_test": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "settled_outcome": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "source_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "source_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Manifest Sha256",
+      "type": "string"
+    },
+    "test_approval": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "test_observation": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "timeline": {
+      "$ref": "#/$defs/IncidentTimeline"
+    },
+    "truth_custody": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "truth_record": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "verification_result": {
+      "$ref": "#/$defs/ArtifactBinding"
+    }
+  },
+  "required": [
+    "dossier_id",
+    "source_id",
+    "source_manifest_sha256",
+    "evidence_track",
+    "group",
+    "roles",
+    "reviews",
+    "clocks",
+    "evidence_times",
+    "timeline",
+    "physical_provenance",
+    "plane_separation_receipt",
+    "model_visible_projection",
+    "evidence_bundle",
+    "evidence_sequence",
+    "truth_record",
+    "truth_custody",
+    "hypothesis_set",
+    "discriminating_test",
+    "selected_test",
+    "safety_envelope",
+    "test_approval",
+    "test_observation",
+    "diagnostic_execution",
+    "recovery_plan",
+    "recovery_approval",
+    "recovery_execution",
+    "settled_outcome",
+    "verification_result",
+    "incident_resource_plane"
+  ],
+  "title": "IncidentDossier",
+  "type": "object"
+}

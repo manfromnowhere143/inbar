@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "LeakageArtifactScan": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_bytes": {
+          "minimum": 0,
+          "title": "Artifact Bytes",
+          "type": "integer"
+        },
+        "artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Artifact Sha256",
+          "type": "string"
+        },
+        "forbidden_field_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Field Paths",
+          "type": "array"
+        },
+        "matched_identity_token_sha256": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "title": "Matched Identity Token Sha256",
+          "type": "array"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "scan_mode": {
+          "enum": [
+            "utf8_json",
+            "opaque_stream"
+          ],
+          "title": "Scan Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_sha256",
+        "artifact_bytes",
+        "media_type",
+        "scan_mode",
+        "forbidden_field_paths",
+        "matched_identity_token_sha256"
+      ],
+      "title": "LeakageArtifactScan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_scans": {
+      "items": {
+        "$ref": "#/$defs/LeakageArtifactScan"
+      },
+      "minItems": 1,
+      "title": "Artifact Scans",
+      "type": "array"
+    },
+    "forbidden_field_set_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Forbidden Field Set Sha256",
+      "type": "string"
+    },
+    "identity_token_set_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Identity Token Set Sha256",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "input_artifacts_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Artifacts Sha256",
+      "type": "string"
+    },
+    "leakage_detected": {
+      "title": "Leakage Detected",
+      "type": "boolean"
+    },
+    "scanner_id": {
+      "const": "fieldtrue-validator-leakage-scan-v1",
+      "default": "fieldtrue-validator-leakage-scan-v1",
+      "title": "Scanner Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.model-visible-leakage-scan-report.v1",
+      "default": "fieldtrue.model-visible-leakage-scan-report.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "incident_id",
+    "input_artifacts_sha256",
+    "forbidden_field_set_sha256",
+    "identity_token_set_sha256",
+    "artifact_scans",
+    "leakage_detected"
+  ],
+  "title": "ModelVisibleLeakageScanReport",
+  "type": "object"
+}

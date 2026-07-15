@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "outcome": {
+      "enum": [
+        "passed",
+        "failed",
+        "skipped"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "was_xfail": {
+      "title": "Was Xfail",
+      "type": "boolean"
+    },
+    "when": {
+      "enum": [
+        "setup",
+        "call",
+        "teardown"
+      ],
+      "title": "When",
+      "type": "string"
+    }
+  },
+  "required": [
+    "when",
+    "outcome",
+    "was_xfail"
+  ],
+  "title": "PytestPhase",
+  "type": "object"
+}

@@ -1,0 +1,231 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "ControlManifestEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "control_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Control Id",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/ArtifactBinding"
+        },
+        "expected_failure_code": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected Failure Code"
+        },
+        "expected_gate_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Expected Gate Id",
+          "type": "string"
+        },
+        "expected_verdict": {
+          "enum": [
+            "PASS_PILOT",
+            "BLOCKED_ACQUISITION",
+            "BLOCKED_RIGHTS",
+            "INVALID",
+            "KILL_CONSTRUCT"
+          ],
+          "title": "Expected Verdict",
+          "type": "string"
+        },
+        "pytest_node_id": {
+          "title": "Pytest Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "control_id",
+        "pytest_node_id",
+        "expected_verdict",
+        "expected_gate_id",
+        "expected_failure_code",
+        "evidence"
+      ],
+      "title": "ControlManifestEntry",
+      "type": "object"
+    },
+    "GitBoundSource": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "git_blob": {
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+          "title": "Git Blob",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "git_blob",
+        "sha256",
+        "bytes"
+      ],
+      "title": "GitBoundSource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "controls": {
+      "items": {
+        "$ref": "#/$defs/ControlManifestEntry"
+      },
+      "title": "Controls",
+      "type": "array"
+    },
+    "dependency_mode": {
+      "const": "uv-offline-frozen",
+      "title": "Dependency Mode",
+      "type": "string"
+    },
+    "environment_policy": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Environment Policy",
+      "type": "array"
+    },
+    "execution_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Execution Commit",
+      "type": "string"
+    },
+    "execution_tree": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Execution Tree",
+      "type": "string"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "repository_clean_after": {
+      "const": true,
+      "title": "Repository Clean After",
+      "type": "boolean"
+    },
+    "repository_clean_before": {
+      "const": true,
+      "title": "Repository Clean Before",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "fieldtrue.control-execution-manifest.v1",
+      "default": "fieldtrue.control-execution-manifest.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/GitBoundSource"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "suite_id": {
+      "const": "iter001-admission-controls-v1",
+      "title": "Suite Id",
+      "type": "string"
+    },
+    "uv_executable": {
+      "title": "Uv Executable",
+      "type": "string"
+    },
+    "uv_executable_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Uv Executable Sha256",
+      "type": "string"
+    },
+    "uv_version": {
+      "title": "Uv Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "suite_id",
+    "execution_commit",
+    "execution_tree",
+    "started_at",
+    "finished_at",
+    "repository_clean_before",
+    "repository_clean_after",
+    "dependency_mode",
+    "uv_executable",
+    "uv_executable_sha256",
+    "uv_version",
+    "environment_policy",
+    "sources",
+    "controls"
+  ],
+  "title": "ControlExecutionManifest",
+  "type": "object"
+}

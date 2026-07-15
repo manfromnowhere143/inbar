@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "abort_specification": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "action_contract_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Action Contract Id",
+      "type": "string"
+    },
+    "command_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Command Sha256",
+      "type": "string"
+    },
+    "committed_at": {
+      "format": "date-time",
+      "title": "Committed At",
+      "type": "string"
+    },
+    "expected_realized_action_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Expected Realized Action Sha256",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "max_cost_usd": {
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+      "title": "Max Cost Usd",
+      "type": "string"
+    },
+    "max_duration_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Duration Seconds",
+      "type": "number"
+    },
+    "max_risk": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Max Risk",
+      "type": "number"
+    },
+    "parameter_bounds": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "schema_version": {
+      "const": "fieldtrue.diagnostic-action-contract.v1",
+      "default": "fieldtrue.diagnostic-action-contract.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "test_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Test Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action_contract_id",
+    "incident_id",
+    "test_id",
+    "command_sha256",
+    "expected_realized_action_sha256",
+    "parameter_bounds",
+    "abort_specification",
+    "max_duration_seconds",
+    "max_risk",
+    "max_cost_usd",
+    "committed_at"
+  ],
+  "title": "DiagnosticActionContract",
+  "type": "object"
+}

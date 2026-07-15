@@ -1,0 +1,98 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "evidence_cutoff_at": {
+      "format": "date-time",
+      "title": "Evidence Cutoff At",
+      "type": "string"
+    },
+    "hypothesis_committed_at": {
+      "format": "date-time",
+      "title": "Hypothesis Committed At",
+      "type": "string"
+    },
+    "model_visible_cutoff_ns": {
+      "title": "Model Visible Cutoff Ns",
+      "type": "integer"
+    },
+    "outcome_verified_at": {
+      "format": "date-time",
+      "title": "Outcome Verified At",
+      "type": "string"
+    },
+    "recovery_finished_at": {
+      "format": "date-time",
+      "title": "Recovery Finished At",
+      "type": "string"
+    },
+    "recovery_plan_committed_at": {
+      "format": "date-time",
+      "title": "Recovery Plan Committed At",
+      "type": "string"
+    },
+    "recovery_started_at": {
+      "format": "date-time",
+      "title": "Recovery Started At",
+      "type": "string"
+    },
+    "safe_test_reviewed_at": {
+      "format": "date-time",
+      "title": "Safe Test Reviewed At",
+      "type": "string"
+    },
+    "settled_window_finished_at": {
+      "format": "date-time",
+      "title": "Settled Window Finished At",
+      "type": "string"
+    },
+    "settled_window_started_at": {
+      "format": "date-time",
+      "title": "Settled Window Started At",
+      "type": "string"
+    },
+    "source_acquired_at": {
+      "format": "date-time",
+      "title": "Source Acquired At",
+      "type": "string"
+    },
+    "test_finished_at": {
+      "format": "date-time",
+      "title": "Test Finished At",
+      "type": "string"
+    },
+    "test_started_at": {
+      "format": "date-time",
+      "title": "Test Started At",
+      "type": "string"
+    },
+    "truth_committed_at": {
+      "format": "date-time",
+      "title": "Truth Committed At",
+      "type": "string"
+    },
+    "truth_unsealed_at": {
+      "format": "date-time",
+      "title": "Truth Unsealed At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_acquired_at",
+    "truth_committed_at",
+    "evidence_cutoff_at",
+    "model_visible_cutoff_ns",
+    "hypothesis_committed_at",
+    "safe_test_reviewed_at",
+    "test_started_at",
+    "test_finished_at",
+    "recovery_plan_committed_at",
+    "recovery_started_at",
+    "recovery_finished_at",
+    "settled_window_started_at",
+    "settled_window_finished_at",
+    "outcome_verified_at",
+    "truth_unsealed_at"
+  ],
+  "title": "IncidentTimeline",
+  "type": "object"
+}

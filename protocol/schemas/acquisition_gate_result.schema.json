@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "detail": {
+      "minLength": 1,
+      "title": "Detail",
+      "type": "string"
+    },
+    "gate_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Gate Id",
+      "type": "string"
+    },
+    "observed": {
+      "title": "Observed"
+    },
+    "requirement": {
+      "minLength": 1,
+      "title": "Requirement",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "blocked",
+        "invalid"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "gate_id",
+    "status",
+    "observed",
+    "requirement",
+    "detail"
+  ],
+  "title": "AcquisitionGateResult",
+  "type": "object"
+}

@@ -1,0 +1,53 @@
+{
+  "authority_profile": "canonical",
+  "control_authority_status": "bootstrap",
+  "iteration_id": "iter001_physical_causal_evidence_acquisition",
+  "control_suite_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "dependency_lock_sha256": "19fe8aaea2f7af991cc614d8b439aa7101e02ced0147b7e534decb858efbb196",
+  "max_clock_alignment_error_ns": 100000000,
+  "max_clock_missing_fraction": 0.05,
+  "maximum_family_share": 0.5,
+  "minimum_complete_physical_incidents": 30,
+  "minimum_fault_families": 3,
+  "minimum_faults_per_system_family": 2,
+  "minimum_hardware_identities": 6,
+  "minimum_identities_per_system_family": 2,
+  "minimum_incidents_per_fault_family": 6,
+  "minimum_incidents_per_hardware_identity": 3,
+  "minimum_incidents_per_system_family": 6,
+  "minimum_operational_modalities": 2,
+  "minimum_system_families": 3,
+  "minimum_system_families_per_fault": 2,
+  "preregistration_commit": "52d71e16a75df12adf47e943fd5c329f6e04d5c0",
+  "preregistration_path": "experiments/iter001_physical_causal_evidence_acquisition/HYPOTHESIS.md",
+  "preregistration_sha256": "47a1920b1b5326601c7404d17a6aac0df3309c2433fa76f56f0dffedf2511ad8",
+  "required_domains": [
+    "aerospace",
+    "robotics"
+  ],
+  "required_permissions": [
+    "acquire",
+    "process",
+    "retain_raw",
+    "retain_derived",
+    "publish_metadata",
+    "independent_review",
+    "commercial_research"
+  ],
+  "trust_anchor_public_key": "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962",
+  "validator_git_blob": "0000000000000000000000000000000000000000",
+  "validator_source_sha256": "f0d6a0b5d1aac9dfecfcc2b6a63f6e037e1fbd0dbf138dbe57102d40247d9fb4",
+  "resource_ceiling": {
+    "max_cloud_jobs": 0,
+    "max_cost_usd": "0",
+    "max_cpu_seconds": 14400.0,
+    "max_derived_bytes": 2147483648,
+    "max_downloaded_bytes": 1073741824,
+    "max_gpu_seconds": 0.0,
+    "max_paid_calls": 0,
+    "max_peak_memory_bytes": 17179869184,
+    "max_peak_staged_bytes": 2147483648,
+    "max_wall_seconds": 7200.0
+  },
+  "schema_version": "fieldtrue.acquisition-contract.v1"
+}

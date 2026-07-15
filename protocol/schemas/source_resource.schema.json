@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "bytes": {
+      "minimum": 0,
+      "title": "Bytes",
+      "type": "integer"
+    },
+    "media_type": {
+      "minLength": 1,
+      "title": "Media Type",
+      "type": "string"
+    },
+    "resource_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Resource Id",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    },
+    "staged_artifact": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "staged_at": {
+      "format": "date-time",
+      "title": "Staged At",
+      "type": "string"
+    },
+    "uri": {
+      "minLength": 1,
+      "title": "Uri",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "resource_id",
+    "uri",
+    "version",
+    "sha256",
+    "bytes",
+    "media_type",
+    "staged_at",
+    "staged_artifact"
+  ],
+  "title": "SourceResource",
+  "type": "object"
+}

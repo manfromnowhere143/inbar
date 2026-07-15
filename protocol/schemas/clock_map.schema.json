@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "clock_domain": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Clock Domain",
+      "type": "string"
+    },
+    "mapping_artifact": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "max_alignment_error_ns": {
+      "minimum": 0,
+      "title": "Max Alignment Error Ns",
+      "type": "integer"
+    },
+    "missing_fraction": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Missing Fraction",
+      "type": "number"
+    },
+    "offset_ns": {
+      "title": "Offset Ns",
+      "type": "integer"
+    },
+    "origin": {
+      "minLength": 1,
+      "title": "Origin",
+      "type": "string"
+    },
+    "reference_clock_domain": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Reference Clock Domain",
+      "type": "string"
+    },
+    "scale_to_reference": {
+      "exclusiveMinimum": 0,
+      "title": "Scale To Reference",
+      "type": "number"
+    },
+    "unit": {
+      "minLength": 1,
+      "title": "Unit",
+      "type": "string"
+    }
+  },
+  "required": [
+    "clock_domain",
+    "unit",
+    "origin",
+    "reference_clock_domain",
+    "scale_to_reference",
+    "offset_ns",
+    "max_alignment_error_ns",
+    "missing_fraction",
+    "mapping_artifact"
+  ],
+  "title": "ClockMap",
+  "type": "object"
+}

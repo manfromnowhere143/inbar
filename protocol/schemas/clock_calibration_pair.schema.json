@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "reference_ns": {
+      "title": "Reference Ns",
+      "type": "integer"
+    },
+    "source_value": {
+      "title": "Source Value",
+      "type": "number"
+    }
+  },
+  "required": [
+    "source_value",
+    "reference_ns"
+  ],
+  "title": "ClockCalibrationPair",
+  "type": "object"
+}

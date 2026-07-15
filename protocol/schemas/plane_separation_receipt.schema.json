@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "EvidencePlane": {
+      "enum": [
+        "model_visible",
+        "truth_only",
+        "excluded"
+      ],
+      "title": "EvidencePlane",
+      "type": "string"
+    },
+    "FieldPlaneAssignment": {
+      "additionalProperties": false,
+      "properties": {
+        "field_name": {
+          "minLength": 1,
+          "title": "Field Name",
+          "type": "string"
+        },
+        "plane": {
+          "$ref": "#/$defs/EvidencePlane"
+        },
+        "rationale": {
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field_name",
+        "plane",
+        "rationale"
+      ],
+      "title": "FieldPlaneAssignment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assignments": {
+      "items": {
+        "$ref": "#/$defs/FieldPlaneAssignment"
+      },
+      "minItems": 1,
+      "title": "Assignments",
+      "type": "array"
+    },
+    "evidence_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Evidence Incident Ids Sha256",
+      "type": "string"
+    },
+    "evidence_manifest": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "parser_coverage": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "produced_at": {
+      "format": "date-time",
+      "title": "Produced At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.plane-separation-receipt.v1",
+      "default": "fieldtrue.plane-separation-receipt.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_fields": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Source Fields",
+      "type": "array"
+    },
+    "source_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "source_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Manifest Sha256",
+      "type": "string"
+    },
+    "truth_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Truth Incident Ids Sha256",
+      "type": "string"
+    },
+    "truth_manifest": {
+      "$ref": "#/$defs/ArtifactBinding"
+    }
+  },
+  "required": [
+    "source_id",
+    "source_manifest_sha256",
+    "source_fields",
+    "assignments",
+    "parser_coverage",
+    "evidence_manifest",
+    "truth_manifest",
+    "evidence_incident_ids_sha256",
+    "truth_incident_ids_sha256",
+    "produced_at"
+  ],
+  "title": "PlaneSeparationReceipt",
+  "type": "object"
+}

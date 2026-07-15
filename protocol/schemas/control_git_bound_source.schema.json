@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "bytes": {
+      "minimum": 0,
+      "title": "Bytes",
+      "type": "integer"
+    },
+    "git_blob": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Git Blob",
+      "type": "string"
+    },
+    "name": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Name",
+      "type": "string"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "path",
+    "git_blob",
+    "sha256",
+    "bytes"
+  ],
+  "title": "GitBoundSource",
+  "type": "object"
+}

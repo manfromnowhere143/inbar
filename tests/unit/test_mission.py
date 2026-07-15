@@ -105,52 +105,13 @@ def _committed_amendment_repo(tmp_path: Path) -> Path:
     _git(source, "clone", "--quiet", "--no-hardlinks", source.as_posix(), repo.as_posix())
     _git(repo, "config", "user.name", "Amendment Test")
     _git(repo, "config", "user.email", "amendment@example.invalid")
-    proof_attempt = (
-        repo / "experiments" / "iter000_nasa_adapt_corpus_readiness" / "proof" / "attempt_001"
+    _git(
+        repo,
+        "checkout",
+        "--quiet",
+        "--detach",
+        mission_module._ITER000_ATTEMPT_001_EXECUTION_COMMIT,
     )
-    if proof_attempt.exists():
-        shutil.rmtree(proof_attempt)
-    correction_paths = (
-        "experiments/iter000_nasa_adapt_corpus_readiness/authority/attempt_001_consumption.json",
-        "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_001.md",
-        "experiments/iter000_nasa_adapt_corpus_readiness/VERIFICATION_AMENDMENT_002.md",
-        "protocol/amendments/iter000_verification_001.json",
-        "protocol/amendments/iter000_verification_002.json",
-    )
-    for relative in correction_paths:
-        (repo / relative).unlink(missing_ok=True)
-    changed_paths = (
-        "experiments/iter000_nasa_adapt_corpus_readiness/AMENDMENT_001.md",
-        "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_000/execution_ledger.jsonl",
-        "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_000/execution_ledger.head.json",
-        "protocol/amendments/iter000_001.json",
-        "protocol/attempt_authorities/iter000_001.json",
-        "pyproject.toml",
-        "src/fieldtrue/adapters/adapt.py",
-        "src/fieldtrue/cli.py",
-        "src/fieldtrue/experiment.py",
-        "src/fieldtrue/mission.py",
-        "src/fieldtrue/verification.py",
-        "uv.lock",
-    )
-    for relative in changed_paths:
-        destination = repo / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source / relative, destination)
-    authority_path = repo / "protocol" / "attempt_authorities" / "iter000_001.json"
-    authority = json.loads(authority_path.read_text())
-    schema_paths = {
-        path.relative_to(repo).as_posix() for path in (repo / "protocol" / "schemas").glob("*.json")
-    }
-    protocol_paths = mission_module._ITER000_ATTEMPT_001_PROTOCOL_PATHS | schema_paths
-    authority["protocol_hashes"] = {
-        relative: sha256_bytes((repo / relative).read_bytes())
-        for relative in sorted(protocol_paths)
-    }
-    authority_path.write_bytes(canonical_json_pretty(authority))
-    _git(repo, "add", "--all")
-    if _git(repo, "status", "--porcelain"):
-        _git(repo, "commit", "--quiet", "-m", "authorize amendment fixture")
     return repo
 
 
@@ -244,11 +205,63 @@ def test_amendment_001_authorizes_only_the_committed_predata_failure(
     tmp_path: Path,
 ) -> None:
     repo = _committed_amendment_repo(tmp_path)
+    assert _git(repo, "rev-parse", "HEAD") == (mission_module._ITER000_ATTEMPT_001_EXECUTION_COMMIT)
+    for relative, (
+        _,
+        authorized_hash,
+    ) in mission_module._ITER000_ATTEMPT_001_AUTHORIZED_SOURCE_HASHES.items():
+        assert sha256_bytes((repo / relative).read_bytes()) == authorized_hash
 
     passed, detail = _verify_iteration_amendment_001(repo)
 
     assert passed
     assert "one isolated certifi-backed retry" in detail
+
+
+def test_historical_correction_separates_current_source_from_committed_trust_inputs(
+    tmp_path: Path,
+) -> None:
+    repo = _historical_attempt_repo(tmp_path)
+    for relative in (
+        "src/fieldtrue/adapters/adapt.py",
+        "src/fieldtrue/experiment.py",
+        "src/fieldtrue/verification.py",
+    ):
+        path = repo / relative
+        path.write_bytes(path.read_bytes() + b"\n# future iteration implementation\n")
+
+    passed, detail = _verify_iteration_amendment_001(repo)
+
+    assert passed
+    assert "exact Git objects" in detail
+
+    correction_path = repo / mission_module._ITER000_VERIFICATION_CONTRACT_PATH
+    correction_bytes = correction_path.read_bytes()
+    correction_path.write_bytes(correction_bytes + b"\n")
+    _git(repo, "add", correction_path.relative_to(repo).as_posix())
+    _git(repo, "commit", "--quiet", "-m", "replace current correction trust input")
+    correction_path.write_bytes(correction_bytes)
+    passed, detail = _verify_iteration_amendment_001(repo)
+    assert not passed
+    assert "correction trust input is not committed at HEAD" in detail
+
+
+def test_historical_correction_requires_retained_exact_correction_authority(
+    tmp_path: Path,
+) -> None:
+    repo = _historical_attempt_repo(tmp_path)
+    correction_path = repo / mission_module._ITER000_VERIFICATION_CORRECTION_PATH
+    original = correction_path.read_bytes()
+
+    correction_path.write_bytes(original + b"\n")
+    passed, detail = _verify_iteration_amendment_001(repo)
+    assert not passed
+    assert "correction trust input differs" in detail
+
+    correction_path.unlink()
+    passed, detail = _verify_iteration_amendment_001(repo)
+    assert not passed
+    assert "correction trust input is missing" in detail
 
 
 def test_amendment_001_contract_fields_are_exact(tmp_path: Path) -> None:
@@ -776,6 +789,22 @@ def test_gate_falsification_policy_rejects_paper_only_controls() -> None:
 def test_gate_control_registry_resolves_executable_pytest_nodes(tmp_path: Path) -> None:
     repo = _repo()
     registry = repo / "protocol" / "gate_controls" / "v1.json"
+    registry_value = _json(registry)
+    seal = registry_value["execution_seal"]
+    assert isinstance(seal, dict)
+    sealed_paths = seal["sealed_paths"]
+    controls = registry_value["controls"]
+    assert isinstance(sealed_paths, list)
+    assert isinstance(controls, list)
+    assert (
+        _gate_control_set_hash(
+            repo,
+            iteration_id=registry_value["iteration_id"],
+            controls=controls,
+            sealed_paths=tuple(sealed_paths),
+        )
+        != seal["control_set_sha256"]
+    )
     passed, detail = _verify_gate_control_registry(repo, registry)
     assert passed
     assert "Executed and verified 16 distinct controls" in detail
@@ -886,14 +915,14 @@ def test_gate_control_registry_requires_a_reproduced_passing_execution(
     def timeout(*_args: object, **_kwargs: object) -> None:
         raise subprocess.TimeoutExpired(cmd="pytest", timeout=120)
 
-    monkeypatch.setattr(mission_module.subprocess, "run", timeout)
+    monkeypatch.setattr(mission_module, "_run_gate_control_nodes", timeout)
     passed, detail = _verify_gate_control_registry(repo, registry)
     assert not passed
     assert "TimeoutExpired" in detail
 
     monkeypatch.setattr(
-        mission_module.subprocess,
-        "run",
+        mission_module,
+        "_run_gate_control_nodes",
         lambda *_args, **_kwargs: SimpleNamespace(
             returncode=1,
             stdout="failed control",

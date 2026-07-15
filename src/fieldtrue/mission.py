@@ -15,6 +15,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
 from itertools import pairwise
 from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -23,6 +24,11 @@ from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 from pydantic import BaseModel, ConfigDict
 
+from fieldtrue.acquisition import (
+    AcquisitionAuditError,
+    load_acquisition_contract,
+    verify_preregistration_binding,
+)
 from fieldtrue.adapters import adapt as adapt_adapter
 from fieldtrue.adapters.adapt import load_adapt_lock
 from fieldtrue.canonical import canonical_json, canonical_json_pretty, sha256_bytes, sha256_value
@@ -58,6 +64,7 @@ _ITER000_GATE_FAILURE_CLASSES = {
 _PUBLICATION_ANCHOR_ID = "publication-transition"
 _PUBLICATION_LEDGER_SCOPE = "publication-gates"
 _ITER000_ID = "iter000_nasa_adapt_corpus_readiness"
+_ITER001_ACQUISITION_CONTRACT_PATH = "protocol/acquisition/iter001_contract.json"
 _AMENDMENT_001_PATH = "protocol/amendments/iter000_001.json"
 _AMENDMENT_001_DOCUMENT_PATH = f"experiments/{_ITER000_ID}/AMENDMENT_001.md"
 _ATTEMPT_000_PROOF_PATH = f"experiments/{_ITER000_ID}/proof/attempt_000"
@@ -66,6 +73,7 @@ _ATTEMPT_000_HEAD_PATH = f"{_ATTEMPT_000_PROOF_PATH}/execution_ledger.head.json"
 _ITER000_ANCHOR_PATH = "protocol/trust/iter000_signer_anchor.json"
 _ITER000_DATASET_PATH = "protocol/datasets/nasa_adapt_v1.json"
 _ITER000_GATE_CONTROL_PATH = "protocol/gate_controls/v1.json"
+_ITER000_GATE_CONTROL_COMMIT = "d07789886f7350a0405f49a358e3dabfdca6c878"
 _ITER000_HYPOTHESIS_PATH = f"experiments/{_ITER000_ID}/HYPOTHESIS.md"
 _ITER000_ATTEMPT_001_AUTHORITY_PATH = "protocol/attempt_authorities/iter000_001.json"
 _ITER000_ATTEMPT_001_RECEIPT_PATH = (
@@ -342,6 +350,51 @@ def _gate_control_set_hash(
     )
 
 
+def _materialize_gate_control_snapshot(
+    repo_root: Path,
+    *,
+    git: str,
+    destination: Path,
+) -> bool:
+    paths = {"pyproject.toml", "tests/__init__.py", "tests/unit/__init__.py"}
+    for prefix in ("src/fieldtrue", "tests"):
+        discovered = _git_tree_paths(repo_root, git, _ITER000_GATE_CONTROL_COMMIT, prefix)
+        if discovered is None:
+            return False
+        paths.update(discovered)
+    for relative in sorted(paths):
+        data = _git_blob_at_path(
+            repo_root,
+            git,
+            _ITER000_GATE_CONTROL_COMMIT,
+            relative,
+        )
+        if data is None:
+            return False
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+    return True
+
+
+def _run_gate_control_nodes(
+    snapshot_root: Path,
+    node_ids: list[str],
+) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(snapshot_root / "src")
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    return subprocess.run(  # noqa: S603 - node IDs and paths are validated before execution
+        [sys.executable, "-m", "pytest", "-q", *node_ids],
+        cwd=snapshot_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=environment,
+    )
+
+
 def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, str]:
     try:
         registry = _json(path)
@@ -371,30 +424,6 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
         by_gate[gate_id] = control
     if set(by_gate) != set(_ITER000_GATE_FAILURE_CLASSES):
         return False, "Gate control registry does not cover the exact iteration-000 gate set."
-    failures: list[str] = []
-    node_ids: list[str] = []
-    for gate_id, failure_class in _ITER000_GATE_FAILURE_CLASSES.items():
-        control = by_gate[gate_id]
-        if control.get("failure_class") != failure_class:
-            failures.append(f"{gate_id}: failure class")
-        for role in ("positive_control", "negative_control"):
-            node_id = control.get(role)
-            if not _control_node_is_substantive(
-                repo_root,
-                node_id,
-                gate_id=gate_id,
-                role=role.removesuffix("_control"),
-                expected_status="pass" if role == "positive_control" else failure_class,
-            ):
-                failures.append(f"{gate_id}: {role}")
-            elif isinstance(node_id, str):
-                node_ids.append(node_id)
-        if control.get("positive_control") == control.get("negative_control"):
-            failures.append(f"{gate_id}: controls are not distinct")
-    if len(node_ids) != len(set(node_ids)):
-        failures.append("control node IDs are not globally unique")
-    if failures:
-        return False, "Gate control registry failures: " + "; ".join(failures)
     expected_seal_keys = {
         "schema_version",
         "runner",
@@ -413,23 +442,64 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
         or tuple(sealed_paths) != _GATE_CONTROL_SEALED_PATHS
     ):
         return False, "Gate control execution seal is malformed or has incomplete source coverage."
-    control_set_hash = _gate_control_set_hash(
-        repo_root,
-        iteration_id=registry["iteration_id"],
-        controls=controls,
-        sealed_paths=tuple(sealed_paths),
-    )
-    if control_set_hash is None or execution_seal.get("control_set_sha256") != control_set_hash:
-        return False, "Gate control source seal does not match the executable control set."
+    git = shutil.which("git")
+    if git is None or not _git_commit_resolves(repo_root, git, _ITER000_GATE_CONTROL_COMMIT):
+        return False, "Gate control historical implementation commit is unavailable."
     try:
-        execution = subprocess.run(  # noqa: S603 - node IDs and paths are validated above
-            [sys.executable, "-m", "pytest", "-q", *node_ids],
-            cwd=repo_root,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=120,
+        historical_registry = _git_blob_at_path(
+            repo_root,
+            git,
+            _ITER000_GATE_CONTROL_COMMIT,
+            _ITER000_GATE_CONTROL_PATH,
         )
+        if historical_registry is None:
+            return False, "Gate control historical registry is unavailable."
+        with TemporaryDirectory(prefix="fieldtrue-iter000-controls-") as temporary:
+            snapshot_root = Path(temporary)
+            if not _materialize_gate_control_snapshot(
+                repo_root,
+                git=git,
+                destination=snapshot_root,
+            ):
+                return False, "Gate control historical implementation cannot be materialized."
+            failures: list[str] = []
+            node_ids: list[str] = []
+            for gate_id, failure_class in _ITER000_GATE_FAILURE_CLASSES.items():
+                control = by_gate[gate_id]
+                if control.get("failure_class") != failure_class:
+                    failures.append(f"{gate_id}: failure class")
+                for role in ("positive_control", "negative_control"):
+                    node_id = control.get(role)
+                    if not _control_node_is_substantive(
+                        snapshot_root,
+                        node_id,
+                        gate_id=gate_id,
+                        role=role.removesuffix("_control"),
+                        expected_status=("pass" if role == "positive_control" else failure_class),
+                    ):
+                        failures.append(f"{gate_id}: {role}")
+                    elif isinstance(node_id, str):
+                        node_ids.append(node_id)
+                if control.get("positive_control") == control.get("negative_control"):
+                    failures.append(f"{gate_id}: controls are not distinct")
+            if len(node_ids) != len(set(node_ids)):
+                failures.append("control node IDs are not globally unique")
+            if failures:
+                return False, "Gate control registry failures: " + "; ".join(failures)
+            control_set_hash = _gate_control_set_hash(
+                snapshot_root,
+                iteration_id=registry["iteration_id"],
+                controls=controls,
+                sealed_paths=tuple(sealed_paths),
+            )
+            if (
+                control_set_hash is None
+                or execution_seal.get("control_set_sha256") != control_set_hash
+            ):
+                return False, "Gate control source seal does not match the executable control set."
+            if path.read_bytes() != historical_registry:
+                return False, "Gate control registry differs from its historical Git binding."
+            execution = _run_gate_control_nodes(snapshot_root, node_ids)
     except (OSError, subprocess.TimeoutExpired) as error:
         return False, f"Gate control execution failed to run: {type(error).__name__}."
     result = {
@@ -1410,11 +1480,32 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
         or not _git_is_ancestor(repo_root, git, _ITER000_TRIGGER_COMMIT, head)
     ):
         return False, "Amendment 001 triggering commit is not an ancestor of HEAD."
-    correction_history = (repo_root / _ITER000_VERIFICATION_CONTRACT_PATH).is_file()
+    correction_history = _git_is_ancestor(
+        repo_root,
+        git,
+        _ITER000_VERIFICATION_CORRECTION_COMMIT,
+        head,
+    )
     if correction_history:
         history_valid, history_detail = _verify_iter000_history(repo_root, git, head)
         if not history_valid:
             return False, history_detail
+        correction_trust_inputs = {
+            _ITER000_VERIFICATION_CONTRACT_PATH: _ITER000_VERIFICATION_CONTRACT_SHA256,
+            _ITER000_VERIFICATION_CORRECTION_PATH: (_ITER000_VERIFICATION_CORRECTION_SHA256),
+        }
+        for relative, expected_hash in correction_trust_inputs.items():
+            path = repo_root / relative
+            if path.is_symlink() or not path.is_file():
+                return False, f"Verification correction trust input is missing: {relative}."
+            current_bytes = path.read_bytes()
+            if sha256_bytes(current_bytes) != expected_hash:
+                return False, f"Verification correction trust input differs: {relative}."
+            if _git_blob_at_path(repo_root, git, head, relative) != current_bytes:
+                return (
+                    False,
+                    f"Verification correction trust input is not committed at HEAD: {relative}.",
+                )
         proof_valid, proof_detail = _verify_attempt_001_proof_preserved(repo_root, git, head)
         if not proof_valid:
             return False, proof_detail
@@ -1426,7 +1517,7 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
     )
     if not surface_valid:
         return False, surface_detail
-    trust_inputs = (
+    trust_inputs = [
         _AMENDMENT_001_PATH,
         _AMENDMENT_001_DOCUMENT_PATH,
         _ITER000_ATTEMPT_001_AUTHORITY_PATH,
@@ -1435,11 +1526,16 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
         _ITER000_ANCHOR_PATH,
         _ITER000_DATASET_PATH,
         _ITER000_HYPOTHESIS_PATH,
-        "pyproject.toml",
-        "uv.lock",
-        "src/fieldtrue/adapters/adapt.py",
-        "src/fieldtrue/experiment.py",
-    )
+    ]
+    if not correction_history:
+        trust_inputs.extend(
+            (
+                "pyproject.toml",
+                "uv.lock",
+                "src/fieldtrue/adapters/adapt.py",
+                "src/fieldtrue/experiment.py",
+            )
+        )
     for relative in trust_inputs:
         path = repo_root / relative
         if path.is_symlink() or not path.is_file():
@@ -1752,6 +1848,25 @@ def validate_mission(repo_root: Path) -> MissionValidation:
             and hypothesis.read_bytes()
             == _root_preregistration_bytes(repo_root, hypothesis_relative),
             "Iteration 000 must byte-match its root-commit preregistration.",
+        )
+    )
+    try:
+        acquisition_contract = load_acquisition_contract(
+            repo_root / _ITER001_ACQUISITION_CONTRACT_PATH
+        )
+        verify_preregistration_binding(repo_root, acquisition_contract)
+        acquisition_contract_valid = True
+        acquisition_contract_detail = (
+            "Iteration 001 acquisition contract matches its committed preregistration."
+        )
+    except (AcquisitionAuditError, OSError, ValueError) as error:
+        acquisition_contract_valid = False
+        acquisition_contract_detail = f"Iteration 001 acquisition contract failed: {error}"
+    checks.append(
+        _check(
+            "iter001-acquisition-contract",
+            acquisition_contract_valid,
+            acquisition_contract_detail,
         )
     )
     dataset_lock = load_adapt_lock(repo_root / "protocol" / "datasets" / "nasa_adapt_v1.json")

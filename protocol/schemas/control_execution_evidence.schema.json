@@ -1,0 +1,283 @@
+{
+  "$defs": {
+    "ControlObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "control_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Control Id",
+          "type": "string"
+        },
+        "fixture": {
+          "$ref": "#/$defs/FixtureSnapshot"
+        },
+        "observed_failure_code": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Observed Failure Code"
+        },
+        "observed_gate_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Observed Gate Id",
+          "type": "string"
+        },
+        "observed_verdict": {
+          "enum": [
+            "PASS_PILOT",
+            "BLOCKED_ACQUISITION",
+            "BLOCKED_RIGHTS",
+            "INVALID",
+            "KILL_CONSTRUCT"
+          ],
+          "title": "Observed Verdict",
+          "type": "string"
+        },
+        "pytest_node_id": {
+          "title": "Pytest Node Id",
+          "type": "string"
+        },
+        "report": {
+          "additionalProperties": true,
+          "title": "Report",
+          "type": "object"
+        },
+        "report_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Report Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "fieldtrue.control-observation.v1",
+          "default": "fieldtrue.control-observation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "control_id",
+        "pytest_node_id",
+        "fixture",
+        "report_sha256",
+        "report",
+        "observed_verdict",
+        "observed_gate_id",
+        "observed_failure_code"
+      ],
+      "title": "ControlObservation",
+      "type": "object"
+    },
+    "FixtureFile": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes"
+      ],
+      "title": "FixtureFile",
+      "type": "object"
+    },
+    "FixtureSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "fieldtrue.fixture-tree.v1",
+          "default": "fieldtrue.fixture-tree.v1",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FixtureFile"
+          },
+          "minItems": 1,
+          "title": "Files",
+          "type": "array"
+        },
+        "root_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Root Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "files",
+        "root_sha256"
+      ],
+      "title": "FixtureSnapshot",
+      "type": "object"
+    },
+    "PytestLifecycle": {
+      "additionalProperties": false,
+      "properties": {
+        "collected_node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Collected Node Ids",
+          "type": "array"
+        },
+        "exit_status": {
+          "title": "Exit Status",
+          "type": "integer"
+        },
+        "phases": {
+          "items": {
+            "$ref": "#/$defs/PytestPhase"
+          },
+          "title": "Phases",
+          "type": "array"
+        },
+        "requested_node_id": {
+          "title": "Requested Node Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "fieldtrue.pytest-control-lifecycle.v1",
+          "default": "fieldtrue.pytest-control-lifecycle.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requested_node_id",
+        "collected_node_ids",
+        "phases",
+        "exit_status"
+      ],
+      "title": "PytestLifecycle",
+      "type": "object"
+    },
+    "PytestPhase": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "skipped"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "was_xfail": {
+          "title": "Was Xfail",
+          "type": "boolean"
+        },
+        "when": {
+          "enum": [
+            "setup",
+            "call",
+            "teardown"
+          ],
+          "title": "When",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "outcome",
+        "was_xfail"
+      ],
+      "title": "PytestPhase",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "command": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Command",
+      "type": "array"
+    },
+    "control_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Control Id",
+      "type": "string"
+    },
+    "execution_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Execution Commit",
+      "type": "string"
+    },
+    "execution_tree": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Execution Tree",
+      "type": "string"
+    },
+    "lifecycle": {
+      "$ref": "#/$defs/PytestLifecycle"
+    },
+    "observation": {
+      "$ref": "#/$defs/ControlObservation"
+    },
+    "pytest_node_id": {
+      "title": "Pytest Node Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.control-execution-evidence.v1",
+      "default": "fieldtrue.control-execution-evidence.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stderr": {
+      "title": "Stderr",
+      "type": "string"
+    },
+    "stderr_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Stderr Sha256",
+      "type": "string"
+    },
+    "stdout": {
+      "title": "Stdout",
+      "type": "string"
+    },
+    "stdout_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Stdout Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "execution_commit",
+    "execution_tree",
+    "control_id",
+    "pytest_node_id",
+    "command",
+    "observation",
+    "lifecycle",
+    "stdout_sha256",
+    "stderr_sha256",
+    "stdout",
+    "stderr"
+  ],
+  "title": "ControlExecutionEvidence",
+  "type": "object"
+}

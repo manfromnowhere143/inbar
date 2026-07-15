@@ -1,0 +1,356 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "AttestationSubjectKind": {
+      "enum": [
+        "source_rights",
+        "physical_provenance",
+        "mechanism_truth",
+        "review",
+        "diagnostic_execution",
+        "recovery_execution",
+        "settled_outcome",
+        "protocol_review",
+        "shortcut_baseline",
+        "control_suite",
+        "model_visible_projection",
+        "resource_usage",
+        "truth_custody",
+        "comparator_registry",
+        "candidate_registry",
+        "evidence_sequence"
+      ],
+      "title": "AttestationSubjectKind",
+      "type": "string"
+    },
+    "EvidenceTrack": {
+      "enum": [
+        "physical_admission",
+        "causal_laboratory",
+        "reality_control"
+      ],
+      "title": "EvidenceTrack",
+      "type": "string"
+    },
+    "PermissionDecision": {
+      "enum": [
+        "allowed",
+        "prohibited",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "PermissionDecision",
+      "type": "string"
+    },
+    "PermissionDisposition": {
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/ArtifactBinding"
+        },
+        "decision": {
+          "$ref": "#/$defs/PermissionDecision"
+        },
+        "kind": {
+          "$ref": "#/$defs/PermissionKind"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "decision",
+        "scope",
+        "basis"
+      ],
+      "title": "PermissionDisposition",
+      "type": "object"
+    },
+    "PermissionKind": {
+      "enum": [
+        "acquire",
+        "process",
+        "retain_raw",
+        "retain_derived",
+        "publish_metadata",
+        "independent_review",
+        "redistribute_raw",
+        "redistribute_derived",
+        "commercial_research"
+      ],
+      "title": "PermissionKind",
+      "type": "string"
+    },
+    "SignedAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "attestation_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Attestation Hash",
+          "type": "string"
+        },
+        "attestation_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Attestation Id",
+          "type": "string"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "fieldtrue.signed-attestation.v1",
+          "default": "fieldtrue.signed-attestation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[0-9a-f]{128}$",
+          "title": "Signature",
+          "type": "string"
+        },
+        "signer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Signer Id",
+          "type": "string"
+        },
+        "signer_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signer Public Key",
+          "type": "string"
+        },
+        "subject_kind": {
+          "$ref": "#/$defs/AttestationSubjectKind"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attestation_id",
+        "signer_id",
+        "subject_kind",
+        "subject_sha256",
+        "issued_at",
+        "signer_public_key",
+        "attestation_hash",
+        "signature"
+      ],
+      "title": "SignedAttestation",
+      "type": "object"
+    },
+    "SourceResource": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "resource_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "staged_artifact": {
+          "$ref": "#/$defs/ArtifactBinding"
+        },
+        "staged_at": {
+          "format": "date-time",
+          "title": "Staged At",
+          "type": "string"
+        },
+        "uri": {
+          "minLength": 1,
+          "title": "Uri",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_id",
+        "uri",
+        "version",
+        "sha256",
+        "bytes",
+        "media_type",
+        "staged_at",
+        "staged_artifact"
+      ],
+      "title": "SourceResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "approved_at": {
+      "format": "date-time",
+      "title": "Approved At",
+      "type": "string"
+    },
+    "deletion_obligations": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Deletion Obligations",
+      "type": "array"
+    },
+    "evidence_track": {
+      "$ref": "#/$defs/EvidenceTrack"
+    },
+    "landing_page": {
+      "minLength": 1,
+      "title": "Landing Page",
+      "type": "string"
+    },
+    "limitations": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "permissions": {
+      "items": {
+        "$ref": "#/$defs/PermissionDisposition"
+      },
+      "title": "Permissions",
+      "type": "array"
+    },
+    "resources": {
+      "items": {
+        "$ref": "#/$defs/SourceResource"
+      },
+      "minItems": 1,
+      "title": "Resources",
+      "type": "array"
+    },
+    "restricted_fields": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Restricted Fields",
+      "type": "array"
+    },
+    "rights_attestation": {
+      "$ref": "#/$defs/SignedAttestation"
+    },
+    "rights_reviewer_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Rights Reviewer Id",
+      "type": "string"
+    },
+    "rights_reviewer_independence_group": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Rights Reviewer Independence Group",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.source-manifest.v1",
+      "default": "fieldtrue.source-manifest.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_authority": {
+      "minLength": 1,
+      "title": "Source Authority",
+      "type": "string"
+    },
+    "source_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Source Id",
+      "type": "string"
+    },
+    "source_steward_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Source Steward Id",
+      "type": "string"
+    },
+    "source_steward_independence_group": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Source Steward Independence Group",
+      "type": "string"
+    },
+    "source_version": {
+      "minLength": 1,
+      "title": "Source Version",
+      "type": "string"
+    },
+    "terms_artifact": {
+      "$ref": "#/$defs/ArtifactBinding"
+    }
+  },
+  "required": [
+    "source_id",
+    "source_authority",
+    "source_version",
+    "landing_page",
+    "evidence_track",
+    "approved_at",
+    "source_steward_id",
+    "source_steward_independence_group",
+    "rights_reviewer_id",
+    "rights_reviewer_independence_group",
+    "terms_artifact",
+    "permissions",
+    "rights_attestation",
+    "resources"
+  ],
+  "title": "SourceManifest",
+  "type": "object"
+}

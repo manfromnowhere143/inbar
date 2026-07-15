@@ -26,6 +26,7 @@ from fieldtrue.adapters.adapt import (
 from fieldtrue.canonical import (
     atomic_write,
     canonical_json_pretty,
+    read_json,
     sha256_file,
     sha256_value,
 )
@@ -392,14 +393,14 @@ def _write_attempt_001_authority_consumption(
 
 
 def _protocol_bundle(repo_root: Path) -> dict[str, object]:
-    fixed_paths = (*_ATTEMPT_001_PROTOCOL_HASH_PATHS, _ATTEMPT_001_AUTHORITY_SPEC_PATH)
-    schema_paths = tuple(
-        path.relative_to(repo_root).as_posix()
-        for path in sorted((repo_root / "protocol" / "schemas").glob("*.json"))
-    )
-    hashes = {
-        relative: sha256_file(repo_root / relative) for relative in (*fixed_paths, *schema_paths)
-    }
+    authority = read_json(repo_root / _ATTEMPT_001_AUTHORITY_SPEC_PATH)
+    protocol_hashes = authority.get("protocol_hashes")
+    if not isinstance(protocol_hashes, dict) or not all(
+        isinstance(relative, str) for relative in protocol_hashes
+    ):
+        raise ExperimentPreflightError("attempt 001 protocol bundle manifest is invalid")
+    paths = (*sorted(protocol_hashes), _ATTEMPT_001_AUTHORITY_SPEC_PATH)
+    hashes = {relative: sha256_file(repo_root / relative) for relative in paths}
     return {
         "schema_version": "fieldtrue.protocol-bundle.v1",
         "files": hashes,

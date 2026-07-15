@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "RoleKind": {
+      "enum": [
+        "source_steward",
+        "rights_reviewer",
+        "evidence_curator",
+        "truth_producer",
+        "mechanism_reviewer",
+        "hypothesis_proposer",
+        "test_proposer",
+        "safety_reviewer",
+        "test_selector",
+        "test_executor",
+        "recovery_proposer",
+        "recovery_executor",
+        "outcome_verifier",
+        "statistician"
+      ],
+      "title": "RoleKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "approval_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Approval Public Key",
+      "type": "string"
+    },
+    "conflict_disclosure": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "independence_group_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Independence Group Id",
+      "type": "string"
+    },
+    "role": {
+      "$ref": "#/$defs/RoleKind"
+    }
+  },
+  "required": [
+    "role",
+    "actor_id",
+    "independence_group_id",
+    "conflict_disclosure",
+    "approval_public_key"
+  ],
+  "title": "RoleAssignment",
+  "type": "object"
+}

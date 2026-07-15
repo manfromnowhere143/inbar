@@ -1,0 +1,53 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifact_bytes": {
+      "minimum": 0,
+      "title": "Artifact Bytes",
+      "type": "integer"
+    },
+    "artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Artifact Sha256",
+      "type": "string"
+    },
+    "forbidden_field_paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Forbidden Field Paths",
+      "type": "array"
+    },
+    "matched_identity_token_sha256": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Matched Identity Token Sha256",
+      "type": "array"
+    },
+    "media_type": {
+      "minLength": 1,
+      "title": "Media Type",
+      "type": "string"
+    },
+    "scan_mode": {
+      "enum": [
+        "utf8_json",
+        "opaque_stream"
+      ],
+      "title": "Scan Mode",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_sha256",
+    "artifact_bytes",
+    "media_type",
+    "scan_mode",
+    "forbidden_field_paths",
+    "matched_identity_token_sha256"
+  ],
+  "title": "LeakageArtifactScan",
+  "type": "object"
+}

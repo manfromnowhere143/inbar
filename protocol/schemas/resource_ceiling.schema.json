@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "max_cloud_jobs": {
+      "minimum": 0,
+      "title": "Max Cloud Jobs",
+      "type": "integer"
+    },
+    "max_cost_usd": {
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+      "title": "Max Cost Usd",
+      "type": "string"
+    },
+    "max_cpu_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Cpu Seconds",
+      "type": "number"
+    },
+    "max_derived_bytes": {
+      "minimum": 0,
+      "title": "Max Derived Bytes",
+      "type": "integer"
+    },
+    "max_downloaded_bytes": {
+      "minimum": 0,
+      "title": "Max Downloaded Bytes",
+      "type": "integer"
+    },
+    "max_gpu_seconds": {
+      "minimum": 0,
+      "title": "Max Gpu Seconds",
+      "type": "number"
+    },
+    "max_paid_calls": {
+      "minimum": 0,
+      "title": "Max Paid Calls",
+      "type": "integer"
+    },
+    "max_peak_memory_bytes": {
+      "exclusiveMinimum": 0,
+      "title": "Max Peak Memory Bytes",
+      "type": "integer"
+    },
+    "max_peak_staged_bytes": {
+      "minimum": 0,
+      "title": "Max Peak Staged Bytes",
+      "type": "integer"
+    },
+    "max_wall_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Wall Seconds",
+      "type": "number"
+    }
+  },
+  "required": [
+    "max_cpu_seconds",
+    "max_wall_seconds",
+    "max_peak_memory_bytes",
+    "max_downloaded_bytes",
+    "max_peak_staged_bytes",
+    "max_derived_bytes",
+    "max_gpu_seconds",
+    "max_cloud_jobs",
+    "max_paid_calls",
+    "max_cost_usd"
+  ],
+  "title": "ResourceCeiling",
+  "type": "object"
+}

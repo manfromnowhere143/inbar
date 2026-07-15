@@ -618,14 +618,18 @@ def _verify_implementation_hashes(
     commit: str,
     hashes: Mapping[str, str],
     label: str,
+    require_working_tree: bool = True,
 ) -> None:
     for relative, expected_hash in hashes.items():
-        path = repo_root / relative
-        data = _read_regular_file(path, f"{label} file {relative}")
-        if sha256_bytes(data) != expected_hash:
-            _fail(f"{label} working hash differs: {relative}")
-        if _git_blob(repo_root, commit, relative) != data:
-            _fail(f"{label} file differs from the selected implementation commit: {relative}")
+        committed_data = _git_blob(repo_root, commit, relative)
+        if sha256_bytes(committed_data) != expected_hash:
+            _fail(f"{label} selected-commit hash differs: {relative}")
+        if require_working_tree:
+            data = _read_regular_file(repo_root / relative, f"{label} file {relative}")
+            if sha256_bytes(data) != expected_hash:
+                _fail(f"{label} working hash differs: {relative}")
+            if committed_data != data:
+                _fail(f"{label} file differs from the selected implementation commit: {relative}")
 
 
 def _load_verification_authority(
@@ -768,19 +772,31 @@ def _load_verification_authority(
     if set(test_hashes) != _git_file_set(repo_root, commit, "tests"):
         _fail("verification authority does not bind the complete test tree")
     _verify_implementation_hashes(
-        repo_root, commit=commit, hashes=source_hashes, label="verification source"
+        repo_root,
+        commit=commit,
+        hashes=source_hashes,
+        label="verification source",
+        require_working_tree=strict_selection_head,
     )
     _verify_implementation_hashes(
-        repo_root, commit=commit, hashes=test_hashes, label="verification test"
+        repo_root,
+        commit=commit,
+        hashes=test_hashes,
+        label="verification test",
+        require_working_tree=strict_selection_head,
     )
     for relative, field in (
         ("pyproject.toml", "pyproject_sha256"),
         (_LOCKFILE_PROTOCOL_PATH, "uv_lock_sha256"),
     ):
         expected_hash = _hash(implementation[field], f"verification {relative} hash")
-        data = _read_regular_file(repo_root / relative, f"verification {relative}")
-        if sha256_bytes(data) != expected_hash or _git_blob(repo_root, commit, relative) != data:
+        committed_data = _git_blob(repo_root, commit, relative)
+        if sha256_bytes(committed_data) != expected_hash:
             _fail(f"verification implementation differs for {relative}")
+        if strict_selection_head:
+            data = _read_regular_file(repo_root / relative, f"verification {relative}")
+            if sha256_bytes(data) != expected_hash or committed_data != data:
+                _fail(f"verification implementation differs for {relative}")
 
     protocol_hashes = _authority_hash_map(
         implementation["protocol_hashes"], "verification protocol map"
@@ -819,19 +835,7 @@ def _load_verification_authority(
         _VERIFICATION_AUTHORITY_PATH,
         _VERIFICATION_SIGNER_ANCHOR_PATH,
     }
-    post_verification_paths = {
-        "CONTINUITY.md",
-        "HANDOFF.md",
-        _VERIFICATION_RECEIPT_PATH,
-        "memory/research_engine_extraction.jsonl",
-    }
-    changes_valid = (
-        changed == expected_selection_changes
-        if strict_selection_head
-        else expected_selection_changes.issubset(changed)
-        and changed.issubset(expected_selection_changes | post_verification_paths)
-    )
-    if not changes_valid:
+    if strict_selection_head and changed != expected_selection_changes:
         _fail("tracked files changed after correction implementation selection")
     if (
         _proof_file_hashes(repo_root / _ATTEMPT_001_PROOF_PATH)

@@ -1,0 +1,49 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifact_bytes": {
+      "exclusiveMinimum": 0,
+      "title": "Artifact Bytes",
+      "type": "integer"
+    },
+    "artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Artifact Sha256",
+      "type": "string"
+    },
+    "chunk_bytes": {
+      "exclusiveMinimum": 0,
+      "maximum": 1048576,
+      "title": "Chunk Bytes",
+      "type": "integer"
+    },
+    "evidence_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Evidence Id",
+      "type": "string"
+    },
+    "ordered_chunk_sha256": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Ordered Chunk Sha256",
+      "type": "array"
+    },
+    "source_order_monotonic": {
+      "title": "Source Order Monotonic",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "artifact_sha256",
+    "artifact_bytes",
+    "chunk_bytes",
+    "ordered_chunk_sha256",
+    "source_order_monotonic"
+  ],
+  "title": "EvidenceStreamSequence",
+  "type": "object"
+}

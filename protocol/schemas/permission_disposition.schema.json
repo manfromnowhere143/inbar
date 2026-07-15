@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "PermissionDecision": {
+      "enum": [
+        "allowed",
+        "prohibited",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "PermissionDecision",
+      "type": "string"
+    },
+    "PermissionKind": {
+      "enum": [
+        "acquire",
+        "process",
+        "retain_raw",
+        "retain_derived",
+        "publish_metadata",
+        "independent_review",
+        "redistribute_raw",
+        "redistribute_derived",
+        "commercial_research"
+      ],
+      "title": "PermissionKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "basis": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "decision": {
+      "$ref": "#/$defs/PermissionDecision"
+    },
+    "kind": {
+      "$ref": "#/$defs/PermissionKind"
+    },
+    "scope": {
+      "minLength": 1,
+      "title": "Scope",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "decision",
+    "scope",
+    "basis"
+  ],
+  "title": "PermissionDisposition",
+  "type": "object"
+}

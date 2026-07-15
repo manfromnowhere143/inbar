@@ -1,0 +1,266 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    },
+    "AttestationSubjectKind": {
+      "enum": [
+        "source_rights",
+        "physical_provenance",
+        "mechanism_truth",
+        "review",
+        "diagnostic_execution",
+        "recovery_execution",
+        "settled_outcome",
+        "protocol_review",
+        "shortcut_baseline",
+        "control_suite",
+        "model_visible_projection",
+        "resource_usage",
+        "truth_custody",
+        "comparator_registry",
+        "candidate_registry",
+        "evidence_sequence"
+      ],
+      "title": "AttestationSubjectKind",
+      "type": "string"
+    },
+    "ExecutionAuthority": {
+      "enum": [
+        "replay",
+        "simulator",
+        "testbed"
+      ],
+      "title": "ExecutionAuthority",
+      "type": "string"
+    },
+    "SignedAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "attestation_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Attestation Hash",
+          "type": "string"
+        },
+        "attestation_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Attestation Id",
+          "type": "string"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "title": "Issued At",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "fieldtrue.signed-attestation.v1",
+          "default": "fieldtrue.signed-attestation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[0-9a-f]{128}$",
+          "title": "Signature",
+          "type": "string"
+        },
+        "signer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Signer Id",
+          "type": "string"
+        },
+        "signer_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signer Public Key",
+          "type": "string"
+        },
+        "subject_kind": {
+          "$ref": "#/$defs/AttestationSubjectKind"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attestation_id",
+        "signer_id",
+        "subject_kind",
+        "subject_sha256",
+        "issued_at",
+        "signer_public_key",
+        "attestation_hash",
+        "signature"
+      ],
+      "title": "SignedAttestation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "abort_log": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "acknowledged_at": {
+      "format": "date-time",
+      "title": "Acknowledged At",
+      "type": "string"
+    },
+    "acknowledgement": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "action_contract": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "adverse_events": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Adverse Events",
+      "type": "array"
+    },
+    "approval_receipt_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Approval Receipt Hash",
+      "type": "string"
+    },
+    "attestation": {
+      "$ref": "#/$defs/SignedAttestation"
+    },
+    "authority": {
+      "$ref": "#/$defs/ExecutionAuthority"
+    },
+    "candidate_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Candidate Sha256",
+      "type": "string"
+    },
+    "command": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "commanded_at": {
+      "format": "date-time",
+      "title": "Commanded At",
+      "type": "string"
+    },
+    "constraint_margins": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "direct_cost_usd": {
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,6})?$",
+      "title": "Direct Cost Usd",
+      "type": "string"
+    },
+    "execution_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "executor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Executor Id",
+      "type": "string"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "observation_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Observation Sha256",
+      "type": "string"
+    },
+    "realized_action": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "realized_at": {
+      "format": "date-time",
+      "title": "Realized At",
+      "type": "string"
+    },
+    "safety_envelope_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Safety Envelope Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.diagnostic-execution.v1",
+      "default": "fieldtrue.diagnostic-execution.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "test_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Test Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "execution_id",
+    "incident_id",
+    "test_id",
+    "executor_id",
+    "candidate_sha256",
+    "safety_envelope_sha256",
+    "observation_sha256",
+    "authority",
+    "started_at",
+    "commanded_at",
+    "acknowledged_at",
+    "realized_at",
+    "finished_at",
+    "approval_receipt_hash",
+    "action_contract",
+    "command",
+    "acknowledgement",
+    "realized_action",
+    "constraint_margins",
+    "abort_log",
+    "direct_cost_usd",
+    "attestation"
+  ],
+  "title": "DiagnosticExecution",
+  "type": "object"
+}

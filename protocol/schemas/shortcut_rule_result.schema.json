@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "evaluation": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "implementation": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "resolves_mechanism_without_action": {
+      "title": "Resolves Mechanism Without Action",
+      "type": "boolean"
+    },
+    "rule_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Rule Id",
+      "type": "string"
+    },
+    "truth_access": {
+      "title": "Truth Access",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "rule_id",
+    "implementation",
+    "evaluation",
+    "truth_access",
+    "resolves_mechanism_without_action"
+  ],
+  "title": "ShortcutRuleResult",
+  "type": "object"
+}
