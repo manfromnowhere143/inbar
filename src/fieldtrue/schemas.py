@@ -92,6 +92,13 @@ from fieldtrue.memory import ResearchMemoryRecord
 from fieldtrue.receipts import LedgerEvent, LedgerHead, SignerAnchor
 from fieldtrue.runtime import RuntimeIdentity
 from fieldtrue.splits import SplitLock
+from fieldtrue.terminal_authority import (
+    AcquisitionInputEntry,
+    AcquisitionInputManifest,
+    AdmissionInvalidityRecord,
+    AdmissionTerminalRecord,
+    AdmissionVerifierCertificate,
+)
 
 _SCHEMAS: dict[str, type[BaseModel]] = {
     "acquisition_admission_report.schema.json": AcquisitionAdmissionReport,
@@ -173,6 +180,11 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "truth_custody_receipt.schema.json": TruthCustodyReceipt,
     "trusted_actor.schema.json": TrustedActor,
     "verification_result.schema.json": VerificationResult,
+    "acquisition_input_entry.schema.json": AcquisitionInputEntry,
+    "acquisition_input_manifest.schema.json": AcquisitionInputManifest,
+    "admission_invalidity_record.schema.json": AdmissionInvalidityRecord,
+    "admission_terminal_record.schema.json": AdmissionTerminalRecord,
+    "admission_verifier_certificate.schema.json": AdmissionVerifierCertificate,
 }
 
 

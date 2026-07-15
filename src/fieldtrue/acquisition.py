@@ -169,6 +169,7 @@ class AttestationSubjectKind(StrEnum):
     COMPARATOR_REGISTRY = "comparator_registry"
     CANDIDATE_REGISTRY = "candidate_registry"
     EVIDENCE_SEQUENCE = "evidence_sequence"
+    ADMISSION_VERIFIER_CERTIFICATE = "admission_verifier_certificate"
 
 
 class ArtifactBinding(FrozenModel):

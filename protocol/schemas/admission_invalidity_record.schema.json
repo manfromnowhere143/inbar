@@ -1,0 +1,64 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Contract Sha256",
+      "type": "string"
+    },
+    "diagnostic_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Diagnostic Sha256",
+      "type": "string"
+    },
+    "failure_code": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Failure Code",
+      "type": "string"
+    },
+    "failure_stage": {
+      "enum": [
+        "authority",
+        "input_snapshot",
+        "control_verification",
+        "artifact_loading",
+        "admission_audit",
+        "output_staging"
+      ],
+      "title": "Failure Stage",
+      "type": "string"
+    },
+    "input_manifest_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Manifest Sha256",
+      "type": "string"
+    },
+    "iteration_id": {
+      "const": "iter001_physical_causal_evidence_acquisition",
+      "default": "iter001_physical_causal_evidence_acquisition",
+      "title": "Iteration Id",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.admission-invalidity-record.v1",
+      "default": "fieldtrue.admission-invalidity-record.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contract_sha256",
+    "input_manifest_sha256",
+    "failure_stage",
+    "failure_code",
+    "diagnostic_sha256",
+    "occurred_at"
+  ],
+  "title": "AdmissionInvalidityRecord",
+  "type": "object"
+}

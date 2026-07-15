@@ -17,7 +17,8 @@
         "truth_custody",
         "comparator_registry",
         "candidate_registry",
-        "evidence_sequence"
+        "evidence_sequence",
+        "admission_verifier_certificate"
       ],
       "title": "AttestationSubjectKind",
       "type": "string"

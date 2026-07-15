@@ -1,38 +1,5 @@
 {
   "$defs": {
-    "ArtifactBinding": {
-      "additionalProperties": false,
-      "properties": {
-        "bytes": {
-          "minimum": 0,
-          "title": "Bytes",
-          "type": "integer"
-        },
-        "media_type": {
-          "minLength": 1,
-          "title": "Media Type",
-          "type": "string"
-        },
-        "path": {
-          "minLength": 1,
-          "title": "Path",
-          "type": "string"
-        },
-        "sha256": {
-          "pattern": "^[0-9a-f]{64}$",
-          "title": "Sha256",
-          "type": "string"
-        }
-      },
-      "required": [
-        "path",
-        "sha256",
-        "bytes",
-        "media_type"
-      ],
-      "title": "ArtifactBinding",
-      "type": "object"
-    },
     "AttestationSubjectKind": {
       "enum": [
         "source_rights",
@@ -54,37 +21,6 @@
         "admission_verifier_certificate"
       ],
       "title": "AttestationSubjectKind",
-      "type": "string"
-    },
-    "ReviewPurpose": {
-      "enum": [
-        "mechanism",
-        "ambiguity",
-        "safe_test",
-        "recovery",
-        "settled_outcome"
-      ],
-      "title": "ReviewPurpose",
-      "type": "string"
-    },
-    "RoleKind": {
-      "enum": [
-        "source_steward",
-        "rights_reviewer",
-        "evidence_curator",
-        "truth_producer",
-        "mechanism_reviewer",
-        "hypothesis_proposer",
-        "test_proposer",
-        "safety_reviewer",
-        "test_selector",
-        "test_executor",
-        "recovery_proposer",
-        "recovery_executor",
-        "outcome_verifier",
-        "statistician"
-      ],
-      "title": "RoleKind",
       "type": "string"
     },
     "SignedAttestation": {
@@ -151,52 +87,79 @@
   },
   "additionalProperties": false,
   "properties": {
-    "attestation": {
+    "certificate_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Certificate Id",
+      "type": "string"
+    },
+    "control_suite_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Control Suite Sha256",
+      "type": "string"
+    },
+    "dependency_lock_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dependency Lock Sha256",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "iteration_id": {
+      "const": "iter001_physical_causal_evidence_acquisition",
+      "default": "iter001_physical_causal_evidence_acquisition",
+      "title": "Iteration Id",
+      "type": "string"
+    },
+    "not_before": {
+      "format": "date-time",
+      "title": "Not Before",
+      "type": "string"
+    },
+    "root_attestation": {
       "$ref": "#/$defs/SignedAttestation"
     },
-    "evidence": {
-      "items": {
-        "$ref": "#/$defs/ArtifactBinding"
-      },
-      "minItems": 1,
-      "title": "Evidence",
-      "type": "array"
-    },
-    "producer_role": {
-      "$ref": "#/$defs/RoleKind"
-    },
-    "purpose": {
-      "$ref": "#/$defs/ReviewPurpose"
-    },
-    "review_id": {
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
-      "title": "Review Id",
+    "schema_version": {
+      "const": "fieldtrue.admission-verifier-certificate.v1",
+      "default": "fieldtrue.admission-verifier-certificate.v1",
+      "title": "Schema Version",
       "type": "string"
     },
-    "reviewed_at": {
-      "format": "date-time",
-      "title": "Reviewed At",
+    "validator_git_blob": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Validator Git Blob",
       "type": "string"
     },
-    "reviewer_role": {
-      "$ref": "#/$defs/RoleKind"
-    },
-    "subject_sha256": {
+    "validator_source_sha256": {
       "pattern": "^[0-9a-f]{64}$",
-      "title": "Subject Sha256",
+      "title": "Validator Source Sha256",
+      "type": "string"
+    },
+    "verifier_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Verifier Id",
+      "type": "string"
+    },
+    "verifier_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Verifier Public Key",
       "type": "string"
     }
   },
   "required": [
-    "review_id",
-    "purpose",
-    "subject_sha256",
-    "producer_role",
-    "reviewer_role",
-    "reviewed_at",
-    "evidence",
-    "attestation"
+    "certificate_id",
+    "verifier_id",
+    "verifier_public_key",
+    "validator_git_blob",
+    "validator_source_sha256",
+    "control_suite_sha256",
+    "dependency_lock_sha256",
+    "not_before",
+    "expires_at",
+    "root_attestation"
   ],
-  "title": "BoundReview",
+  "title": "AdmissionVerifierCertificate",
   "type": "object"
 }

@@ -1,0 +1,161 @@
+{
+  "$defs": {
+    "ArtifactBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBinding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attestation_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Attestation Hash",
+      "type": "string"
+    },
+    "contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Contract Sha256",
+      "type": "string"
+    },
+    "control_suite_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Control Suite Sha256",
+      "type": "string"
+    },
+    "dependency_lock_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Dependency Lock Sha256",
+      "type": "string"
+    },
+    "execution_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Execution Commit",
+      "type": "string"
+    },
+    "execution_tree": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Execution Tree",
+      "type": "string"
+    },
+    "input_manifest": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "iteration_id": {
+      "const": "iter001_physical_causal_evidence_acquisition",
+      "default": "iter001_physical_causal_evidence_acquisition",
+      "title": "Iteration Id",
+      "type": "string"
+    },
+    "payload": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "payload_kind": {
+      "enum": [
+        "admission_report",
+        "invalidity_record"
+      ],
+      "title": "Payload Kind",
+      "type": "string"
+    },
+    "produced_at": {
+      "format": "date-time",
+      "title": "Produced At",
+      "type": "string"
+    },
+    "rendered_result": {
+      "$ref": "#/$defs/ArtifactBinding"
+    },
+    "schema_version": {
+      "const": "fieldtrue.admission-terminal-record.v1",
+      "default": "fieldtrue.admission-terminal-record.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signature": {
+      "pattern": "^[0-9a-f]{128}$",
+      "title": "Signature",
+      "type": "string"
+    },
+    "terminal_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Terminal Id",
+      "type": "string"
+    },
+    "validator_git_blob": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Validator Git Blob",
+      "type": "string"
+    },
+    "validator_source_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Validator Source Sha256",
+      "type": "string"
+    },
+    "verifier_certificate_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Verifier Certificate Sha256",
+      "type": "string"
+    },
+    "verifier_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Verifier Id",
+      "type": "string"
+    },
+    "verifier_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Verifier Public Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "terminal_id",
+    "execution_commit",
+    "execution_tree",
+    "contract_sha256",
+    "verifier_certificate_sha256",
+    "control_suite_sha256",
+    "validator_git_blob",
+    "validator_source_sha256",
+    "dependency_lock_sha256",
+    "input_manifest",
+    "payload_kind",
+    "payload",
+    "rendered_result",
+    "produced_at",
+    "verifier_id",
+    "verifier_public_key",
+    "attestation_hash",
+    "signature"
+  ],
+  "title": "AdmissionTerminalRecord",
+  "type": "object"
+}

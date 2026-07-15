@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "AcquisitionInputEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "mode": {
+          "maximum": 4095,
+          "minimum": 0,
+          "title": "Mode",
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "mode"
+      ],
+      "title": "AcquisitionInputEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/AcquisitionInputEntry"
+      },
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    },
+    "iteration_id": {
+      "const": "iter001_physical_causal_evidence_acquisition",
+      "default": "iter001_physical_causal_evidence_acquisition",
+      "title": "Iteration Id",
+      "type": "string"
+    },
+    "root_algorithm": {
+      "const": "sha256-canonical-path-content-v1",
+      "default": "sha256-canonical-path-content-v1",
+      "title": "Root Algorithm",
+      "type": "string"
+    },
+    "root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Root Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "fieldtrue.acquisition-input-manifest.v1",
+      "default": "fieldtrue.acquisition-input-manifest.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "total_bytes": {
+      "minimum": 0,
+      "title": "Total Bytes",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "entries",
+    "total_bytes",
+    "root_sha256"
+  ],
+  "title": "AcquisitionInputManifest",
+  "type": "object"
+}
