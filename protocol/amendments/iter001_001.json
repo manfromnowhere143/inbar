@@ -1,0 +1,927 @@
+{
+  "amendment_document": {
+    "artifact_sha256": "9278eb33ef5a837c0ae043112f2fb041df4faa39cf34d26787a47f2326bf360c",
+    "path": "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_001.md"
+  },
+  "amendment_id": "iter001_001",
+  "approval": {
+    "decision": "approve_shortcut_v2_implementation_only",
+    "frozen_owner_actor_id": "daniel-wahnich",
+    "frozen_owner_ed25519_public_key": "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962",
+    "frozen_owner_key_trust_basis": "git-pinned-iter001-governance-ed25519-no-external-timestamp",
+    "frozen_owner_signer_anchor_artifact_sha256": "c5cf91b620ae3f34cc9ecebf936c4f48014f04cfa21e3fdc1cf0713f440b1804",
+    "frozen_owner_signer_anchor_commit": "2955c1bcca190430cd5c88c57187126bb7531d7a",
+    "frozen_owner_signer_anchor_path": "protocol/acquisition/iter001_contract.json",
+    "frozen_owner_signing_key_id": "iter001-governance",
+    "previous_receipt_genesis": "0000000000000000000000000000000000000000000000000000000000000000",
+    "receipt_fields": [
+      "schema_version",
+      "approval_id",
+      "owner_actor_id",
+      "owner_signing_key_id",
+      "owner_signer_anchor_artifact_sha256",
+      "owner_key_trust_basis",
+      "owner_ed25519_public_key",
+      "proposal_git_commit",
+      "amendment_document_artifact_sha256",
+      "machine_proposal_artifact_sha256",
+      "decision",
+      "previous_approval_receipt_sha256",
+      "nonce",
+      "issued_at",
+      "receipt_hash",
+      "signature"
+    ],
+    "receipt_hash_algorithm": "sha256-compact-canonical-json-v1",
+    "receipt_hash_excludes": [
+      "receipt_hash",
+      "signature"
+    ],
+    "receipt_nonce": "fresh_32_bytes_lowercase_hex",
+    "receipt_schema": "inbar.owner-amendment-approval-receipt.v1",
+    "receipt_signature": "ed25519_over_raw_receipt_hash_bytes",
+    "separate_signed_receipt_required": true
+  },
+  "authority_effect": {
+    "canonical_control_authority": "bootstrap",
+    "proposal_alone_implementation_authorized": false,
+    "proposal_alone_publication_transition_authorized": false,
+    "proposal_alone_scientific_verdict_authorized": false,
+    "proposal_alone_truth_release_authorized": false,
+    "v1_canonical_authority": "forbidden"
+  },
+  "canonical_hashing": {
+    "artifact_algorithm": "sha256-raw-bytes-v1",
+    "duplicate_items": "INVALID",
+    "historical_json_bindings": "raw_committed_bytes",
+    "semantic_algorithm": "sha256-compact-canonical-json-v1",
+    "semantic_roots": {
+      "case_key": {
+        "domain": "inbar.iter001.shortcut-case-key.v1",
+        "fields": [
+          "incident_id",
+          "hypothesis_set_artifact_sha256"
+        ]
+      },
+      "crossfit_fold_root_sha256": {
+        "domain": "inbar.iter001.shortcut-crossfit-fold-root.v1",
+        "item_fields": [
+          "axis",
+          "holdout_group",
+          "train_incident_ids_sha256",
+          "holdout_incident_ids_sha256"
+        ],
+        "ordering": "axis_then_holdout_group"
+      },
+      "eligible_dossier_root_sha256": {
+        "domain": "inbar.iter001.eligible-dossier-root.v1",
+        "item_fields": [
+          "incident_id",
+          "dossier_artifact_sha256"
+        ],
+        "ordering": "incident_id"
+      },
+      "eligible_incident_ids_sha256": {
+        "domain": "inbar.iter001.eligible-incident-ids.v1",
+        "item": "incident_id",
+        "ordering": "canonical_utf8"
+      },
+      "envelope_reveal_root_sha256": {
+        "domain": "inbar.iter001.envelope-reveal-root.v1",
+        "item_fields": [
+          "phase_ordinal",
+          "release_context",
+          "target_subset",
+          "salt_hex",
+          "envelope_commitment_sha256",
+          "prepared_release_receipt_artifact_sha256",
+          "publication_receipt_artifact_sha256",
+          "open_receipt_artifact_sha256"
+        ],
+        "ordering": "phase_ordinal"
+      },
+      "evaluation_root_sha256": {
+        "domain": "inbar.iter001.shortcut-evaluation-root.v1",
+        "item_fields": [
+          "rule_id",
+          "axis",
+          "holdout_group",
+          "evaluation_artifact_sha256"
+        ],
+        "ordering": "registry_then_axis_then_holdout_group"
+      },
+      "extractor_registry_sha256": {
+        "domain": "inbar.iter001.extractor-registry.v1",
+        "value": "complete_signed_registry"
+      },
+      "feature_inventory_root_sha256": {
+        "domain": "inbar.iter001.feature-inventory-root.v1",
+        "item_fields": [
+          "incident_id",
+          "feature_inventory_artifact_sha256",
+          "completeness_receipt_artifact_sha256"
+        ],
+        "ordering": "incident_id"
+      },
+      "final_recomputation_receipt_sha256": {
+        "domain": "inbar.iter001.final-recomputation-receipt.v1",
+        "value": "complete_signed_receipt"
+      },
+      "fitted_state_root_sha256": {
+        "domain": "inbar.iter001.shortcut-fitted-state-root.v1",
+        "item_fields": [
+          "rule_id",
+          "axis",
+          "holdout_group",
+          "fitted_state_artifact_sha256"
+        ],
+        "ordering": "registry_then_axis_then_holdout_group"
+      },
+      "freeze_receipt_sha256": {
+        "domain": "inbar.iter001.shortcut-freeze-receipt.v1",
+        "value": "complete_signed_receipt"
+      },
+      "hypothesis_set_root_sha256": {
+        "domain": "inbar.iter001.hypothesis-set-root.v1",
+        "item_fields": [
+          "case_key",
+          "hypothesis_set_artifact_sha256"
+        ],
+        "ordering": "case_key"
+      },
+      "open_receipt_root_sha256": {
+        "domain": "inbar.iter001.truth-release-open-root.v1",
+        "item": "open_receipt_artifact_sha256",
+        "ordering": "phase_ordinal"
+      },
+      "phase_completion_root_sha256": {
+        "domain": "inbar.iter001.shortcut-phase-completion-root.v1",
+        "item": "phase_completion_receipt_artifact_sha256",
+        "ordering": "phase_ordinal"
+      },
+      "prediction_key_root_sha256": {
+        "domain": "inbar.iter001.prediction-key-root.v1",
+        "fields": [
+          "ontology_artifact_sha256",
+          "assignments"
+        ],
+        "item_fields": [
+          "case_key",
+          "hypothesis_id",
+          "prediction_key"
+        ],
+        "ordering": "case_key_then_hypothesis_id"
+      },
+      "prediction_root_sha256": {
+        "domain": "inbar.iter001.shortcut-prediction-root.v1",
+        "item_fields": [
+          "rule_id",
+          "axis",
+          "holdout_group",
+          "prediction_manifest_artifact_sha256"
+        ],
+        "ordering": "registry_then_axis_then_holdout_group"
+      },
+      "prepared_release_root_sha256": {
+        "domain": "inbar.iter001.prepared-truth-release-root.v1",
+        "item": "prepared_release_receipt_artifact_sha256",
+        "ordering": "phase_ordinal"
+      },
+      "projection_root_sha256": {
+        "domain": "inbar.iter001.projection-root.v1",
+        "item_fields": [
+          "incident_id",
+          "projection_artifact_sha256"
+        ],
+        "ordering": "incident_id"
+      },
+      "publication_receipt_root_sha256": {
+        "domain": "inbar.iter001.truth-release-publication-root.v1",
+        "item": "publication_receipt_artifact_sha256",
+        "ordering": "phase_ordinal"
+      },
+      "release_plan_sha256": {
+        "domain": "inbar.iter001.shortcut-release-plan.v1",
+        "value": "complete_ordered_release_plan"
+      },
+      "rule_registry_sha256": {
+        "domain": "inbar.iter001.shortcut-rule-registry.v2",
+        "value": "complete_signed_registry"
+      },
+      "split_locks_sha256": {
+        "axis_order": [
+          "hardware_family",
+          "hardware_identity",
+          "fault_family"
+        ],
+        "domain": "inbar.iter001.split-lock-root.v1",
+        "item_fields": [
+          "axis",
+          "split_lock_artifact_sha256"
+        ]
+      },
+      "target_manifest_hiding_commitment_sha256": {
+        "domain": "inbar.iter001.target-manifest-commitment.v1",
+        "fields": [
+          "target_manifest_sha256",
+          "salt_hex"
+        ]
+      },
+      "target_manifest_sha256": {
+        "domain": "inbar.iter001.mechanism-target-root.v1",
+        "item_fields": [
+          "case_key",
+          "target_artifact_sha256"
+        ],
+        "ordering": "case_key"
+      }
+    },
+    "truth_only_before_scope_release": [
+      "target_manifest_sha256",
+      "per_case_target_artifact_sha256",
+      "raw_target_sha256",
+      "target_manifest_commitment_salt"
+    ]
+  },
+  "census_policy": {
+    "axis_counts_may_be_summed": false,
+    "denominator": "complete_eligible_physical_root_census_per_axis",
+    "eligibility_phase": "non_shortcut_gates_only",
+    "kill_minimum_denominator": 30,
+    "nonshortcut_coverage_must_pass_before_kill": true,
+    "shortcut_defect_can_remove_case": false,
+    "unit": "root_incident_group",
+    "v2_phase": "exact_frozen_census",
+    "zero_count_resolution_forbidden": true
+  },
+  "crossfit_policy": {
+    "axis_group_fields": {
+      "fault_family": "TruthRecord.fault_family",
+      "hardware_family": "IncidentGroupRecord.system_family",
+      "hardware_identity": "IncidentGroupRecord.hardware_id"
+    },
+    "axis_order": [
+      "hardware_family",
+      "hardware_identity",
+      "fault_family"
+    ],
+    "fold_order": "holdout_group_canonical_utf8",
+    "holdout_membership": "all_eligible_incidents_with_exact_group_value",
+    "job_identity_fields": [
+      "rule_id",
+      "axis",
+      "holdout_group",
+      "recipient_stage"
+    ],
+    "one_holdout_prediction_per_incident_per_axis": true,
+    "recipient_isolation_per_job": true,
+    "recipient_stage_order": [
+      "train_prediction",
+      "holdout_evaluation"
+    ],
+    "stage_target_access": {
+      "holdout_evaluation": "immutable_prediction_artifacts_and_exact_fold_holdout_targets_only_no_refit",
+      "train_prediction": "exact_fold_train_targets_only_then_destroy_after_fit_and_prediction_freeze"
+    },
+    "train_membership": "exact_eligible_complement",
+    "worker_implementation_may_run_sequential_jobs": true,
+    "worker_process_key_and_state_destroyed_between_jobs": true
+  },
+  "diagnostic_selector_policy": {
+    "absolute_time_signature": "sorted_arrays_evidence_id_normalized_start_ns_normalized_end_ns",
+    "annotation_projection": "complete_canonical_typed_annotation_manifest",
+    "fault_label": "TruthRecord.fault_family_canonical_utf8_truth_only",
+    "path_and_filename": "sorted_validated_repo_relative_posix_path_and_final_segment_no_resolution_normalization_casefold_or_platform_separator",
+    "random_identity_bucket": {
+      "bucket_count": 256,
+      "digest_bytes": "first_8_unsigned_big_endian",
+      "input": "seed_utf8_null_canonical_json_system_family_hardware_id",
+      "seed": "inbar-shortcut-v2-random-identity-embedding-v1",
+      "seed_sha256": "4eb725c244d2089ebeb42476e52c4bdb290def3091192b999cc837d21eb7c352"
+    },
+    "site_identity": "IncidentGroupRecord.site_id_canonical_utf8",
+    "source_identity": "SourceManifest.source_id_canonical_utf8",
+    "system_identity": "canonical_json_array_system_family_hardware_id",
+    "task_identity": "IncidentGroupRecord.mission_id_canonical_utf8"
+  },
+  "feature_authority": {
+    "allowed_feature_types": [
+      "boolean",
+      "numeric_canonical_decimal_string",
+      "categorical_canonical_utf8"
+    ],
+    "artifact_dispositions": [
+      "fully_extracted",
+      "explicitly_forbidden",
+      "unsupported_blocked_acquisition"
+    ],
+    "completeness_receipt_required": true,
+    "extractor_registry_deadline": "before_any_v2_designer_extractor_worker_or_rule_author_accesses_eligible_model_visible_content",
+    "feature_key_fields": [
+      "schema_version",
+      "extractor_id",
+      "extractor_schema_version",
+      "canonical_source_pointer",
+      "feature_type"
+    ],
+    "feature_key_schema": "inbar.iter001.feature-key.v1",
+    "identity_scanner_before_emission": true,
+    "maximum_candidate_predicates_per_node": 100000,
+    "maximum_distinct_feature_keys": 4096,
+    "missingness": "explicit_distinct_state",
+    "numeric_canonicalization": {
+      "arithmetic": "unbounded_decimal",
+      "canonical_pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+      "exponent": "forbidden",
+      "leading_plus": "forbidden",
+      "negative_zero": "canonicalize_to_0",
+      "trailing_fractional_zero": "forbidden"
+    },
+    "opaque_media_without_registered_extractor": "BLOCKED_ACQUISITION",
+    "post_registry_extractor_change": "requires_prospective_amendment",
+    "structured_json": {
+      "array_indices_retained": true,
+      "duplicate_keys": "INVALID",
+      "invalid_utf8": "INVALID",
+      "nonfinite_numbers": "INVALID",
+      "numeric_lexemes": "exact_canonical_decimal_strings",
+      "scalar_leaf_inventory": "complete_recursive",
+      "unsupported_values": "INVALID"
+    },
+    "target_driven_processing": "INVALID",
+    "transformations_forbidden": [
+      "feature_selection",
+      "learned_embedding",
+      "hashing_trick",
+      "dimensionality_reduction",
+      "imputation",
+      "normalization",
+      "scaling",
+      "target_driven_pruning"
+    ]
+  },
+  "final_recomputation_policy": {
+    "authorized_subject_kind": "registry_recomputation",
+    "complete_registry_truth_release_required": true,
+    "envelope_reveal_manifest_required": true,
+    "evaluator_independent_from": [
+      "mechanism_custodian",
+      "hypothesis_proposer",
+      "ontology_reviewer",
+      "shortcut_workers",
+      "action_roles",
+      "outcome_roles"
+    ],
+    "target_manifest_commitment_reveal_required": true,
+    "validator_private_key_access": false,
+    "verifies_every_released_subset": true,
+    "verifies_full_receipt_chain": true
+  },
+  "freeze_receipt_policy": {
+    "artifact_plane": "public_nontruth",
+    "attestation_subject_kind": "SHORTCUT_FREEZE",
+    "required_bindings": [
+      "proposal_git_commit",
+      "amendment_document_artifact_sha256",
+      "machine_proposal_artifact_sha256",
+      "owner_approval_receipt_sha256",
+      "canonical_acquisition_contract_binding",
+      "eligible_incident_ids_sha256",
+      "eligible_dossier_root_sha256",
+      "projection_root_sha256",
+      "hypothesis_set_root_sha256",
+      "prediction_key_root_sha256",
+      "extractor_registry_sha256",
+      "feature_inventory_root_sha256",
+      "crossfit_fold_root_sha256",
+      "split_locks_sha256",
+      "target_manifest_hiding_commitment_sha256",
+      "rule_registry_sha256",
+      "release_plan_sha256",
+      "trust_registry_sha256",
+      "previous_authority_receipt_sha256",
+      "git_commit",
+      "git_tree",
+      "dependency_lock_artifact_sha256",
+      "execution_environment_sha256",
+      "authority_module_root_sha256",
+      "authority_schema_root_sha256",
+      "committed_at",
+      "reviewer_id",
+      "attestation"
+    ],
+    "signer_role": "shortcut_protocol_reviewer"
+  },
+  "frozen_inputs": {
+    "acquisition_contract": {
+      "artifact_sha256": "c5cf91b620ae3f34cc9ecebf936c4f48014f04cfa21e3fdc1cf0713f440b1804",
+      "git_commit": "2955c1bcca190430cd5c88c57187126bb7531d7a",
+      "path": "protocol/acquisition/iter001_contract.json"
+    },
+    "design_basis": {
+      "artifact_sha256": "b458217a3562c3f1b76f9cfc489e15693c061facf77298828adeac084294ad63",
+      "git_commit": "2955c1bcca190430cd5c88c57187126bb7531d7a",
+      "path": "docs/research/ITER001_SHORTCUT_AUTHORITY_V2.md"
+    },
+    "preregistration": {
+      "artifact_sha256": "47a1920b1b5326601c7404d17a6aac0df3309c2433fa76f56f0dffedf2511ad8",
+      "git_commit": "52d71e16a75df12adf47e943fd5c329f6e04d5c0",
+      "path": "experiments/iter001_physical_causal_evidence_acquisition/HYPOTHESIS.md"
+    }
+  },
+  "implementation_gate": {
+    "canonical_contract_must_fail_closed": true,
+    "control_suite_version_must_change": true,
+    "owner_approval_required_before_code": true,
+    "production_artifacts_authorized": false,
+    "v2_authority_hashes_required_in_admission_report": true
+  },
+  "iteration_id": "iter001_physical_causal_evidence_acquisition",
+  "kill_baseline_policy": {
+    "candidate_search": "forbidden",
+    "fit_policy": "exact_train_subset_per_crossfit_fold",
+    "maximum_depth": 2,
+    "predictor": "depth_two_exact_gini_tree",
+    "rule_id": "cheapest-deterministic-evidence-only",
+    "selector": "model_visible_feature_inventory",
+    "tree_algorithm": {
+      "boolean_predicates": [
+        "equals_true",
+        "equals_false"
+      ],
+      "categorical_predicates": "equals_each_distinct_nonmissing_train_value",
+      "gini_arithmetic": "exact_integer_counts_and_rational_numbers",
+      "gini_formula": "G(S)=1-sum_k((n_k/abs(S))^2); split=(abs(L)*G(L)+abs(R)*G(R))/abs(S)",
+      "leaf_prediction": "unique_modal_shared_target_key_else_abstain",
+      "minimum_child_incidents": 2,
+      "missing_for_nonmissing_predicates": false,
+      "missing_predicate": "is_missing",
+      "numeric_midpoint_arithmetic": "unbounded_decimal_arithmetic_canonical_decimal_serialization",
+      "numeric_predicates": "less_than_or_equal_exact_midpoints_of_consecutive_distinct_node_local_train_values",
+      "predicate_enumeration_scope": "train_incidents_reaching_current_node",
+      "predicate_spec": {
+        "byte_encoding": "repository_compact_canonical_json_utf8",
+        "comparison": "unsigned_lexicographic_bytes",
+        "exact_fields": [
+          "schema_version",
+          "feature_key",
+          "operator",
+          "operand"
+        ],
+        "feature_key": "64_lowercase_hex_characters",
+        "operator_operand_union": {
+          "equals_boolean": "json_boolean",
+          "equals_categorical": "canonical_utf8_string",
+          "is_missing": "json_null",
+          "less_than_or_equal_numeric": "canonical_decimal_string"
+        },
+        "schema_version": "inbar.iter001.tree-predicate.v1"
+      },
+      "split_condition": "strictly_lower_impurity_than_parent",
+      "split_selection": "minimum_exact_weighted_gini",
+      "split_tie": "canonical_predicate_spec_bytes",
+      "unavailable_heldout_key": "abstain_key_unavailable",
+      "unseen_categorical_value": false
+    }
+  },
+  "mechanism_target_policy": {
+    "commit_after": [
+      "hypothesis_set_commitment",
+      "ontology_assignment_commitment",
+      "ambiguity_review_commitment"
+    ],
+    "commit_before": "safe_test_review",
+    "exactly_one_target_per_eligible_case": true,
+    "mapping_evidence_required": true,
+    "plaintext_plane": "truth_only",
+    "required_bindings": [
+      "case_key",
+      "incident_id",
+      "truth_record_artifact_sha256",
+      "hypothesis_set_artifact_sha256",
+      "ontology_artifact_sha256",
+      "prediction_key_manifest_artifact_sha256",
+      "mechanism_ids_sha256",
+      "target_hypothesis_id",
+      "target_prediction_key",
+      "target_kind",
+      "mapping_evidence",
+      "committed_at",
+      "mechanism_reviewer_id",
+      "attestation"
+    ],
+    "signer_role": "mechanism_reviewer",
+    "target_manifest_commitment_salt": "fresh_32_bytes_exactly_64_lowercase_hex_characters",
+    "target_manifest_hiding_commitment_receipt_fields": [
+      "schema_version",
+      "target_manifest_hiding_commitment_sha256",
+      "target_count",
+      "eligible_incident_ids_sha256",
+      "committed_at",
+      "custodian_id",
+      "attestation"
+    ],
+    "target_manifest_required": true
+  },
+  "normative_relation": {
+    "conflict_disposition": "INVALID",
+    "document_and_machine_proposal_jointly_required": true,
+    "implementation_must_bind_both_artifact_hashes": true,
+    "machine_proposal_may_not_weaken_document": true
+  },
+  "prior_exposure": {
+    "eligible_iter001_physical_corpus_inspected": false,
+    "real_v2_outcome_inspected": false,
+    "reviewed_material": [
+      "v1_validator",
+      "synthetic_v1_controls",
+      "public_source_roles",
+      "shortcut_v2_design_note"
+    ]
+  },
+  "receipt_signature_policy": {
+    "attestation_excluded_from_subject": true,
+    "derived_artifact_hash_excluded_from_own_subject": true,
+    "subject_domain": "inbar.iter001.shortcut-attestation-subject.v1",
+    "subject_fields": [
+      "domain",
+      "kind",
+      "subject"
+    ],
+    "subject_hash": "sha256-compact-canonical-json-v1"
+  },
+  "release_policy": {
+    "bundle_root": {
+      "domain": "inbar.iter001.truth-release-bundle-root.v1",
+      "item_fields": [
+        "relative_path",
+        "artifact_sha256",
+        "bytes"
+      ],
+      "ordering": "relative_path_canonical_utf8"
+    },
+    "cipher": {
+      "algorithm": "libsodium-crypto_box_seal-x25519-xsalsa20poly1305-v1",
+      "dedicated_encryption_key_required": true,
+      "ed25519_to_x25519_conversion_forbidden": true,
+      "recipient_key_registry": "signed_actor_trust_registry",
+      "signing_algorithm": "ed25519",
+      "synthetic_key_possession_preflight_required": true
+    },
+    "envelope": {
+      "commitment": "sha256_value_of_exact_envelope_payload",
+      "framing": "uint64_big_endian_json_length_then_json_bytes",
+      "json_encoding": "repository_compact_canonical_json",
+      "open_validation": [
+        "sodium_unpad_success",
+        "unpadded_length_equals_frame_plus_json",
+        "frame_length_equals_json_bytes",
+        "no_trailing_bytes",
+        "canonical_json",
+        "exact_release_context",
+        "exact_commitment"
+      ],
+      "padding_blocksize": "16384 * (incident_count + 1)",
+      "padding_max_buflen": "16384 * (incident_count + 1)",
+      "padding_output_length": "16384 * (incident_count + 1)",
+      "payload_fields": [
+        "schema_version",
+        "release_context",
+        "target_subset",
+        "salt_hex"
+      ],
+      "payload_schema": "inbar.iter001.target-envelope.v1",
+      "prepad_length_requirement": "strictly_less_than_padding_blocksize",
+      "salt_bytes": 32,
+      "salt_encoding": "exactly_64_lowercase_hex_characters",
+      "salt_reuse": "INVALID",
+      "salt_source": "libsodium_randombytes_buf"
+    },
+    "final_recomputation_receipt_fields": [
+      "schema_version",
+      "rule_registry_sha256",
+      "target_manifest_sha256",
+      "target_manifest_hiding_commitment_sha256",
+      "target_manifest_commitment_salt_hex",
+      "fitted_state_root_sha256",
+      "prediction_root_sha256",
+      "evaluation_root_sha256",
+      "prepared_release_root_sha256",
+      "publication_receipt_root_sha256",
+      "open_receipt_root_sha256",
+      "phase_completion_root_sha256",
+      "envelope_reveal_root_sha256",
+      "per_axis_counts",
+      "verdict",
+      "recomputed_at",
+      "evaluator_id",
+      "attestation"
+    ],
+    "genesis_previous_phase_completion_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "global_order": [
+      "commit_targets_and_target_manifest_hiding_commitment",
+      "freeze_all_nontarget_roots_execution_boundary_and_release_plan",
+      "for_each_registry_axis_holdout_group_run_isolated_train_prediction_stage_then_destroy_context",
+      "after_all_predictions_frozen_for_each_registry_axis_holdout_group_run_fresh_isolated_holdout_evaluation_stage_without_refit_then_destroy_context",
+      "release_complete_registry_truth_and_target_manifest_reveal_to_final_evaluator",
+      "final_validator_recomputation"
+    ],
+    "isolation": {
+      "axes_may_be_pooled": false,
+      "ciphertext_recipient_access_before_atomic_release": "INVALID",
+      "cross_job_target_access": "INVALID",
+      "execution_context_per_rule_axis_fold_stage": true,
+      "final_evaluator_independent": true,
+      "recipient_private_key_shared_across_jobs": "INVALID",
+      "release_bundle_publication": "atomic_no_replace"
+    },
+    "key_preflight_receipt_fields": [
+      "schema_version",
+      "recipient_actor_id",
+      "isolated_execution_context_id",
+      "recipient_encryption_key_id",
+      "recipient_encryption_key_epoch",
+      "recipient_x25519_public_key_sha256",
+      "challenge_ciphertext_artifact_sha256",
+      "challenge_plaintext_commitment_sha256",
+      "acquisition_session_id",
+      "proposal_git_commit",
+      "amendment_document_artifact_sha256",
+      "machine_proposal_artifact_sha256",
+      "trust_registry_sha256",
+      "challenge_id",
+      "challenge_nonce",
+      "purpose",
+      "authority_subject",
+      "issued_at",
+      "expires_at",
+      "opened_at",
+      "success",
+      "attestation"
+    ],
+    "phase_completion_receipt_fields": [
+      "schema_version",
+      "phase_ordinal",
+      "prepared_release_receipt_artifact_sha256",
+      "publication_receipt_artifact_sha256",
+      "open_receipt_artifact_sha256",
+      "fit_prediction_or_evaluation_artifacts",
+      "completed_at",
+      "actor_id",
+      "attestation"
+    ],
+    "prepared_release_receipt_fields": [
+      "schema_version",
+      "release_context_sha256",
+      "envelope_commitment_sha256",
+      "ciphertext_artifact_sha256",
+      "recipient_inbox",
+      "prepared_at",
+      "custodian_id",
+      "attestation"
+    ],
+    "public_metadata": [
+      "authority_subject",
+      "incident_count",
+      "incident_ids_sha256",
+      "release_context_sha256",
+      "envelope_commitment_sha256",
+      "ciphertext_artifact_sha256"
+    ],
+    "publication_receipt_fields": [
+      "schema_version",
+      "prepared_release_receipt_artifact_sha256",
+      "bundle_root_sha256",
+      "destination",
+      "publication_primitive",
+      "no_replace",
+      "result",
+      "published_at",
+      "custodian_id",
+      "attestation"
+    ],
+    "recipient_open_receipt_fields": [
+      "schema_version",
+      "prepared_release_receipt_artifact_sha256",
+      "publication_receipt_artifact_sha256",
+      "release_context_sha256",
+      "envelope_commitment_sha256",
+      "ciphertext_artifact_sha256",
+      "opened_at",
+      "success",
+      "recipient_actor_id",
+      "attestation"
+    ],
+    "release_bundle_contents": [
+      "ciphertext",
+      "prepared_release_receipt"
+    ],
+    "release_context_fields": [
+      "schema_version",
+      "domain",
+      "iteration_id",
+      "acquisition_session_id",
+      "proposal_git_commit",
+      "amendment_document_artifact_sha256",
+      "machine_proposal_artifact_sha256",
+      "owner_approval_receipt_sha256",
+      "canonical_acquisition_contract_binding",
+      "trust_registry_sha256",
+      "freeze_receipt_artifact_sha256",
+      "target_manifest_hiding_commitment_sha256",
+      "release_plan_sha256",
+      "release_id",
+      "phase_ordinal",
+      "previous_phase_completion_sha256",
+      "prerequisite_artifacts",
+      "recipient_actor_id",
+      "isolated_execution_context_id",
+      "recipient_encryption_key_id",
+      "recipient_encryption_key_epoch",
+      "recipient_x25519_public_key_sha256",
+      "key_preflight_receipt_artifact_sha256",
+      "authority_subject"
+    ],
+    "release_context_subject_union": {
+      "registry_recomputation": [
+        "kind",
+        "rule_registry_sha256",
+        "scope",
+        "incident_count",
+        "incident_ids_sha256"
+      ],
+      "rule_axis_fold": [
+        "kind",
+        "rule_id",
+        "axis",
+        "holdout_group",
+        "recipient_stage",
+        "scope",
+        "incident_count",
+        "incident_ids_sha256"
+      ]
+    },
+    "stage_order": [
+      "prepared_release_receipt",
+      "atomic_no_replace_bundle_publication",
+      "post_publication_receipt",
+      "recipient_open_receipt",
+      "phase_completion_receipt"
+    ],
+    "target_dependent_ciphertext_length": "INVALID"
+  },
+  "rule_registry": [
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "source-identity",
+      "selector": "source_identity"
+    },
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "task-identity",
+      "selector": "task_identity"
+    },
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "system-identity",
+      "selector": "system_identity"
+    },
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "site-identity",
+      "selector": "site_identity"
+    },
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "path-and-filename",
+      "selector": "path_and_filename"
+    },
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "timestamp",
+      "selector": "absolute_time_signature"
+    },
+    {
+      "authority": "diagnostic_oracle",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "truth_only_oracle",
+      "predictor": "categorical_train_mode",
+      "rule_id": "fault-label",
+      "selector": "fault_label"
+    },
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "annotation",
+      "selector": "annotation_projection"
+    },
+    {
+      "authority": "diagnostic",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "control_only",
+      "predictor": "categorical_train_mode",
+      "rule_id": "random-identity-embedding",
+      "selector": "sha256_identity_bucket"
+    },
+    {
+      "authority": "sole_kill",
+      "fit_policy": "crossfit_train_subset_only",
+      "permitted_plane": "model_visible",
+      "predictor": "depth_two_exact_gini_tree",
+      "rule_id": "cheapest-deterministic-evidence-only",
+      "selector": "model_visible_feature_inventory"
+    }
+  ],
+  "schema_version": "inbar.iter001-shortcut-authority-proposal.v1",
+  "shared_prediction_key_policy": {
+    "assignment_deadline": "with_or_before_reviewed_hypothesis_set",
+    "biconditional_class_key_mapping_required": true,
+    "canonical_class_definition_fields": [
+      "canonical_name",
+      "causal_locus",
+      "failure_mode",
+      "temporal_signature",
+      "directionality",
+      "definition"
+    ],
+    "class_key_algorithm": "sha256_value_inbar.iter001.mechanism-class.v1",
+    "exactly_one_key_per_hypothesis": true,
+    "identity_distinguished_classes": "INVALID",
+    "independent_ontology_review_required": true,
+    "ontology_reviewer_independent_from": [
+      "hypothesis_proposer",
+      "mechanism_reviewer",
+      "shortcut_workers",
+      "final_evaluator"
+    ],
+    "positional_keys_forbidden": true,
+    "predicted_key_absent_from_case": "abstain_key_unavailable",
+    "reserved_unknown_key": "unknown",
+    "same_class_different_key": "INVALID",
+    "same_key_different_class": "INVALID",
+    "selected_absent_or_multiply_mapped_key": "INVALID",
+    "target_derived_keys_forbidden": true,
+    "unique_within_case": true
+  },
+  "status": "immutable_proposal",
+  "trusted_execution_boundary": {
+    "bind_clean_git_commit_and_tree": true,
+    "bind_dependency_lock": true,
+    "bind_execution_environment": true,
+    "bind_immutable_container_digest_when_used": true,
+    "bind_module_and_schema_roots": true,
+    "dirty_tree_disposition": "BLOCKED_ACQUISITION",
+    "minimum_authority_surfaces": [
+      "canonicalization",
+      "domain_models",
+      "acquisition_validator",
+      "split_and_crossfit_validator",
+      "schema_registry",
+      "signature_verifier",
+      "encryption_and_key_registry",
+      "atomic_no_replace_publication",
+      "executable_entry_point"
+    ],
+    "single_source_file_binding_sufficient": false
+  },
+  "verdict_policy": {
+    "axis_order": [
+      "hardware_family",
+      "hardware_identity",
+      "fault_family"
+    ],
+    "diagnostic_rules_can_kill": false,
+    "each_axis_correct_equals_denominator": true,
+    "each_axis_denominator_equals_frozen_census": true,
+    "each_axis_selected_equals_denominator": true,
+    "forbidden_metadata_model_visible": "INVALID",
+    "nonshortcut_coverage_must_pass": true,
+    "sole_kill_rule": "cheapest-deterministic-evidence-only",
+    "structural_defect": "INVALID",
+    "supplied_boolean_is_authority": false,
+    "v1_canonical_result": "forbidden",
+    "valid_abstention": "non_resolving",
+    "valid_wrong_prediction": "non_resolving",
+    "zero_count_resolution_forbidden": true
+  }
+}
