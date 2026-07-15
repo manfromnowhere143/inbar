@@ -11,8 +11,8 @@ in Python imports, signed artifacts, schema IDs, environment variables, and hist
 records. It is not the current public-facing mission name.
 
 Research-memory records through sequence 49 retain their original V1 `fieldtrue` mission identity.
-The first post-migration append and every later record use V2 with `mission_id` equal to `inbar`;
-the verifier rejects any return to the legacy identity.
+Sequence 50 records the identity transition. It and every later record use V2 with `mission_id` equal
+to `inbar`; the verifier rejects any return to the legacy identity.
 
 Formal commercial identity clearance remains pending. The preliminary Inbar screen and release
 gate are recorded in `mission/name.json`, `docs/IDENTITY.md`, and the append-only research memory.
@@ -49,7 +49,19 @@ anchors cannot authorize an Inbar publication transition.
 
 The complete matrix passes 376 tests with one platform-capability skip and 90.20 percent branch
 coverage. Ruff, strict mypy across 23 source modules, 85 generated schemas, the dependency lock,
-and Git whitespace checks pass.
+and Git whitespace checks pass. Exact commit
+`8735dbea2675b51f8e38a5abec9d625e3f47e16b` passed GitHub Actions run `29405551773`
+across the quality, package, dependency, data, Ubuntu, and macOS jobs. The earlier Linux-only
+`/private/tmp` failure and its correction remain separate append-only memory records.
+
+## Conditional research interest
+
+Daniel's deep interest in Einstein field equations, Ricci curvature, and general relativity is
+preserved as research context, not admitted scope. Inbar adopts relativistic geometry only when a
+concrete domain need makes it decision-relevant and a preregistered comparison shows value beyond
+an adequate simpler model. Candidate triggers include relativistic navigation, precision timing,
+gravimetry, strong-gravity sensing, or curved-spacetime observations. Decorative or
+preference-driven mathematical expansion is prohibited.
 
 ## Remaining blockers
 
@@ -85,7 +97,7 @@ approved compute plan before use.
 
 ## Resume state
 
-The append-only research memory contains 50 verified events with head
-`772dfaa6a959ed9aab529a6e7cc8ee471ca49b3a7351ee6423d600f2fcec8f66` before the identity-migration
-event is appended. Resume from `HANDOFF.md`, verify Git and memory anchors, and keep the standalone
-general research engine out of this repository.
+The append-only research memory contains 54 verified events with head
+`f1bbc3ec56e82a3b9457a24654e840332494057214427ba9b6fa7848092283a5`. Resume from `HANDOFF.md`,
+verify Git and memory anchors, and keep the standalone general research engine out of this
+repository.

@@ -12,13 +12,14 @@ before relying on it.
 - Preferred command: `inbar`
 - Legacy compatibility namespace: `fieldtrue`
 - Terminal Phase 1 base commit: `b1e6b369d39de98004b3eacb2770779d86410504`
+- Identity checkpoint commit: `8735dbea2675b51f8e38a5abec9d625e3f47e16b`
 - Preregistration commit: `52d71e16a75df12adf47e943fd5c329f6e04d5c0`
 - Private remote: `https://github.com/manfromnowhere143/inbar.git`
 - Public release: not authorized
 
-The identity migration is the commit containing this handoff. It changes active metadata and future
-publication identity only. It does not rewrite Git history, signed evidence, frozen protocol IDs,
-the `fieldtrue` Python package, or existing research-memory records.
+The identity migration is anchored at the identity checkpoint commit. It changes active metadata
+and future publication identity only. It does not rewrite Git history, signed evidence, frozen
+protocol IDs, the `fieldtrue` Python package, or existing research-memory records.
 
 Research-memory V1 remains valid only for the immutable Fieldtrue-era prefix through sequence 49.
 New appends use V2 with `mission_id` equal to `inbar`; the verifier rejects identity regression.
@@ -62,7 +63,17 @@ was loaded, no CLI path was activated, and canonical status was not changed.
 - Strict mypy: passed across 23 source modules
 - Generated schemas: 85 verified
 - Dependency lock: verified
-- Research memory before identity event: 50 events, head `772dfaa6a959ed9aab529a6e7cc8ee471ca49b3a7351ee6423d600f2fcec8f66`
+- Identity checkpoint CI: GitHub Actions run `29405551773`, completed successfully on exact commit
+  `8735dbea2675b51f8e38a5abec9d625e3f47e16b`
+- Research memory: 54 events, head `f1bbc3ec56e82a3b9457a24654e840332494057214427ba9b6fa7848092283a5`
+
+## Conditional research interest
+
+Daniel has recorded deep interest in Einstein field equations, Ricci curvature, and general
+relativity. This is not a current scope change. Admit that model class only for a concrete domain
+need, such as relativistic navigation, precision timing, gravimetry, strong-gravity sensing, or
+curved-spacetime observations, and only under a preregistered comparison against an adequate
+simpler model. Do not add it for decoration, prestige, or personal preference.
 
 ## Remaining blockers
 
@@ -107,4 +118,5 @@ uv run inbar mission validate --expect-failure iter001-acquisition-contract
 ```
 
 First confirm the private remote, active Inbar identity, immutable memory prefix, and canonical
-bootstrap status. Then close blockers in the listed order.
+bootstrap status. Verify that sequence 50 is the first V2 Inbar memory event and that the ledger
+head matches this handoff. Then close blockers in the listed order.
