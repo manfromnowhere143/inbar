@@ -63,6 +63,20 @@ an adequate simpler model. Candidate triggers include relativistic navigation, p
 gravimetry, strong-gravity sensing, or curved-spacetime observations. Decorative or
 preference-driven mathematical expansion is prohibited.
 
+## Future research engine
+
+The future research engine is a separate Daniel Wahnich research product and repository. It is not
+an Aweb project or a Maestro subsystem and has no inherited runtime, database, namespace, control
+plane, or scientific authority from either. It will serve Daniel's research missions and sit under
+Daniel Wahnich's research identity and domain alongside Perception Proof, Sentinel, Telos, and
+Inbar. The exact route and hostname remain unreserved.
+
+Construction remains deferred until Inbar has produced several complete cycles including a null or
+correction, a real data or compute path, and repeated manual work that justifies automation. Odeya
+is recorded as a highly meaningful leading name candidate, not an adopted name. Spelling,
+transliteration, collision, legal, domain, package, pronunciation, and technical-fit checks remain
+open. The separate Inbar surface belongs to another mission and must not be changed here.
+
 ## Remaining blockers
 
 1. Commit a prospective shortcut amendment with exact-census, no-fit kill authority and
@@ -97,7 +111,7 @@ approved compute plan before use.
 
 ## Resume state
 
-The append-only research memory contains 54 verified events with head
-`f1bbc3ec56e82a3b9457a24654e840332494057214427ba9b6fa7848092283a5`. Resume from `HANDOFF.md`,
+The append-only research memory contains 56 verified events with head
+`be128add60d11e0fa942592aecb50d0d4598009c668608525e87269ac63385ad`. Resume from `HANDOFF.md`,
 verify Git and memory anchors, and keep the standalone general research engine out of this
 repository.

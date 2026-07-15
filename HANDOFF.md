@@ -65,7 +65,9 @@ was loaded, no CLI path was activated, and canonical status was not changed.
 - Dependency lock: verified
 - Identity checkpoint CI: GitHub Actions run `29405551773`, completed successfully on exact commit
   `8735dbea2675b51f8e38a5abec9d625e3f47e16b`
-- Research memory: 54 events, head `f1bbc3ec56e82a3b9457a24654e840332494057214427ba9b6fa7848092283a5`
+- Shutdown checkpoint CI: GitHub Actions run `29406222303`, completed successfully on exact commit
+  `aaff4f11e342eea145343893413f7516f9637ff5`
+- Research memory: 56 events, head `be128add60d11e0fa942592aecb50d0d4598009c668608525e87269ac63385ad`
 
 ## Conditional research interest
 
@@ -74,6 +76,19 @@ relativity. This is not a current scope change. Admit that model class only for 
 need, such as relativistic navigation, precision timing, gravimetry, strong-gravity sensing, or
 curved-spacetime observations, and only under a preregistered comparison against an adequate
 simpler model. Do not add it for decoration, prestige, or personal preference.
+
+## Future research engine
+
+The future engine is a separate Daniel Wahnich research product and repository. It is not related
+to Aweb or Maestro by ownership, architecture, runtime, data plane, namespace, control authority,
+or scientific authority. It will eventually serve Daniel's research missions under Daniel
+Wahnich's research identity and domain. Do not create it until several complete Inbar cycles expose
+a null or correction path, a real data or compute path, and repeated manual toil worth automating.
+
+Odeya is a serious leading name candidate because of its exceptional personal significance to
+Daniel and its Hebrew gratitude-to-God meaning. It is not adopted. Complete transliteration,
+collision, legal, package, domain, pronunciation, and technical-fit review before proposing final
+adoption. Do not alter the separate Inbar surface being built by another mission.
 
 ## Remaining blockers
 
