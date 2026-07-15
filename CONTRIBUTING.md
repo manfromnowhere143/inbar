@@ -1,6 +1,6 @@
 # Contributing
 
-Fieldtrue is a preregistered, single-owner research mission. Contributions are reviewed for both
+Inbar is a preregistered, single-owner research mission. Contributions are reviewed for both
 software correctness and their effect on the scientific contract.
 
 ## Before changing code
@@ -20,8 +20,8 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
 uv run pytest --cov --cov-report=term-missing
-uv run fieldtrue schemas check
-uv run fieldtrue mission validate
+uv run inbar schemas check
+uv run inbar mission validate --expect-failure iter001-acquisition-contract
 git diff --check
 ```
 

@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import ssl
+import stat
 import subprocess
 import sys
 import tomllib
@@ -37,6 +38,7 @@ from fieldtrue.memory import load_memory_records, verify_memory
 from fieldtrue.receipts import (
     LedgerEvent,
     LedgerVerificationError,
+    PublicationSignerAnchor,
     SignerAnchor,
     load_signer_anchor,
     verify_ledger,
@@ -63,6 +65,7 @@ _ITER000_GATE_FAILURE_CLASSES = {
 }
 _PUBLICATION_ANCHOR_ID = "publication-transition"
 _PUBLICATION_LEDGER_SCOPE = "publication-gates"
+_MAX_PUBLICATION_TRUST_INPUT_BYTES = 16 * 1024 * 1024
 _ITER000_ID = "iter000_nasa_adapt_corpus_readiness"
 _ITER001_ACQUISITION_CONTRACT_PATH = "protocol/acquisition/iter001_contract.json"
 _AMENDMENT_001_PATH = "protocol/amendments/iter000_001.json"
@@ -668,6 +671,53 @@ def _safe_relative_path(value: object) -> str | None:
     if pure.is_absolute() or not pure.parts or ".." in pure.parts or pure.as_posix() != value:
         return None
     return value
+
+
+def _read_repo_regular_file(repo_root: Path, relative_path: str) -> bytes:
+    safe_path = _safe_relative_path(relative_path)
+    if safe_path is None:
+        raise ValueError("repository file path is unsafe")
+    parts = PurePosixPath(safe_path).parts
+    no_follow = getattr(os, "O_NOFOLLOW", 0)
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | no_follow
+    descriptors: list[int] = []
+    try:
+        current = os.open(repo_root, directory_flags)
+        descriptors.append(current)
+        for component in parts[:-1]:
+            current = os.open(component, directory_flags, dir_fd=current)
+            descriptors.append(current)
+        file_descriptor = os.open(parts[-1], os.O_RDONLY | no_follow, dir_fd=current)
+        before = os.fstat(file_descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            os.close(file_descriptor)
+            raise ValueError("repository file must be regular")
+        if before.st_size > _MAX_PUBLICATION_TRUST_INPUT_BYTES:
+            os.close(file_descriptor)
+            raise ValueError("repository trust input exceeds the size limit")
+        with os.fdopen(file_descriptor, "rb") as handle:
+            content = handle.read(_MAX_PUBLICATION_TRUST_INPUT_BYTES + 1)
+            after = os.fstat(handle.fileno())
+        before_identity = (
+            before.st_dev,
+            before.st_ino,
+            before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
+        )
+        after_identity = (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+        if before_identity != after_identity or len(content) != before.st_size:
+            raise ValueError("repository trust input changed while being read")
+        return content
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
 
 
 def _git_is_ancestor(repo_root: Path, git: str, ancestor: str, descendant: str) -> bool:
@@ -1616,20 +1666,28 @@ def _verify_publication_transition(
     anchor_relative = _safe_relative_path(transition.get("signer_anchor_path"))
     if receipt_relative is None or anchor_relative is None:
         return False, "Publication receipt and signer anchor must be safe repository paths."
-    receipt_path = repo_root / receipt_relative
-    anchor_path = repo_root / anchor_relative
-    if receipt_path.is_symlink() or anchor_path.is_symlink():
-        return False, "Publication receipt and signer anchor must be regular files."
     try:
-        receipt = _json(receipt_path)
-        receipt_bytes = receipt_path.read_bytes()
-        anchor = load_signer_anchor(anchor_path)
+        receipt_bytes = _read_repo_regular_file(repo_root, receipt_relative)
+        anchor_bytes = _read_repo_regular_file(repo_root, anchor_relative)
+        contract_bytes = _read_repo_regular_file(repo_root, "mission/contract.json")
+        loop_bytes = _read_repo_regular_file(repo_root, "mission/loop.json")
+        receipt = json.loads(receipt_bytes)
+        contract = json.loads(contract_bytes)
+        anchor = PublicationSignerAnchor.model_validate_json(anchor_bytes)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         return False, f"Publication evidence is unreadable: {type(error).__name__}."
-    if canonical_json_pretty(receipt) != receipt_bytes:
-        return False, "Publication receipt must use canonical JSON."
+    if not isinstance(receipt, dict) or not isinstance(contract, dict):
+        return False, "Publication receipt and mission contract must be JSON objects."
+    if (
+        canonical_json_pretty(receipt) != receipt_bytes
+        or canonical_json_pretty(anchor) != anchor_bytes
+        or canonical_json_pretty(contract) != contract_bytes
+        or canonical_json_pretty(loop) != loop_bytes
+    ):
+        return False, "Publication trust inputs must use canonical JSON."
     if (
         anchor.anchor_id != _PUBLICATION_ANCHOR_ID
+        or anchor.mission_id != "inbar"
         or anchor.ledger_scope != _PUBLICATION_LEDGER_SCOPE
     ):
         return False, "Publication signer anchor has the wrong identity or scope."
@@ -1647,9 +1705,12 @@ def _verify_publication_transition(
         return False, "Publication receipt fields are not exact."
     requirements = receipt.get("requirements")
     evidence = receipt.get("evidence")
+    active_mission_id = contract.get("mission_id")
     if (
         receipt.get("schema_version") != "fieldtrue.publication-gate-receipt.v1"
-        or receipt.get("mission_id") != "fieldtrue"
+        or active_mission_id != "inbar"
+        or loop.get("mission_id") != active_mission_id
+        or receipt.get("mission_id") != active_mission_id
         or receipt.get("target_stage") != "published"
         or not isinstance(requirements, list)
         or not all(isinstance(requirement, str) for requirement in requirements)
@@ -1696,11 +1757,13 @@ def _verify_publication_transition(
         return False, "Publication evidence cannot resolve HEAD."
     if _GIT_OBJECT_ID_PATTERN.fullmatch(head) is None:
         return False, "Publication evidence resolved an invalid HEAD."
-    for relative, expected_bytes in (
-        ("mission/loop.json", canonical_json_pretty(loop)),
+    trust_inputs = (
+        ("mission/contract.json", contract_bytes),
+        ("mission/loop.json", loop_bytes),
         (receipt_relative, receipt_bytes),
-        (anchor_relative, anchor_path.read_bytes()),
-    ):
+        (anchor_relative, anchor_bytes),
+    )
+    for relative, expected_bytes in trust_inputs:
         if _git_blob_at_path(repo_root, git, head, relative) != expected_bytes:
             return False, f"Publication trust input is not anchored at HEAD: {relative}."
 
@@ -1715,7 +1778,13 @@ def _verify_publication_transition(
         if (
             evidence_relative is None
             or evidence_relative in evidence_paths
-            or evidence_relative in {receipt_relative, anchor_relative, "mission/loop.json"}
+            or evidence_relative
+            in {
+                receipt_relative,
+                anchor_relative,
+                "mission/contract.json",
+                "mission/loop.json",
+            }
             or not isinstance(commit, str)
             or not isinstance(digest, str)
             or re.fullmatch(r"[0-9a-f]{64}", digest) is None
@@ -1727,6 +1796,15 @@ def _verify_publication_transition(
         if blob is None or sha256_bytes(blob) != digest:
             return False, f"Publication evidence bytes do not verify for {requirement}."
         evidence_paths.add(evidence_relative)
+    try:
+        stable = all(
+            _read_repo_regular_file(repo_root, relative) == expected_bytes
+            for relative, expected_bytes in trust_inputs
+        )
+    except (OSError, ValueError):
+        stable = False
+    if not stable:
+        return False, "Publication trust input changed during verification."
     return True, "Publication authorization is signed and every gate has distinct Git evidence."
 
 
@@ -1734,6 +1812,7 @@ def validate_mission(repo_root: Path) -> MissionValidation:
     checks: list[ValidationCheck] = []
     contract = _json(repo_root / "mission" / "contract.json")
     loop = _json(repo_root / "mission" / "loop.json")
+    identity = _json(repo_root / "mission" / "name.json")
     authorities = set(contract.get("execution_authorities", []))
     forbidden = set(contract.get("forbidden_authorities", []))
     checks.append(
@@ -1741,6 +1820,19 @@ def validate_mission(repo_root: Path) -> MissionValidation:
             "owner-boundary",
             contract.get("owner") == "Daniel Wahnich",
             "Mission owner must remain Daniel Wahnich.",
+        )
+    )
+    checks.append(
+        _check(
+            "active-identity",
+            contract.get("mission_id") == "inbar"
+            and contract.get("name") == "Inbar"
+            and loop.get("mission_id") == "inbar"
+            and identity.get("canonical_name") == "Inbar"
+            and identity.get("canonical_slug") == "inbar"
+            and contract.get("legacy_protocol_namespace") == "fieldtrue",
+            "Current mission surfaces must identify Inbar while preserving the legacy "
+            "protocol namespace.",
         )
     )
     checks.append(

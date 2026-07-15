@@ -144,6 +144,32 @@
     }
   },
   "additionalProperties": false,
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "mission_id": {
+              "const": "fieldtrue"
+            },
+            "schema_version": {
+              "const": "daniel.research-memory.v1"
+            }
+          }
+        },
+        {
+          "properties": {
+            "mission_id": {
+              "const": "inbar"
+            },
+            "schema_version": {
+              "const": "daniel.research-memory.v2"
+            }
+          }
+        }
+      ]
+    }
+  ],
   "properties": {
     "access": {
       "$ref": "#/$defs/AccessClass",
@@ -224,8 +250,11 @@
       "type": "number"
     },
     "mission_id": {
-      "const": "fieldtrue",
-      "default": "fieldtrue",
+      "default": "inbar",
+      "enum": [
+        "fieldtrue",
+        "inbar"
+      ],
       "title": "Mission Id",
       "type": "string"
     },
@@ -263,8 +292,11 @@
       "title": "Recurrence Key"
     },
     "schema_version": {
-      "const": "daniel.research-memory.v1",
-      "default": "daniel.research-memory.v1",
+      "default": "daniel.research-memory.v2",
+      "enum": [
+        "daniel.research-memory.v1",
+        "daniel.research-memory.v2"
+      ],
       "title": "Schema Version",
       "type": "string"
     },

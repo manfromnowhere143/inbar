@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from fieldtrue.canonical import CanonicalizationError
+from fieldtrue.canonical import CanonicalizationError, canonical_json, sha256_value
 from fieldtrue.memory import (
     AccessClass,
     EpistemicPhase,
@@ -17,6 +17,7 @@ from fieldtrue.memory import (
     MemoryEvidenceRef,
     MemoryStatus,
     MemoryVerificationError,
+    ResearchMemoryRecord,
     append_memory,
     verify_memory,
     verify_memory_prefix,
@@ -58,6 +59,45 @@ def test_memory_chain_and_correction_are_append_only(tmp_path: Path) -> None:
     count, head = verify_memory(path)
     assert count == 2
     assert len(head) == 64
+
+
+def test_memory_identity_transition_is_versioned_and_one_way(tmp_path: Path) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(path, "legacy-decision")
+    legacy = json.loads(path.read_text(encoding="utf-8"))
+    legacy["schema_version"] = "daniel.research-memory.v1"
+    legacy["mission_id"] = "fieldtrue"
+    legacy_body = {key: value for key, value in legacy.items() if key != "event_hash"}
+    legacy["event_hash"] = sha256_value(legacy_body)
+    path.write_bytes(canonical_json(legacy) + b"\n")
+
+    _append(path, "inbar-decision")
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert records[0]["schema_version"] == "daniel.research-memory.v1"
+    assert records[0]["mission_id"] == "fieldtrue"
+    assert records[1]["schema_version"] == "daniel.research-memory.v2"
+    assert records[1]["mission_id"] == "inbar"
+    assert verify_memory(path)[0] == 2
+
+    with pytest.raises(ValidationError, match="identity"):
+        ResearchMemoryRecord.model_validate(
+            {**records[1], "schema_version": "daniel.research-memory.v1"}
+        )
+
+    regression = {
+        **records[1],
+        "schema_version": "daniel.research-memory.v1",
+        "mission_id": "fieldtrue",
+        "sequence": 2,
+        "event_id": "legacy-regression",
+        "previous_event_hash": records[1]["event_hash"],
+    }
+    regression_body = {key: value for key, value in regression.items() if key != "event_hash"}
+    regression["event_hash"] = sha256_value(regression_body)
+    with path.open("ab") as handle:
+        handle.write(canonical_json(regression) + b"\n")
+    with pytest.raises(MemoryVerificationError, match="cannot resume"):
+        verify_memory(path)
 
 
 def test_memory_rejects_unknown_correction_and_duplicate_id(tmp_path: Path) -> None:

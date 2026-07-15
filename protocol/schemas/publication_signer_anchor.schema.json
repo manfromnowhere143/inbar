@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "anchor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Anchor Id",
+      "type": "string"
+    },
+    "ledger_scope": {
+      "minLength": 1,
+      "title": "Ledger Scope",
+      "type": "string"
+    },
+    "mission_id": {
+      "const": "inbar",
+      "default": "inbar",
+      "title": "Mission Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.publication-signer-anchor.v1",
+      "default": "inbar.publication-signer-anchor.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signer_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Signer Public Key",
+      "type": "string"
+    },
+    "trust_basis": {
+      "const": "git-anchored-inbar-release-key",
+      "default": "git-anchored-inbar-release-key",
+      "title": "Trust Basis",
+      "type": "string"
+    }
+  },
+  "required": [
+    "anchor_id",
+    "ledger_scope",
+    "signer_public_key"
+  ],
+  "title": "PublicationSignerAnchor",
+  "type": "object"
+}

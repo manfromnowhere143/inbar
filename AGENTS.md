@@ -1,4 +1,4 @@
-# Mission Agent Bootstrap
+# Inbar Agent Bootstrap
 
 Canonical workspace:
 `/Users/danielwahnich/workspace/fieldtrue`.
@@ -7,7 +7,7 @@ Run first:
 
 ```bash
 uv sync --group dev
-uv run fieldtrue mission validate
+uv run inbar mission validate --expect-failure iter001-acquisition-contract
 uv run pytest --cov
 git status --short --branch
 ```

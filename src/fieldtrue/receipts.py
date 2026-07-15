@@ -79,6 +79,19 @@ class SignerAnchor(BaseModel):
     trust_basis: Literal["git-preregistered-local-key"] = "git-preregistered-local-key"
 
 
+class PublicationSignerAnchor(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["inbar.publication-signer-anchor.v1"] = (
+        "inbar.publication-signer-anchor.v1"
+    )
+    anchor_id: Identifier
+    mission_id: Literal["inbar"] = "inbar"
+    ledger_scope: str = Field(min_length=1)
+    signer_public_key: Ed25519PublicKey
+    trust_basis: Literal["git-anchored-inbar-release-key"] = "git-anchored-inbar-release-key"
+
+
 class LedgerVerification(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -165,6 +178,35 @@ def load_signer_anchor(path: Path) -> SignerAnchor:
     if path.is_symlink() or not path.is_file():
         raise LedgerVerificationError("signer anchor must be a committed regular file")
     return SignerAnchor.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def write_publication_signer_anchor(
+    path: Path,
+    signing_key: SigningKey,
+    *,
+    anchor_id: Identifier,
+    ledger_scope: str,
+) -> PublicationSignerAnchor:
+    anchor = PublicationSignerAnchor(
+        anchor_id=anchor_id,
+        ledger_scope=ledger_scope,
+        signer_public_key=_public_key(signing_key),
+    )
+    if path.exists():
+        existing = PublicationSignerAnchor.model_validate_json(path.read_text(encoding="utf-8"))
+        if existing != anchor:
+            raise LedgerVerificationError(
+                "existing publication signer anchor does not match local key"
+            )
+        return existing
+    atomic_write(path, canonical_json_pretty(anchor))
+    return anchor
+
+
+def load_publication_signer_anchor(path: Path) -> PublicationSignerAnchor:
+    if path.is_symlink() or not path.is_file():
+        raise LedgerVerificationError("publication signer anchor must be a committed regular file")
+    return PublicationSignerAnchor.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 def _verify_event(event: LedgerEvent, expected_sequence: int, expected_previous: str) -> None:

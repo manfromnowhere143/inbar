@@ -1,6 +1,6 @@
 # Inbar Mission Handoff
 
-This file records the current resumable mission state. Verify every Git anchor and command result
+This file records the current resumable state. Verify every Git, remote, schema, and memory anchor
 before relying on it.
 
 ## Resume identity
@@ -8,123 +8,88 @@ before relying on it.
 - Workspace: `/Users/danielwahnich/workspace/fieldtrue`
 - Owner: Daniel Wahnich
 - Branch: `main`
-- Current implementation commit: `ca3b7671f29443a22c925a49f49631655b3414f8`
-- Current implementation tree: `afc186bb2cb0b00b888ad9fed8d40637f5225bf8`
-- Semantic hardening commit: `f599b340f0958401b9a392ae0bd26a881cc806e9`
-- Initial bootstrap commit: `b79f2d114d1081550f50ab55aefbcace5dcb7521`
-- Git remote: `origin` -> `https://github.com/manfromnowhere143/inbar.git`
-- GitHub visibility: private
-- Remote default branch: `main`
-- Last verified remote commit: `b746823e2f0c8596c7872beb09699dbc638faa56`
-- Historical repository identity: Fieldtrue
-- Selected mission name: Inbar
-- Public spelling: title-case `Inbar`, never the acronym form `INBAR`
-- Name status: selected by Daniel; formal commercial trademark clearance and any repository or
-  package migration remain pending
+- Active mission and repository name: Inbar
+- Preferred command: `inbar`
+- Legacy compatibility namespace: `fieldtrue`
+- Terminal Phase 1 base commit: `b1e6b369d39de98004b3eacb2770779d86410504`
+- Preregistration commit: `52d71e16a75df12adf47e943fd5c329f6e04d5c0`
+- Private remote: `https://github.com/manfromnowhere143/inbar.git`
+- Public release: not authorized
+
+The identity migration is the commit containing this handoff. It changes active metadata and future
+publication identity only. It does not rewrite Git history, signed evidence, frozen protocol IDs,
+the `fieldtrue` Python package, or existing research-memory records.
+
+Research-memory V1 remains valid only for the immutable Fieldtrue-era prefix through sequence 49.
+New appends use V2 with `mission_id` equal to `inbar`; the verifier rejects identity regression.
 
 ## Scientific state
 
 - Iteration: `iter001_physical_causal_evidence_acquisition`
-- Preregistration commit: `52d71e16a75df12adf47e943fd5c329f6e04d5c0`
-- Preregistration SHA-256:
-  `47a1920b1b5326601c7404d17a6aac0df3309c2433fa76f56f0dffedf2511ad8`
 - Source-role verdict: `KILL_PUBLIC_SUBSTRATE`
 - Canonical control authority: `bootstrap`
 - Production control receipt: absent
 - Pilot admission verdict: none
+- GPU, cloud, paid, live-system, and download use: zero
 - Publication state: blocked
 
-No screened public source supplies the full same-incident contract for clocked multimodal evidence,
-pre-outcome ambiguity, independent mechanism truth, reviewed diagnostic action, realized diagnostic
-and recovery execution, and an independently settled outcome. Public sources remain role-limited
-parser, simulator, shift, and shortcut controls. New qualifying physical evidence must come through
-prospective human-approved testbeds.
-
-The initial product wedge is an offline and shadow-mode evidence dossier compiler with ranked,
+The product wedge is an offline and shadow-mode evidence dossier compiler with ranked,
 human-reviewable safe-test recommendations. It has no live command authority.
 
-## Implemented bootstrap
+## Implemented checkpoint
 
-- Typed physical evidence, rights, clocks, custody, hypothesis, approval, execution, recovery,
-  outcome, resource, split, comparator, and review contracts
-- Signed candidate registry that separates discovered roots from complete eligible dossiers
-- Conjunctive admission over the same physical incident roots
-- Validator-recomputed cross-plane collision, sequence-order, near-duplicate, and leakage controls
-- Exact derived-data redistribution rights and frozen clock tolerances
-- Pre-action ambiguity-review chronology
-- Settled-outcome bindings to the selected test, observation, diagnostic execution, and recovery
-  execution
-- Explicit test-fixture versus canonical authority profiles
-- Twenty-two exact outcome-bound admission controls
-- Isolated offline and frozen control execution with fixture-tree, Git-blob, dependency-lock, and
-  exact ordered source-path bindings
-- Delayed governance-key loading after control completion and clean-HEAD rechecks
-- Production verification that rejects canonical `bootstrap` authority
-- Complete input, terminal signature, replay, and invalidity authority design, not yet implemented
+- Same-incident evidence, rights, clock, custody, hypothesis, approval, execution, recovery,
+  settled-outcome, split, comparator, review, resource, and candidate-registry contracts
+- Exact conjunctive admission over eligible physical incident roots
+- Twenty-two isolated, outcome-bound admission controls
+- Root-certified terminal verifier certificate model
+- Inbar-bound publication signer anchor that rejects legacy cross-mission authority
+- Complete input manifests with canonical UTF-8 ordering, mode and content binding, hard-link and
+  case-fold controls, descriptor-relative no-follow traversal, mutation detection, and hard bounds
+- Typed terminal and invalidity records with Ed25519 issue and read-only verification primitives
+- Bound artifact and complete-input replay checks
+- Five new generated terminal schemas
 
-## Unresolved release blockers
-
-Do not seal or publish until every item below is closed with executable negative tests:
-
-1. Approve a prospective shortcut amendment that freezes exact resolution, coverage, abstention,
-   unknown-class, split, and aggregation semantics; then replace V1 signed booleans with executable
-   truth-bound recomputation.
-2. Bind each established physical mechanism to the correct known or unknown hypothesis through a
-   truth-only mechanism-resolution target.
-3. Bind shortcut, protocol-review, source-registry, and complete input authority into a terminally
-   signed output with read-only reconstruction verification.
-4. Emit a content-bound `INVALID` artifact for trust or proof-reconstruction failures.
-5. Add format-specific opaque-media leakage parsers beyond the current bounded known-token scan.
-
-The canonical contract intentionally contains placeholder validator and control-suite bindings.
-`control_authority_status` is `bootstrap`; both production verification paths reject it. Never
-replace those placeholders or set `sealed` without a clean committed implementation, a complete
-test matrix, a newly generated root-signed receipt, and independent read-only verification.
+Phase 1 remains dormant. No certificate or terminal result was generated, no private verifier key
+was loaded, no CLI path was activated, and canonical status was not changed.
 
 ## Validation evidence
 
-- Complete test matrix: `331 passed`
-- Branch-aware coverage: `90.32%`; required: `90%`; gate passed
-- Control-authority module branch-aware coverage: `92%`
+- Tests: 376 passed, one platform-capability skip
+- Branch-aware coverage: 90.20 percent; required minimum: 90 percent
+- Terminal-authority module coverage: 90 percent
 - Ruff formatting and lint: passed
-- Strict mypy: passed across `22` source modules
-- Generated schema verification: passed
-- Dependency lock verification: passed
-- Research-memory events: `45`
-- Research-memory head:
-  `42c5f706bd5b77bb0348bbe1cb9d5b4ebcf5d6abb9e48f756ff71662361e5a0b`
+- Strict mypy: passed across 23 source modules
+- Generated schemas: 85 verified
+- Dependency lock: verified
+- Research memory before identity event: 50 events, head `772dfaa6a959ed9aab529a6e7cc8ee471ca49b3a7351ee6423d600f2fcec8f66`
 
-The coverage gate was initially blocked at 87.50 percent and was raised through authority,
-tampering, lifecycle, scanner, model-invariant, and atomic-output controls. The threshold was not
-rounded or lowered.
+## Remaining blockers
 
-## Resource state
+1. Prospectively freeze shortcut V2 with the exact-census, no-fit rule as the sole construct-kill
+   authority.
+2. Add shared prediction keys, mechanism-resolution targets, and recipient-scoped truth-release
+   receipts.
+3. Wire terminal generation and deterministic replay through the production validator, including
+   atomic single-use output and reconstructible invalidity records.
+4. Add format-specific opaque-media leakage parsers.
+5. Seal only after clean committed controls and independent verification.
 
-- GPU seconds: `0`
-- Cloud jobs: `0`
-- Paid calls: `0`
-- Live-system actions: `0`
-- Public-dataset downloads in Iteration 001: `0` bytes
-- Aggregate engineering wall time, CPU time, and peak memory: not measured; do not report as zero
+## Open-source gate
 
-Daniel reported a mutable shared Google Cloud credit balance for Inbar, Sentinel, and Talos. It is
-an operator budget observation, not a frozen protocol value. Inbar must not spend it until a
-separate post-admission compute plan defines model scope, per-mission accounting, stop limits, and
-approval.
+Inbar is intended for open source. Keep the repository private until the exact release commit has a
+fully green clean-clone matrix, an explicit license, completed rights and secret scans, consistent
+identity, citation, security, contribution, and claim documents, and Daniel's approval of the
+license and visibility change.
 
 ## Non-negotiable boundaries
 
-- Do not rerun or rewrite the frozen Iteration 000 attempt or its consumed correction.
-- Do not lower admission, coverage, or safety thresholds.
-- Do not generate a production receipt from a dirty or uncommitted tree.
-- Do not present synthetic fixture `PASS_PILOT` results as canonical evidence.
-- Do not authorize GPU training, cloud execution, live robot or flight commands, or destructive
-  tests.
-- Do not claim diagnosis benefit, recovery, safety, transfer, product readiness, or economic value.
-- Keep the GitHub repository private. Do not change visibility or publish before Daniel approves
-  the exact public identity and every release gate is green.
-- Do not rename frozen Fieldtrue evidence history during an Inbar identity transition.
-- Do not build the separate general research engine in this repository yet.
+- Do not alter frozen Iteration 000 artifacts, consumed authorities, or existing memory records.
+- Do not rename `fieldtrue.*` schemas, Python imports, environment variables, or historical command
+  records during this migration.
+- Do not generate production authority from a dirty or uncommitted tree.
+- Do not train, spend cloud credits, command a live system, or publish a performance claim.
+- Do not build the standalone general research engine in this repository.
 
 ## Resume procedure
 
@@ -132,22 +97,14 @@ approval.
 cd /Users/danielwahnich/workspace/fieldtrue
 git status --short --branch
 git log --oneline --decorate -5
-uv sync --group dev
-uv run fieldtrue memory verify
-uv run fieldtrue schemas check
+uv sync
+uv run inbar memory verify
+uv run inbar schemas check
 uv run mypy src
-uv run ruff format --check .
 uv run ruff check .
-uv run pytest --cov --cov-report=term-missing
+uv run pytest
+uv run inbar mission validate --expect-failure iter001-acquisition-contract
 ```
 
-First confirm a verified 45-event memory prefix, private `origin`, and canonical bootstrap status.
-Then close the unresolved blockers in severity order. Do not generate or sign the production
-control bundle merely because the behavioral tests pass.
-
-## Research-engine extraction
-
-The append-only ledger is `memory/research_engine_extraction.jsonl`. Preserve its exact prefix.
-Continue recording decisions, failures, corrections, resources, authority transitions, name
-changes, nulls, and handoff state. The later standalone research engine should generalize from
-multiple complete missions; it is not authorized for implementation here.
+First confirm the private remote, active Inbar identity, immutable memory prefix, and canonical
+bootstrap status. Then close blockers in the listed order.

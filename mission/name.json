@@ -1,30 +1,40 @@
 {
   "schema_version": "fieldtrue.identity-decision.v1",
-  "canonical_name": "Fieldtrue",
-  "canonical_slug": "fieldtrue",
-  "pronunciation": "field true",
-  "descriptor": "Active Causal Mission Assurance",
-  "adopted_on": "2026-07-14",
-  "status": "internal_adoption_pending_professional_clearance",
-  "rationale": "A system becomes field-true only when its claimed objective survives independent intervention, physical execution, held-out transfer, and settled recovery. Benchmark success alone is insufficient.",
+  "canonical_name": "Inbar",
+  "canonical_slug": "inbar",
+  "pronunciation": "IN-bar",
+  "descriptor": "Physical Causal Evidence and Verified Intervention Research",
+  "adopted_on": "2026-07-15",
+  "status": "internally_adopted_pending_professional_clearance",
+  "rationale": "Inbar is the Hebrew word for amber and has personal meaning to Daniel Wahnich. The name is short, durable, easy to spell, and independent of a narrow implementation. The mission binds physical evidence, intervention, and settled outcomes into causal claims that can be preserved and inspected.",
   "portfolio_relationship": {
     "Sentinel": "watches and intervenes",
     "Telos": "verifies actual task completion",
-    "Fieldtrue": "requires a claimed objective to survive contact with physical reality"
+    "Inbar": "turns physical evidence and verified intervention into defensible causal claims"
+  },
+  "legacy_boundary": {
+    "name": "Fieldtrue",
+    "status": "retained only as the historical package, protocol, schema, and evidence namespace",
+    "rule": "Never rewrite signed history or frozen identifiers for an identity migration."
   },
   "current_collision_audit": {
-    "performed_on": "2026-07-14",
-    "adjacent_sector_finding": "No exact AI, robotics, autonomy, aerospace, research-assurance, PyPI, npm, or GitHub repository match was found.",
-    "known_unrelated_exact_use": "fieldTRUE LLC is an established United States agriculture and farm-box business using fieldtrue.com.",
+    "performed_on": "2026-07-15",
+    "adjacent_sector_finding": "No major exact-name AI model, robotics platform, or aerospace research mission collision was found in the preliminary screen.",
+    "known_uses": [
+      "INBAR is the International Bamboo and Rattan Organization.",
+      "INBAR Software is used in Israeli traffic-signal planning.",
+      "Inbar Space is an aerospace consulting business.",
+      "inbar.es is a restaurant inventory platform."
+    ],
     "legal_effect": "none",
     "package_registry_http_status": {
       "pypi": 404,
       "npm": 404
     },
-    "github_exact_repository_count": 0,
     "sources": [
-      "https://www.fieldtrue.com/philosophy",
-      "https://www.linkedin.com/company/fieldtrue"
+      "https://www.inbar.int/",
+      "https://www.inbarspace.com/about/",
+      "https://inbar.es/"
     ]
   },
   "pre_publication_gate": [
@@ -32,9 +42,10 @@
     "company and common-law registry search",
     "domain and social handle verification",
     "package and developer-ecosystem recheck",
+    "open-source license and third-party rights review",
     "written identity disposition"
   ],
-  "symbol_direction": "A measured field trajectory crosses an open verification plane, changes under intervention, and settles on a fixed datum. The geometry communicates evidence, challenge, and recovery without a literal shield.",
+  "symbol_direction": "A precise amber inclusion intersects a measured causal path and settles against a fixed datum. The geometry should communicate preserved evidence, intervention, and physical resolution without a literal shield.",
   "symbol_constraints": [
     "monochrome-first",
     "legible as favicon, telemetry glyph, technical-document mark, and spacecraft stencil",

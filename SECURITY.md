@@ -2,7 +2,7 @@
 
 ## Status
 
-Fieldtrue is pre-release research software. It is not authorized for flight, live spacecraft,
+Inbar is pre-release research software. It is not authorized for flight, live spacecraft,
 live robots, destructive tests, production safety decisions, or unattended control.
 
 ## Reporting

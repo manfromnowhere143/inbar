@@ -44,9 +44,9 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy src
       - run: uv run pytest --cov --cov-report=term-missing
-      - run: uv run fieldtrue schemas export
+      - run: uv run inbar schemas export
       - run: git diff --exit-code -- protocol/schemas
-      - run: uv run fieldtrue schemas check
+      - run: uv run inbar schemas check
       - run: uv run inbar mission validate --expect-failure iter001-acquisition-contract
       - name: Verify append-only research memory
         if: github.event_name == 'pull_request'
@@ -54,7 +54,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           git show "origin/${BASE_REF}:memory/research_engine_extraction.jsonl" > /tmp/base-memory.jsonl
-          uv run fieldtrue memory verify-prefix /tmp/base-memory.jsonl
+          uv run inbar memory verify-prefix /tmp/base-memory.jsonl
       - name: Reject tracked data, local keys, and credential material
         run: |
           if git ls-files | grep -E '^(data/(raw|derived)/|\.local/)|\.ed25519$'; then

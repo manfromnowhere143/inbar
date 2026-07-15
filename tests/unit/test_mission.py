@@ -40,7 +40,11 @@ from fieldtrue.mission import (
     _verify_publication_transition,
     validate_mission,
 )
-from fieldtrue.receipts import LedgerVerificationError, write_signer_anchor
+from fieldtrue.receipts import (
+    LedgerVerificationError,
+    write_publication_signer_anchor,
+    write_signer_anchor,
+)
 
 
 def _repo() -> Path:
@@ -63,8 +67,8 @@ def _fixture_git_repo(tmp_path: Path) -> tuple[Path, str, str, bytes]:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "--quiet")
-    _git(repo, "config", "user.name", "Fieldtrue Test")
-    _git(repo, "config", "user.email", "fieldtrue@example.invalid")
+    _git(repo, "config", "user.name", "Inbar Test")
+    _git(repo, "config", "user.email", "inbar@example.invalid")
     evidence = b"historically anchored evidence\n"
     evidence_path = repo / "evidence" / "source.txt"
     evidence_path.parent.mkdir()
@@ -129,6 +133,7 @@ def test_real_mission_invariants_are_individually_reported() -> None:
     validation = validate_mission(repo)
     checks = {check.check_id: check for check in validation.checks}
     assert checks["owner-boundary"].passed
+    assert checks["active-identity"].passed
     assert checks["execution-authority"].passed
     assert checks["preregistration-first"].passed
     assert checks["hypothesis-status"].passed
@@ -1011,6 +1016,7 @@ def test_publication_transition_accepts_only_signed_git_anchored_gate_evidence(
     _git(repo, "config", "user.name", "Publication Test")
     _git(repo, "config", "user.email", "publication@example.invalid")
     loop = _json(_repo() / "mission" / "loop.json")
+    contract = _json(_repo() / "mission" / "contract.json")
     requirements = list(loop["transition_requirements"]["published"])
     evidence: dict[str, dict[str, str]] = {}
     for index, requirement in enumerate(requirements):
@@ -1032,7 +1038,7 @@ def test_publication_transition_accepts_only_signed_git_anchored_gate_evidence(
 
     key = SigningKey.generate()
     anchor_relative = "protocol/trust/publication_signer_anchor.json"
-    write_signer_anchor(
+    write_publication_signer_anchor(
         repo / anchor_relative,
         key,
         anchor_id="publication-transition",
@@ -1040,7 +1046,7 @@ def test_publication_transition_accepts_only_signed_git_anchored_gate_evidence(
     )
     receipt_body = {
         "schema_version": "fieldtrue.publication-gate-receipt.v1",
-        "mission_id": "fieldtrue",
+        "mission_id": contract["mission_id"],
         "target_stage": "published",
         "requirements": requirements,
         "evidence": evidence,
@@ -1067,12 +1073,59 @@ def test_publication_transition_accepts_only_signed_git_anchored_gate_evidence(
     loop_path = repo / "mission" / "loop.json"
     loop_path.parent.mkdir(parents=True)
     loop_path.write_bytes(canonical_json_pretty(authorized_loop))
-    _git(repo, "add", anchor_relative, receipt_relative, "mission/loop.json")
+    contract_path = repo / "mission" / "contract.json"
+    contract_path.write_bytes(canonical_json_pretty(contract))
+    _git(
+        repo,
+        "add",
+        anchor_relative,
+        receipt_relative,
+        "mission/contract.json",
+        "mission/loop.json",
+    )
     _git(repo, "commit", "--quiet", "-m", "authorize publication transition")
 
     passed, detail = _verify_publication_transition(repo, authorized_loop, set(requirements))
     assert passed
     assert "signed" in detail
+
+    anchor_path = repo / anchor_relative
+    inbar_anchor_bytes = anchor_path.read_bytes()
+    anchor_path.unlink()
+    write_signer_anchor(
+        anchor_path,
+        key,
+        anchor_id="publication-transition",
+        ledger_scope="publication-gates",
+    )
+    passed, detail = _verify_publication_transition(repo, authorized_loop, set(requirements))
+    assert not passed
+    assert "unreadable" in detail
+    anchor_path.write_bytes(inbar_anchor_bytes)
+
+    contract_bytes = contract_path.read_bytes()
+    contract_path.write_bytes(b" " + contract_bytes)
+    passed, detail = _verify_publication_transition(repo, authorized_loop, set(requirements))
+    assert not passed
+    assert "canonical JSON" in detail
+    contract_path.write_bytes(contract_bytes)
+
+    outside_contract = repo.parent / "outside-contract.json"
+    outside_contract.write_bytes(contract_bytes)
+    contract_path.unlink()
+    contract_path.symlink_to(outside_contract)
+    passed, detail = _verify_publication_transition(repo, authorized_loop, set(requirements))
+    assert not passed
+    assert "unreadable" in detail
+    contract_path.unlink()
+    contract_path.write_bytes(contract_bytes)
+
+    mismatched_loop = {**authorized_loop, "mission_id": "fieldtrue"}
+    loop_path.write_bytes(canonical_json_pretty(mismatched_loop))
+    passed, detail = _verify_publication_transition(repo, mismatched_loop, set(requirements))
+    assert not passed
+    assert "exact required gate set" in detail
+    loop_path.write_bytes(canonical_json_pretty(authorized_loop))
 
     tampered = json.loads((repo / receipt_relative).read_text())
     tampered["target_stage"] = "learned"

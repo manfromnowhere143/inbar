@@ -125,10 +125,35 @@ _REQUIRED_PAYLOAD_FIELDS: dict[MemoryEventType, frozenset[str]] = {
 
 
 class ResearchMemoryRecord(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "schema_version": {"const": "daniel.research-memory.v1"},
+                                "mission_id": {"const": "fieldtrue"},
+                            }
+                        },
+                        {
+                            "properties": {
+                                "schema_version": {"const": "daniel.research-memory.v2"},
+                                "mission_id": {"const": "inbar"},
+                            }
+                        },
+                    ]
+                }
+            ]
+        },
+    )
 
-    schema_version: Literal["daniel.research-memory.v1"] = "daniel.research-memory.v1"
-    mission_id: Literal["fieldtrue"] = "fieldtrue"
+    schema_version: Literal["daniel.research-memory.v1", "daniel.research-memory.v2"] = (
+        "daniel.research-memory.v2"
+    )
+    mission_id: Literal["fieldtrue", "inbar"] = "inbar"
     sequence: int = Field(ge=0)
     event_id: Identifier
     occurred_at: datetime
@@ -154,6 +179,12 @@ class ResearchMemoryRecord(BaseModel):
 
     @model_validator(mode="after")
     def occurred_at_is_aware(self) -> Self:
+        identity_versions = {
+            ("daniel.research-memory.v1", "fieldtrue"),
+            ("daniel.research-memory.v2", "inbar"),
+        }
+        if (self.schema_version, self.mission_id) not in identity_versions:
+            raise ValueError("research-memory schema and mission identity do not match")
         if self.occurred_at.tzinfo is None or self.occurred_at.utcoffset() is None:
             raise ValueError("memory timestamp must be timezone-aware")
         if self.recorded_at.tzinfo is None or self.recorded_at.utcoffset() is None:
@@ -211,6 +242,7 @@ def _parse_memory(text: str) -> list[ResearchMemoryRecord]:
 def _verify_records(records: list[ResearchMemoryRecord]) -> tuple[int, str]:
     previous = MEMORY_GENESIS_HASH
     identifiers: set[str] = set()
+    inbar_identity_started = False
     for sequence, record in enumerate(records):
         if record.sequence != sequence:
             raise MemoryVerificationError("memory sequence is not contiguous")
@@ -225,6 +257,12 @@ def _verify_records(records: list[ResearchMemoryRecord]) -> tuple[int, str]:
             raise MemoryVerificationError("memory predecessor hash mismatch")
         if sha256_value(_record_body(record)) != record.event_hash:
             raise MemoryVerificationError("memory event hash mismatch")
+        if record.mission_id == "inbar":
+            inbar_identity_started = True
+        elif inbar_identity_started:
+            raise MemoryVerificationError(
+                "legacy mission identity cannot resume after the Inbar transition"
+            )
         identifiers.add(record.event_id)
         previous = record.event_hash
     return len(records), previous
@@ -294,8 +332,8 @@ def append_memory(
         previous = records[-1].event_hash if records else MEMORY_GENESIS_HASH
         occurred = occurred_at or datetime.now(UTC)
         body: dict[str, Any] = {
-            "schema_version": "daniel.research-memory.v1",
-            "mission_id": "fieldtrue",
+            "schema_version": "daniel.research-memory.v2",
+            "mission_id": "inbar",
             "sequence": len(records),
             "event_id": event_id,
             "occurred_at": occurred,

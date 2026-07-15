@@ -552,7 +552,10 @@ def test_snapshot_rejects_symlink_escape_and_special_files(tmp_path: Path) -> No
     with pytest.raises(TerminalAuthorityError, match="special file"):
         snapshot_acquisition_input(fifo_root)
 
-    with tempfile.TemporaryDirectory(prefix="fieldtrue-", dir="/private/tmp") as temporary:
+    socket_parent = Path("/private/tmp")
+    if not socket_parent.is_dir():
+        socket_parent = Path(tempfile.gettempdir())
+    with tempfile.TemporaryDirectory(prefix="inbar-", dir=socket_parent) as temporary:
         socket_root = Path(temporary)
         listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:

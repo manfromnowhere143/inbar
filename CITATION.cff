@@ -1,14 +1,14 @@
 cff-version: 1.2.0
 message: "Cite this software only with the exact revision and proof bundle used."
-title: "Fieldtrue: Active Causal Mission Assurance"
+title: "Inbar: Physical Causal Evidence and Verified Intervention Research"
 type: software
 authors:
   - family-names: Wahnich
     given-names: Daniel
 version: 0.1.0
 abstract: >-
-  Evidence-first causal diagnosis, safe discriminating intervention, independently verified
-  recovery, and calibrated transfer for physical autonomous systems.
+  Physical causal evidence, safe discriminating intervention, independently verified recovery,
+  and calibrated transfer research for multimodal autonomous systems.
 keywords:
   - causal diagnosis
   - multimodal autonomy

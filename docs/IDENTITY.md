@@ -1,31 +1,43 @@
-# Fieldtrue Identity
+# Inbar Identity
 
 ## Name
 
-Fieldtrue is the canonical single-word styling. It is pronounced "field true."
+Inbar is the canonical mission and repository name. Use title case in prose and `inbar` for the
+repository slug and preferred command.
 
-The name defines the standard this mission is intended to test. A policy, model, or autonomous
-system is not field-true because it performs well on a benchmark. Its claimed objective must
-survive independent intervention, physical execution, held-out transfer, and settled recovery.
-Models may propose. Physical outcomes decide.
+Inbar is the Hebrew word for amber and has personal meaning to Daniel Wahnich. The name is short,
+durable, and independent of a narrow implementation. Amber preserves evidence of prior physical
+states; Inbar tests whether evidence, intervention, and settled outcome support a causal claim.
+
+The internal `fieldtrue` package and protocol namespace predates the Inbar identity. It remains in
+Python imports, schema identifiers, signed evidence, environment variables, and historical command
+records. Those references are compatibility anchors, not the current public name, and must not be
+rewritten retroactively.
 
 ## Clearance status
 
-The identity is adopted for internal research use and is not legally cleared. Searches performed
-on 2026-07-14 found no exact adjacent AI, robotics, autonomy, aerospace, research-assurance,
-PyPI, npm, or GitHub repository match. An established agriculture business uses the exact
-fieldTRUE styling and the fieldtrue.com domain.
+The identity is adopted for internal research use and is not legally cleared. The preliminary
+screen found no major exact-name AI model, robotics platform, or aerospace research mission. It did
+find the International Bamboo and Rattan Organization acronym, Israeli traffic-signal software,
+Inbar Space, a restaurant inventory platform, and occupied primary domains.
 
-Public commercialization or a brand launch requires a professional trademark knockout search,
-common-law and company review, domain and handle review, a fresh developer-ecosystem search, and
-a written identity disposition. The current search record is evidence of diligence, not a legal
-opinion.
+Public commercialization requires a professional trademark knockout search, company and common-law
+review, domain and handle review, a fresh developer-ecosystem search, an open-source license and
+third-party rights review, and a written identity disposition. The current record is evidence of
+diligence, not a legal opinion.
+
+## Open-source transition
+
+The repository remains private staging until the exact release commit has a green clean-clone CI
+matrix, identity and claim documents agree, rights and secret scans pass, a license is selected,
+and Daniel approves the visibility change. Canonical scientific authority may remain transparently
+blocked in an open-source code release, but no scientific result or product claim may be implied.
 
 ## Symbol
 
-The future mark will depict a measured field trajectory crossing an open verification plane,
-changing under intervention, and settling on a fixed datum. The form should communicate evidence,
-challenge, and recovery without explanatory text or a literal shield.
+The future mark will combine a precise amber inclusion, a measured causal path, and a fixed settled
+datum. It must communicate preserved evidence, intervention, and physical resolution without
+explanatory text or a literal shield.
 
 Generation remains deferred until the identity clearance decision and the first scientific gate
 are stable. The mark must survive monochrome, 16-pixel, telemetry-display, technical-paper,

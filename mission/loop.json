@@ -1,6 +1,6 @@
 {
   "schema_version": "fieldtrue.mission-loop.v1",
-  "mission_id": "fieldtrue",
+  "mission_id": "inbar",
   "current_stage": "corpus_qualification",
   "stages": [
     "registered",

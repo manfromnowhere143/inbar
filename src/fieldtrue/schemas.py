@@ -89,7 +89,7 @@ from fieldtrue.domain import (
     VerificationResult,
 )
 from fieldtrue.memory import ResearchMemoryRecord
-from fieldtrue.receipts import LedgerEvent, LedgerHead, SignerAnchor
+from fieldtrue.receipts import LedgerEvent, LedgerHead, PublicationSignerAnchor, SignerAnchor
 from fieldtrue.runtime import RuntimeIdentity
 from fieldtrue.splits import SplitLock
 from fieldtrue.terminal_authority import (
@@ -158,6 +158,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "physical_provenance.schema.json": PhysicalProvenanceRecord,
     "protocol_review_record.schema.json": ProtocolReviewRecord,
     "protocol_review_registry.schema.json": ProtocolReviewRegistry,
+    "publication_signer_anchor.schema.json": PublicationSignerAnchor,
     "readiness_report.schema.json": ReadinessReport,
     "recovery_plan.schema.json": RecoveryPlan,
     "recovery_execution.schema.json": RecoveryExecution,

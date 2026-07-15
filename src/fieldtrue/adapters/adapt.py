@@ -233,7 +233,7 @@ def _download_resource(resource: AdaptResourceLock, destination: Path) -> Resour
         try:
             request = urllib.request.Request(  # noqa: S310 - frozen HTTPS source
                 resource.url,
-                headers={"User-Agent": "fieldtrue/0.1"},
+                headers={"User-Agent": "inbar/0.1"},
             )
             with (
                 os.fdopen(descriptor, "wb") as output,
