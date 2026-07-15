@@ -1,104 +1,112 @@
-# Fieldtrue
+# Inbar
 
-Active Causal Mission Assurance
+Physical Causal Evidence and Verified Intervention Research
 
-Fieldtrue is a research system for testing whether multimodal autonomy remains correct when its
-claims meet physical reality. Models propose causal hypotheses and recovery candidates. Approved
-interventions, independent execution, and settled outcomes determine what is accepted.
+Inbar is a research system for determining whether multimodal autonomy remains correct when its
+claims meet physical reality. It turns asynchronous incident evidence into competing causal
+hypotheses, selects safe and informative tests, and separates proposal authority from execution,
+truth, and outcome authority.
 
-The name defines the target property. A system becomes field-true only when its claimed objective
-survives independent intervention, physical execution, held-out transfer, and recovery. Benchmark
-performance alone is insufficient.
+The objective is not another benchmark score. The objective is a defensible chain from evidence to
+mechanism, from mechanism to intervention, and from intervention to independently settled physical
+outcome.
 
 ## Research question
 
-Can a system turn asynchronous multimodal incident evidence into competing physical mechanisms,
-select the safest cost-aware test that separates them, verify recovery through an independent
-outcome authority, and compile the resolved mechanism into a calibrated monitor that transfers to
-unseen hardware?
+Can an open world multimodal system identify physical mechanisms from incomplete incident evidence,
+choose a cost and risk normalized action that separates competing explanations, recover under
+independent execution, and retain calibrated performance on unseen hardware and fault families?
 
-## Current status
+## Current state
 
-The repository is at corpus qualification. Iteration 000 is a preregistered readiness adjudication
-over the public NASA ADAPT corpus. It is not a model benchmark. No diagnosis, recovery, safety,
-transfer, product-readiness, state-of-the-art, or economic-value claim is authorized.
+Inbar is in Iteration 001 corpus qualification. No training run or cloud job has been authorized.
+No diagnosis, recovery, safety, transfer, product readiness, state of the art, or economic value
+claim is active.
 
-Attempt 000 stopped before accepting source data when the Python runtime could not validate its
-local certificate-authority path. Its signed ledger records only `run-started` and `run-failed`;
-it produced no scientific verdict. Amendment 001 preserves that evidence and authorizes one
-isolated retry with a verified `certifi` trust store. It changes no scientific input or gate.
+The source role audit rejected the available public substrate for the complete experiment. Public
+corpora remain useful as parser, simulator, distribution shift, and shortcut controls, but none of
+the screened sources contains the full same incident chain required by the protocol. Qualifying
+physical evidence must therefore be acquired prospectively through reviewed testbed work.
 
-The retry authority is consumed before attempt output is created. A signed, synchronized receipt
-survives ordinary proof deletion, and the execution binds the exact amendment, signer, lockfile,
-installed CA bundle, source tree, schemas, validator, verifier, and gate-control seal. This is a
-local Git and Ed25519 trust boundary. It does not claim external timestamping, write-once storage,
-or protection against the same local owner deleting or rolling back local state.
-
-The expected result is useful even if blocked: it determines whether the corpus can support the
-central experiment before model training or cloud spend begins.
+The first product boundary is deliberately narrower: an offline and shadow mode evidence dossier
+compiler with ranked, human reviewable safe test recommendations. It has no command authority.
 
 ## Authority model
 
-1. Evidence: model-visible telemetry, commands, imagery, text, and provenance.
-2. Truth: separately committed adjudication records unavailable to proposers.
-3. Hypothesis: open-world causal candidates with an explicit unknown mechanism.
-4. Intervention: preapproved actions ranked by information, risk, cost, and duration.
-5. Outcome: independent execution evidence and a settled-state requirement.
-6. Claim: registered scope, uncertainty, falsifiers, and forbidden interpretations.
+1. Evidence authority supplies model visible telemetry, commands, imagery, text, clocks, and
+   provenance.
+2. Hypothesis authority proposes an open set of causal mechanisms with an explicit unknown class.
+3. Truth authority remains sealed from proposal and binds each established mechanism to the
+   adjudicated target.
+4. Safety authority approves the available diagnostic actions and their preconditions.
+5. Execution authority performs the selected action without changing the proposal.
+6. Outcome authority decides whether the physical state settled and recovery completed.
+7. Statistical authority evaluates transfer, calibration, uncertainty, and value independently.
 
-Learned systems never hold safety authority. Version 0 permits replay, simulation, and explicitly
-approved testbed execution. Flight, live spacecraft, live robot, destructive, financial, and
-deployment authority are forbidden.
+Learned systems never hold safety or execution authority. The current protocol permits replay,
+simulation, and explicitly approved testbeds. Flight, live spacecraft, live robots, destructive
+tests, and deployment authority remain forbidden.
 
-## Engineering invariants
+## Scientific invariants
 
-1. Model-visible evidence and adjudication truth are separate artifacts.
-2. Artifacts, transitions, approvals, and claims are content-addressed.
-3. Every claim-bearing gate must reject a deliberately broken or placebo control.
+1. Model visible evidence and adjudication truth are separate artifacts.
+2. Every claim bearing gate must reject a deliberately broken or placebo control.
+3. All artifacts, approvals, transitions, and verdict inputs are content addressed.
 4. Recovery proposers cannot serve as their sole outcome verifier.
-5. Unknown mechanisms and calibrated abstention are first-class outcomes.
+5. Unknown mechanisms and calibrated abstention are first class outcomes.
 6. Evaluation holds out connected hardware, mission, and fault groups rather than random windows.
-7. Null, blocked, invalid, interrupted, and correction results retain full evidentiary weight.
-8. Aweb, Maestro, cloud providers, and GPU runners remain optional adapters behind typed ports.
-9. A signed report is not scientific authority; the verifier recomputes its verdict from the
-   sealed evidence and truth planes.
+7. Null, blocked, invalid, interrupted, and corrected results retain evidentiary weight.
+8. A signed report is not scientific authority unless a verifier can reconstruct it from sealed
+   inputs.
+9. Cloud providers, GPU runners, Aweb, and Maestro remain replaceable adapters behind typed ports.
+
+## Admission status
+
+Iteration 001 is preregistered and its bootstrap admission implementation has 22 exact outcome
+bound controls. The local matrix at the last reviewed checkpoint contained 331 passing tests with
+90.32 percent branch aware coverage.
+
+Canonical admission remains blocked. The control authority is intentionally marked `bootstrap`, no
+production receipt exists, and no pilot verdict has been issued. Release requires executable
+shortcut semantics, truth bound mechanism resolution, terminal signatures over complete inputs,
+reconstructible invalidity records, and opaque media leakage controls.
+
+These blockers are preserved as blockers. CI accepts the checkpoint only when the mission validator
+reports the exact registered blocker set and no additional failure.
 
 ## Verification
 
 ```bash
 uv sync
 uv run ruff check .
-uv run ruff format .
 uv run mypy src
-uv run coverage run -m pytest
-uv run coverage report
-uv run fieldtrue schemas check
-uv run fieldtrue mission validate
+uv run pytest
+uv run inbar schemas check
+uv run inbar memory verify
+uv run inbar mission validate
 ```
 
-Third-party dataset bytes are not committed. The frozen iteration hypothesis defines acquisition,
-stop rules, verdict classes, expected proof artifacts, and forbidden claims.
-
-Each execution has an immutable attempt-specific proof root. The completed iteration proof contains
-the exact amendment, dataset lock, ingestion receipt, coverage report, model-visible manifest,
-separately sealed truth manifest, machine-readable readiness report, and one authoritative
-human-readable result. The verifier requires the separately selected attempt authority and rejects
-self-consistent proof-local replacements. Verification also fails when the reported gates differ
-from proof-local recomputation, even when every producer artifact and ledger event is validly
-signed.
+The final command is expected to return a blocked status until canonical authority is sealed. The
+GitHub workflow checks that this is the only registered mission validation failure; an unexpected
+pass or any additional failure makes CI fail.
 
 ## Repository map
 
 ```text
-src/fieldtrue/  Domain core, ports, adapters, services, verifier, and command line
-mission/        Machine-readable ownership, identity, lifecycle, and release gates
-protocol/       Frozen data, trust, baseline, split, and control contracts
-experiments/    Preregistration, proof bundle, result, and learning record per iteration
-claims/         Scoped machine-readable claim registry
-memory/         Append-only evidence for the future standalone research engine
+src/fieldtrue/  Typed domain core, authority boundaries, validators, and command line
+mission/        Ownership, lifecycle, stage, and publication contracts
+protocol/       Schemas, trust anchors, controls, splits, and frozen data contracts
+experiments/    Preregistrations, amendments, proof artifacts, and result records
+claims/         Scoped machine readable claim registry
+memory/         Append only extraction ledger for the future standalone research engine
 docs/           Architecture, mathematics, frontier review, and publication controls
-tests/          Unit, adversarial, placebo, integration, and end-to-end verification
+tests/          Unit, adversarial, placebo, integration, and reconstruction verification
 ```
 
-Read [Architecture](docs/ARCHITECTURE.md), [Preregistration](PREREGISTRATION.md), and
-[Claim Boundaries](docs/CLAIM_BOUNDARIES.md) before interpreting a result.
+The internal `fieldtrue` namespace is retained because signed historical evidence and frozen schema
+identifiers bind it. Inbar is the mission and repository identity. Historical proof is never
+rewritten for a cosmetic migration.
+
+Start with [the architecture](docs/ARCHITECTURE.md),
+[the Iteration 001 hypothesis](experiments/iter001_physical_causal_evidence_acquisition/HYPOTHESIS.md),
+and [the claim boundaries](docs/CLAIM_BOUNDARIES.md).

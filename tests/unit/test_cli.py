@@ -166,6 +166,47 @@ def test_dataset_mission_and_experiment_commands(
     monkeypatch.setattr(cli_module, "validate_mission", lambda _repo: mission)
     assert main(["--repo", str(repo), "mission", "validate"]) == 1
     capsys.readouterr()
+    assert (
+        main(
+            [
+                "--repo",
+                str(repo),
+                "mission",
+                "validate",
+                "--expect-failure",
+                "fixture",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert (
+        main(
+            [
+                "--repo",
+                str(repo),
+                "mission",
+                "validate",
+                "--expect-failure",
+                "different",
+            ]
+        )
+        == 1
+    )
+    capsys.readouterr()
+    with pytest.raises(SystemExit, match="2"):
+        main(
+            [
+                "--repo",
+                str(repo),
+                "mission",
+                "validate",
+                "--expect-failure",
+                "fixture",
+                "--expect-failure",
+                "fixture",
+            ]
+        )
 
     monkeypatch.setattr(cli_module, "run_iter000", lambda *_args, **_kwargs: _report())
     assert main(["--repo", str(repo), "experiment", "iter000"]) == 0

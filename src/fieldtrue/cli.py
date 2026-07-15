@@ -53,12 +53,19 @@ def _fail(message: str, code: int = 1) -> NoReturn:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fieldtrue")
+    parser = argparse.ArgumentParser(prog="inbar")
     parser.add_argument("--repo", help="Mission repository root")
     groups = parser.add_subparsers(dest="group", required=True)
 
     mission = groups.add_parser("mission")
-    mission.add_subparsers(dest="action", required=True).add_parser("validate")
+    mission_validate = mission.add_subparsers(dest="action", required=True).add_parser("validate")
+    mission_validate.add_argument(
+        "--expect-failure",
+        action="append",
+        default=[],
+        metavar="CHECK_ID",
+        help="return success only when these exact validation checks fail",
+    )
 
     schemas = groups.add_parser("schemas")
     schema_actions = schemas.add_subparsers(dest="action", required=True)
@@ -108,6 +115,12 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.group == "mission" and arguments.action == "validate":
         mission_report = validate_mission(repo)
         print(json.dumps(mission_report.model_dump(mode="json"), indent=2, sort_keys=True))
+        if arguments.expect_failure:
+            expected = set(arguments.expect_failure)
+            if len(expected) != len(arguments.expect_failure):
+                _fail("expected mission failure IDs must be unique", 2)
+            observed = {check.check_id for check in mission_report.checks if not check.passed}
+            return 0 if observed == expected else 1
         return 0 if mission_report.passed else 1
     if arguments.group == "schemas" and arguments.action == "export":
         paths = export_schemas(repo)

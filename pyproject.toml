@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fieldtrue"
 version = "0.1.0"
-description = "Evidence-first active causal diagnosis and independently verified recovery for physical systems."
+description = "Inbar physical causal evidence and independently verified intervention research."
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
 authors = [{ name = "Daniel Wahnich" }]
@@ -53,6 +53,7 @@ security = ["pip-audit>=2.9,<3"]
 
 [project.scripts]
 fieldtrue = "fieldtrue.cli:main"
+inbar = "fieldtrue.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fieldtrue"]

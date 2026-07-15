@@ -1,4 +1,4 @@
-name: mission-ci
+name: inbar-ci
 
 on:
   push:
@@ -47,7 +47,7 @@ jobs:
       - run: uv run fieldtrue schemas export
       - run: git diff --exit-code -- protocol/schemas
       - run: uv run fieldtrue schemas check
-      - run: uv run fieldtrue mission validate
+      - run: uv run inbar mission validate --expect-failure iter001-acquisition-contract
       - name: Verify append-only research memory
         if: github.event_name == 'pull_request'
         env:
@@ -85,6 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
         with:
@@ -124,7 +125,7 @@ jobs:
         run: |
           wheel=$(find dist -name '*.whl' -print -quit)
           uv run --isolated --no-project --python 3.11 --with "$wheel" python -c 'import fieldtrue; print(fieldtrue.__version__)'
-          uv run --isolated --no-project --python 3.14 --with "$wheel" fieldtrue --help
+          uv run --isolated --no-project --python 3.14 --with "$wheel" inbar --help
 
   data-extra:
     runs-on: ubuntu-24.04
