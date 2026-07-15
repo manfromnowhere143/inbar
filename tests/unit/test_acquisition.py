@@ -12,7 +12,10 @@ from pydantic import ValidationError
 from fieldtrue.acquisition import (
     AcquisitionAdmissionReport,
     AcquisitionAuditError,
+    AcquisitionCandidateRegistry,
     AcquisitionContract,
+    ActorTrustRegistry,
+    AdmissionControlSuiteReceipt,
     ArtifactBinding,
     AttestationSubjectKind,
     BoundReview,
@@ -23,12 +26,16 @@ from fieldtrue.acquisition import (
     FieldPlaneAssignment,
     IncidentDossier,
     IncidentTimeline,
+    InterventionComparatorRegistry,
     ModelVisibleLeakageScanReport,
     ModelVisibleProjection,
     PermissionDecision,
     PermissionKind,
     PhysicalProvenanceRecord,
+    PlaneIncidentManifest,
     PlaneSeparationReceipt,
+    ProtocolReviewRecord,
+    ProtocolReviewRegistry,
     RecoveryExecution,
     ResourceUsage,
     ReviewPurpose,
@@ -42,6 +49,8 @@ from fieldtrue.acquisition import (
     audit_acquisition,
     build_model_visible_leakage_scan,
     issue_actor_trust_registry,
+    render_admission_result,
+    write_admission_output,
 )
 from fieldtrue.canonical import read_json, sha256_file, sha256_value, write_json
 from fieldtrue.control_authority import record_control_observation
@@ -1570,3 +1579,277 @@ def test_naive_recovery_and_outcome_timestamps_are_rejected(tmp_path: Path) -> N
 def test_role_enum_exposes_every_required_independence_assignment() -> None:
     assert RoleKind.SOURCE_STEWARD in set(RoleKind)
     assert RoleKind.OUTCOME_VERIFIER in set(RoleKind)
+
+
+def test_signed_registry_and_evidence_models_reject_ambiguous_authority(
+    tmp_path: Path,
+) -> None:
+    build_acquisition_tree(tmp_path)
+    registry = read_json(tmp_path / "trust_registry.json")
+
+    naive_attestation = deepcopy(registry)
+    naive_attestation["issued_at"] = BASE.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="trust-registry timestamp"):
+        ActorTrustRegistry.model_validate(naive_attestation)
+
+    duplicate_roles = deepcopy(registry["actors"][0])
+    duplicate_roles["authorized_roles"] *= 2
+    with pytest.raises(ValidationError, match="roles must be unique"):
+        TrustedActor.model_validate(duplicate_roles)
+
+    duplicate_actor = deepcopy(registry)
+    duplicate_actor["actors"].append(deepcopy(duplicate_actor["actors"][0]))
+    with pytest.raises(ValidationError, match="actor IDs"):
+        ActorTrustRegistry.model_validate(duplicate_actor)
+
+    duplicate_key = deepcopy(registry)
+    duplicate_key["actors"][1]["public_key"] = duplicate_key["actors"][0]["public_key"]
+    with pytest.raises(ValidationError, match="share signing keys"):
+        ActorTrustRegistry.model_validate(duplicate_key)
+
+    duplicate_role_owner = deepcopy(registry)
+    duplicate_role_owner["actors"][1]["authorized_roles"] = duplicate_role_owner["actors"][0][
+        "authorized_roles"
+    ]
+    with pytest.raises(ValidationError, match="multiple owners"):
+        ActorTrustRegistry.model_validate(duplicate_role_owner)
+
+    missing_role = deepcopy(registry)
+    missing_role["actors"].pop()
+    with pytest.raises(ValidationError, match="authorize every dossier role"):
+        ActorTrustRegistry.model_validate(missing_role)
+
+    source = read_json(tmp_path / "sources" / "physical-source.json")
+    naive_resource = deepcopy(source["resources"][0])
+    naive_resource["staged_at"] = BASE.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="staging timestamp"):
+        SourceResource.model_validate(naive_resource)
+
+    evidence_manifest = read_json(tmp_path / "common" / "evidence-manifest.json")
+    evidence_manifest["incident_ids"].append(evidence_manifest["incident_ids"][0])
+    with pytest.raises(ValidationError, match="manifest IDs"):
+        PlaneIncidentManifest.model_validate(evidence_manifest)
+
+    candidate_registry = read_json(tmp_path / "candidate_registry.json")
+    naive_candidate = deepcopy(candidate_registry)
+    naive_candidate["produced_at"] = BASE.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="registry timestamp"):
+        AcquisitionCandidateRegistry.model_validate(naive_candidate)
+    duplicate_candidate = deepcopy(candidate_registry)
+    duplicate_candidate["candidates"][1]["incident_id"] = duplicate_candidate["candidates"][0][
+        "incident_id"
+    ]
+    with pytest.raises(ValidationError, match="candidate incident IDs"):
+        AcquisitionCandidateRegistry.model_validate(duplicate_candidate)
+    duplicate_root = deepcopy(candidate_registry)
+    duplicate_root["candidates"][1]["root_incident_group_id"] = duplicate_root["candidates"][0][
+        "root_incident_group_id"
+    ]
+    with pytest.raises(ValidationError, match="physical roots"):
+        AcquisitionCandidateRegistry.model_validate(duplicate_root)
+
+    dossier = read_json(tmp_path / "dossiers" / "incident-000.json")
+    sequence = read_json(tmp_path / dossier["evidence_sequence"]["path"])
+    naive_sequence = deepcopy(sequence)
+    naive_sequence["produced_at"] = BASE.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="sequence receipt timestamp"):
+        EvidenceSequenceReceipt.model_validate(naive_sequence)
+    duplicate_stream = deepcopy(sequence)
+    duplicate_stream["streams"].append(deepcopy(duplicate_stream["streams"][0]))
+    with pytest.raises(ValidationError, match="evidence IDs"):
+        EvidenceSequenceReceipt.model_validate(duplicate_stream)
+
+    custody = read_json(tmp_path / dossier["truth_custody"]["path"])
+    naive_custody = deepcopy(custody)
+    naive_custody["committed_at"] = BASE.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="custody timestamps"):
+        TruthCustodyReceipt.model_validate(naive_custody)
+    reversed_custody = deepcopy(custody)
+    reversed_custody["unsealed_at"] = reversed_custody["committed_at"]
+    with pytest.raises(ValidationError, match="unseal must follow"):
+        TruthCustodyReceipt.model_validate(reversed_custody)
+
+
+def test_frozen_control_and_review_registries_reject_self_assertion(tmp_path: Path) -> None:
+    build_acquisition_tree(tmp_path)
+    control = read_json(tmp_path / "control_suite_receipt.json")
+    mutations = (
+        ("timestamp", lambda value: value.update(executed_at=BASE.replace(tzinfo=None))),
+        ("exact frozen control set", lambda value: value["controls"].pop()),
+        (
+            "pytest nodes must be unique",
+            lambda value: value["controls"][1].update(
+                pytest_node_id=value["controls"][0]["pytest_node_id"]
+            ),
+        ),
+        (
+            "frozen control requirement",
+            lambda value: value["controls"][0].update(expected_verdict="INVALID"),
+        ),
+        (
+            "unexpected outcome",
+            lambda value: value["controls"][0].update(passed=False),
+        ),
+    )
+    for message, mutate in mutations:
+        candidate = deepcopy(control)
+        mutate(candidate)
+        with pytest.raises(ValidationError, match=message):
+            AdmissionControlSuiteReceipt.model_validate(candidate)
+
+    shortcut = read_json(tmp_path / "shortcut_baseline.json")
+    for field, value, message in (
+        ("evaluated_at", BASE.replace(tzinfo=None), "shortcut report timestamp"),
+        ("results", shortcut["results"][:-1], "exact frozen rule set"),
+    ):
+        candidate = deepcopy(shortcut)
+        candidate[field] = value
+        with pytest.raises(ValidationError, match=message):
+            ShortcutBaselineReport.model_validate(candidate)
+    truth_access = deepcopy(shortcut)
+    truth_access["results"][0]["truth_access"] = True
+    with pytest.raises(ValidationError, match="cannot access truth"):
+        ShortcutBaselineReport.model_validate(truth_access)
+
+    comparators = read_json(tmp_path / "intervention_comparators.json")
+    naive_comparators = deepcopy(comparators)
+    naive_comparators["committed_at"] = BASE.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="comparator-registry timestamp"):
+        InterventionComparatorRegistry.model_validate(naive_comparators)
+    incomplete_comparators = deepcopy(comparators)
+    incomplete_comparators["comparators"].pop()
+    with pytest.raises(ValidationError, match="registry is incomplete"):
+        InterventionComparatorRegistry.model_validate(incomplete_comparators)
+
+    protocol = read_json(tmp_path / "protocol_reviews.json")
+    naive_review = deepcopy(protocol["reviews"][0])
+    naive_review["reviewed_at"] = BASE.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="protocol-review timestamp"):
+        ProtocolReviewRecord.model_validate(naive_review)
+    incomplete_protocol = deepcopy(protocol)
+    incomplete_protocol["reviews"].pop()
+    with pytest.raises(ValidationError, match="cover aerospace and robotics"):
+        ProtocolReviewRegistry.model_validate(incomplete_protocol)
+    unapproved_protocol = deepcopy(protocol)
+    unapproved_protocol["reviews"][0]["approved_for_physical_execution"] = False
+    with pytest.raises(ValidationError, match="has not approved"):
+        ProtocolReviewRegistry.model_validate(unapproved_protocol)
+
+
+def test_leakage_scanner_is_bounded_and_covers_json_and_opaque_modes(tmp_path: Path) -> None:
+    json_payload = b'{"events":[{"fault_label":"unit-identity"}]}'
+    json_path = tmp_path / "input.json"
+    json_path.write_bytes(json_payload)
+    json_binding = ArtifactBinding(
+        path="input.json",
+        sha256=sha256_file(json_path),
+        bytes=len(json_payload),
+        media_type="application/json",
+    )
+    opaque_payload = b"x" * (64 * 1024 - 4) + b"unit-identity"
+    opaque_path = tmp_path / "input.bin"
+    opaque_path.write_bytes(opaque_payload)
+    opaque_binding = ArtifactBinding(
+        path="input.bin",
+        sha256=sha256_file(opaque_path),
+        bytes=len(opaque_payload),
+        media_type="application/octet-stream",
+    )
+
+    report = build_model_visible_leakage_scan(
+        tmp_path,
+        incident_id="incident-scan",
+        artifacts=(json_binding, opaque_binding),
+        identity_values=("abc", "unit-identity"),
+    )
+    assert report.leakage_detected is True
+    assert [scan.scan_mode for scan in report.artifact_scans] == ["utf8_json", "opaque_stream"]
+    assert report.artifact_scans[0].forbidden_field_paths == ("$.events[0].fault_label",)
+    assert report.artifact_scans[1].matched_identity_token_sha256
+
+    oversized_total = opaque_binding.model_copy(update={"bytes": 512 * 1024 * 1024 + 1})
+    with pytest.raises(AcquisitionAuditError, match="input byte ceiling"):
+        build_model_visible_leakage_scan(
+            tmp_path,
+            incident_id="incident-scan",
+            artifacts=(oversized_total,),
+            identity_values=(),
+        )
+    oversized_artifact = opaque_binding.model_copy(update={"bytes": 256 * 1024 * 1024 + 1})
+    with pytest.raises(AcquisitionAuditError, match="artifact byte ceiling"):
+        build_model_visible_leakage_scan(
+            tmp_path,
+            incident_id="incident-scan",
+            artifacts=(oversized_artifact,),
+            identity_values=(),
+        )
+
+    duplicate_json = tmp_path / "duplicate.json"
+    duplicate_json.write_bytes(b'{"signal":1,"signal":2}')
+    duplicate_binding = ArtifactBinding(
+        path="duplicate.json",
+        sha256=sha256_file(duplicate_json),
+        bytes=duplicate_json.stat().st_size,
+        media_type="application/json",
+    )
+    with pytest.raises(AcquisitionAuditError, match="duplicate JSON key"):
+        build_model_visible_leakage_scan(
+            tmp_path,
+            incident_id="incident-scan",
+            artifacts=(duplicate_binding,),
+            identity_values=(),
+        )
+
+
+def test_report_derivation_and_atomic_output_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    input_root = tmp_path / "input"
+    report = audit_acquisition(build_acquisition_tree(input_root), input_root)
+    forged = report.model_dump(mode="json")
+    forged["gates"] = forged["gates"][:-1]
+    with pytest.raises(ValidationError, match="gate registry is not exact"):
+        AcquisitionAdmissionReport.model_validate(forged)
+
+    forged = report.model_dump(mode="json")
+    forged["gates"][1]["status"] = "invalid"
+    with pytest.raises(ValidationError, match="impossible gate status"):
+        AcquisitionAdmissionReport.model_validate(forged)
+
+    forged = report.model_dump(mode="json")
+    forged["verdict"] = "BLOCKED_ACQUISITION"
+    forged["authorized_next_action"] = (
+        "Acquire additional prospective physical dossiers under separate resource and safety "
+        "authorities; training remains forbidden."
+    )
+    with pytest.raises(ValidationError, match="verdict does not follow"):
+        AcquisitionAdmissionReport.model_validate(forged)
+
+    forged = report.model_dump(mode="json")
+    forged["eligible_incident_ids"] = forged["eligible_incident_ids"][:29]
+    with pytest.raises(ValidationError, match="minimum eligible incident count"):
+        AcquisitionAdmissionReport.model_validate(forged)
+
+    forged = report.model_dump(mode="json")
+    forged["eligible_incident_ids"][0] = "incident-unregistered"
+    with pytest.raises(ValidationError, match="absent from the candidate registry"):
+        AcquisitionAdmissionReport.model_validate(forged)
+
+    output_root = tmp_path / "result"
+    write_admission_output(output_root, report)
+    assert (output_root / "admission_report.json").is_file()
+    assert "not publication evidence" in render_admission_result(report).decode("ascii")
+    with pytest.raises(AcquisitionAuditError, match="must not already exist"):
+        write_admission_output(output_root, report)
+
+    failed_output = tmp_path / "failed-result"
+
+    def fail_write(path: Path, data: bytes) -> None:
+        del path, data
+        raise OSError("injected atomic-write failure")
+
+    monkeypatch.setattr("fieldtrue.acquisition.atomic_write", fail_write)
+    with pytest.raises(OSError, match="injected atomic-write failure"):
+        write_admission_output(failed_output, report)
+    assert not failed_output.exists()
+    assert not list(tmp_path.glob(".failed-result.*"))
