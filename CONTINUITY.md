@@ -13,7 +13,7 @@ evidence and consumed authority.
 
 Iteration 001 was prospectively preregistered at commit
 `52d71e16a75df12adf47e943fd5c329f6e04d5c0`. The initial bootstrap is `b79f2d1`; the current
-semantic hardening checkpoint is `f599b340f0958401b9a392ae0bd26a881cc806e9`.
+implementation checkpoint is `ca3b7671f29443a22c925a49f49631655b3414f8`.
 
 The source-role audit returned `KILL_PUBLIC_SUBSTRATE`. Public aerospace, robotics, and industrial
 sources can support narrow parsers, simulators, priors, shift tests, and shortcut controls, but no
@@ -41,17 +41,16 @@ curator-asserted leakage, and control-source path substitution.
 
 The remaining blockers are executable shortcut recomputation, truth-to-hypothesis mapping,
 a prospective amendment that defines shortcut resolution, complete terminal input binding and
-signature, reconstructible invalidity artifacts, deeper opaque-media parsing, and branch-aware
-coverage. Derived-data rights, exact clock thresholds, pre-action ambiguity review, and
-diagnostic-chain binding in settled outcomes are now enforced and negatively tested.
+signature, reconstructible invalidity artifacts, and deeper opaque-media parsing. Derived-data
+rights, exact clock thresholds, pre-action ambiguity review, diagnostic-chain binding, and the
+frozen coverage threshold are now enforced and negatively tested. A complete terminal authority
+design is committed but not yet implemented.
 
 ## Quality state
 
-The broad matrix produced 298 passing behavioral tests and then correctly failed the frozen
-coverage gate at 87.50 percent against 90 percent. After leakage, control-path, and semantic
-hardening, 82 focused acquisition, authority, and integration tests passed. Formatting, lint,
-strict typing across 22 source modules, generated schemas, the dependency lock, and Git whitespace
-checks pass.
+The complete matrix passes 331 tests with 90.32 percent branch-aware coverage against the frozen
+90 percent minimum. Control-authority coverage is 92 percent. Formatting, lint, strict typing
+across 22 source modules, generated schemas, the dependency lock, and Git whitespace checks pass.
 
 This is a durable engineering bootstrap, not a scientific or product verdict. Synthetic fixtures
 are validator evidence only. No canonical `PASS_PILOT` exists.
@@ -70,7 +69,7 @@ research engine in this repository.
 
 ## Resume state
 
-The append-only research-memory ledger contains 41 verified events with head
-`6ca73e7c9b2ec991443bc37f03c0918e3bbcb5e420d5493cde02f943b934dec8`. Resume from `HANDOFF.md`,
+The append-only research-memory ledger contains 44 verified events with head
+`d808b5195df9a289c766df31915eafea8f1a1f029899e71453aee62e7aea74a4`. Resume from `HANDOFF.md`,
 verify the Git and memory anchors, and close the remaining blockers before generating any production
 control receipt.
