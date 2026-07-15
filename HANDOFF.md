@@ -12,7 +12,10 @@ before relying on it.
 - Current implementation tree: `afc186bb2cb0b00b888ad9fed8d40637f5225bf8`
 - Semantic hardening commit: `f599b340f0958401b9a392ae0bd26a881cc806e9`
 - Initial bootstrap commit: `b79f2d114d1081550f50ab55aefbcace5dcb7521`
-- Git remotes: none
+- Git remote: `origin` -> `https://github.com/manfromnowhere143/inbar.git`
+- GitHub visibility: private
+- Remote default branch: `main`
+- Last verified remote commit: `b746823e2f0c8596c7872beb09699dbc638faa56`
 - Historical repository identity: Fieldtrue
 - Selected mission name: Inbar
 - Public spelling: title-case `Inbar`, never the acronym form `INBAR`
@@ -87,9 +90,9 @@ test matrix, a newly generated root-signed receipt, and independent read-only ve
 - Strict mypy: passed across `22` source modules
 - Generated schema verification: passed
 - Dependency lock verification: passed
-- Research-memory events: `44`
+- Research-memory events: `45`
 - Research-memory head:
-  `d808b5195df9a289c766df31915eafea8f1a1f029899e71453aee62e7aea74a4`
+  `42c5f706bd5b77bb0348bbe1cb9d5b4ebcf5d6abb9e48f756ff71662361e5a0b`
 
 The coverage gate was initially blocked at 87.50 percent and was raised through authority,
 tampering, lifecycle, scanner, model-invariant, and atomic-output controls. The threshold was not
@@ -118,8 +121,8 @@ approval.
 - Do not authorize GPU training, cloud execution, live robot or flight commands, or destructive
   tests.
 - Do not claim diagnosis benefit, recovery, safety, transfer, product readiness, or economic value.
-- Do not push, create a public repository, or publish before Daniel approves the exact identity and
-  every release gate is green.
+- Keep the GitHub repository private. Do not change visibility or publish before Daniel approves
+  the exact public identity and every release gate is green.
 - Do not rename frozen Fieldtrue evidence history during an Inbar identity transition.
 - Do not build the separate general research engine in this repository yet.
 
@@ -138,7 +141,7 @@ uv run ruff check .
 uv run pytest --cov --cov-report=term-missing
 ```
 
-First confirm commit `ca3b767`, a verified 44-event memory prefix, and canonical bootstrap status.
+First confirm a verified 45-event memory prefix, private `origin`, and canonical bootstrap status.
 Then close the unresolved blockers in severity order. Do not generate or sign the production
 control bundle merely because the behavioral tests pass.
 

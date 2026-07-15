@@ -63,13 +63,18 @@ Cloud credits are mutable operating context and must not be hard-coded into a pr
 without a separate approved compute plan.
 
 Do not train, use cloud compute, command a live system, lower thresholds, seal placeholders, push,
-publish, or claim performance, recovery, safety, transfer, product readiness, or economic value.
+change the private repository to public, publish, or claim performance, recovery, safety, transfer,
+product readiness, or economic value. Reviewed private checkpoint pushes are permitted.
 Do not rerun Iteration 000 or its consumed verification correction. Do not build the standalone
 research engine in this repository.
 
 ## Resume state
 
-The append-only research-memory ledger contains 44 verified events with head
-`d808b5195df9a289c766df31915eafea8f1a1f029899e71453aee62e7aea74a4`. Resume from `HANDOFF.md`,
-verify the Git and memory anchors, and close the remaining blockers before generating any production
-control receipt.
+The private GitHub remote is `https://github.com/manfromnowhere143/inbar.git`; its initial `main`
+push was verified at `b746823e2f0c8596c7872beb09699dbc638faa56`. Private backup does not alter
+publication or scientific authority.
+
+The append-only research-memory ledger contains 45 verified events with head
+`42c5f706bd5b77bb0348bbe1cb9d5b4ebcf5d6abb9e48f756ff71662361e5a0b`. Resume from `HANDOFF.md`,
+verify the Git, remote, and memory anchors, and close the remaining blockers before generating any
+production control receipt.
