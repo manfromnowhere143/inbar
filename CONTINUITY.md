@@ -12,8 +12,8 @@ public identity change must be a separate committed migration that preserves all
 evidence and consumed authority.
 
 Iteration 001 was prospectively preregistered at commit
-`52d71e16a75df12adf47e943fd5c329f6e04d5c0`. The current implementation checkpoint is
-`b79f2d114d1081550f50ab55aefbcace5dcb7521`.
+`52d71e16a75df12adf47e943fd5c329f6e04d5c0`. The initial bootstrap is `b79f2d1`; the current
+semantic hardening checkpoint is `f599b340f0958401b9a392ae0bd26a881cc806e9`.
 
 The source-role audit returned `KILL_PUBLIC_SUBSTRATE`. Public aerospace, robotics, and industrial
 sources can support narrow parsers, simulators, priors, shift tests, and shortcut controls, but no
@@ -40,16 +40,18 @@ approval, role-group collusion, near-duplicate evidence, shuffled streams, forge
 curator-asserted leakage, and control-source path substitution.
 
 The remaining blockers are executable shortcut recomputation, truth-to-hypothesis mapping,
-pre-action ambiguity-review chronology, diagnostic-action binding in settled outcomes, derived-data
-redistribution rights, complete terminal input binding and signature, reconstructible invalidity
-artifacts, exact clock-threshold freezing, deeper opaque-media parsing, and branch-aware coverage.
+a prospective amendment that defines shortcut resolution, complete terminal input binding and
+signature, reconstructible invalidity artifacts, deeper opaque-media parsing, and branch-aware
+coverage. Derived-data rights, exact clock thresholds, pre-action ambiguity review, and
+diagnostic-chain binding in settled outcomes are now enforced and negatively tested.
 
 ## Quality state
 
 The broad matrix produced 298 passing behavioral tests and then correctly failed the frozen
-coverage gate at 87.50 percent against 90 percent. After the final leakage and control-path
-hardening, 69 focused acquisition and authority tests passed. Formatting, lint, strict typing across
-22 source modules, generated schemas, the dependency lock, and Git whitespace checks pass.
+coverage gate at 87.50 percent against 90 percent. After leakage, control-path, and semantic
+hardening, 82 focused acquisition, authority, and integration tests passed. Formatting, lint,
+strict typing across 22 source modules, generated schemas, the dependency lock, and Git whitespace
+checks pass.
 
 This is a durable engineering bootstrap, not a scientific or product verdict. Synthetic fixtures
 are validator evidence only. No canonical `PASS_PILOT` exists.
@@ -68,7 +70,7 @@ research engine in this repository.
 
 ## Resume state
 
-The append-only research-memory ledger contains 38 verified events with head
-`fce24f4b8f488c05bde245904f1eb8cadc5993078eef1e5283dfc3cc66d55edc`. Resume from `HANDOFF.md`,
+The append-only research-memory ledger contains 41 verified events with head
+`6ca73e7c9b2ec991443bc37f03c0918e3bbcb5e420d5493cde02f943b934dec8`. Resume from `HANDOFF.md`,
 verify the Git and memory anchors, and close the remaining blockers before generating any production
 control receipt.

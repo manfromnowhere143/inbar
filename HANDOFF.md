@@ -8,8 +8,9 @@ before relying on it.
 - Workspace: `/Users/danielwahnich/workspace/fieldtrue`
 - Owner: Daniel Wahnich
 - Branch: `main`
-- Bootstrap implementation commit: `b79f2d114d1081550f50ab55aefbcace5dcb7521`
-- Bootstrap implementation tree: `47ab2201df06d77001c2678584a080cf649cae93`
+- Semantic hardening commit: `f599b340f0958401b9a392ae0bd26a881cc806e9`
+- Semantic hardening tree: `2c7f764755df3c12c0fb7acfddfb1a340a1f4480`
+- Initial bootstrap commit: `b79f2d114d1081550f50ab55aefbcace5dcb7521`
 - Git remotes: none
 - Historical repository identity: Fieldtrue
 - Selected mission name: Inbar
@@ -45,6 +46,10 @@ human-reviewable safe-test recommendations. It has no live command authority.
 - Signed candidate registry that separates discovered roots from complete eligible dossiers
 - Conjunctive admission over the same physical incident roots
 - Validator-recomputed cross-plane collision, sequence-order, near-duplicate, and leakage controls
+- Exact derived-data redistribution rights and frozen clock tolerances
+- Pre-action ambiguity-review chronology
+- Settled-outcome bindings to the selected test, observation, diagnostic execution, and recovery
+  execution
 - Explicit test-fixture versus canonical authority profiles
 - Twenty-two exact outcome-bound admission controls
 - Isolated offline and frozen control execution with fixture-tree, Git-blob, dependency-lock, and
@@ -56,18 +61,16 @@ human-reviewable safe-test recommendations. It has no live command authority.
 
 Do not seal or publish until every item below is closed with executable negative tests:
 
-1. Replace self-asserted shortcut-baseline booleans with executable, truth-bound recomputation.
-2. Bind each established physical mechanism to the correct known or unknown hypothesis.
-3. Require ambiguity review to finish before safe-test review and downstream outcome access.
-4. Bind independent settled-outcome authority to the selected test, observation, and diagnostic
-   execution it declares valid.
-5. Require derivative-data redistribution permission in the exact rights gate.
-6. Bind shortcut, protocol-review, source-registry, and complete input authority into a terminally
+1. Approve a prospective shortcut amendment that freezes exact resolution, coverage, abstention,
+   unknown-class, split, and aggregation semantics; then replace V1 signed booleans with executable
+   truth-bound recomputation.
+2. Bind each established physical mechanism to the correct known or unknown hypothesis through a
+   truth-only mechanism-resolution target.
+3. Bind shortcut, protocol-review, source-registry, and complete input authority into a terminally
    signed output with read-only reconstruction verification.
-7. Emit a content-bound `INVALID` artifact for trust or proof-reconstruction failures.
-8. Freeze exact clock thresholds in the canonical contract validator.
-9. Add format-specific opaque-media leakage parsers beyond the current bounded known-token scan.
-10. Raise meaningful branch-aware coverage from `87.50%` to the frozen `90%` minimum.
+4. Emit a content-bound `INVALID` artifact for trust or proof-reconstruction failures.
+5. Add format-specific opaque-media leakage parsers beyond the current bounded known-token scan.
+6. Raise meaningful branch-aware coverage from `87.50%` to the frozen `90%` minimum.
 
 The canonical contract intentionally contains placeholder validator and control-suite bindings.
 `control_authority_status` is `bootstrap`; both production verification paths reject it. Never
@@ -78,14 +81,14 @@ test matrix, a newly generated root-signed receipt, and independent read-only ve
 
 - Full behavioral matrix before the final leakage hardening: `298 passed`
 - Branch-aware coverage from that matrix: `87.50%`; required: `90%`; gate failed
-- Hardened acquisition and control-authority matrix after the final corrections: `69 passed`
+- Hardened acquisition, control-authority, and integration matrix: `82 passed`
 - Ruff formatting and lint: passed
 - Strict mypy: passed across `22` source modules
 - Generated schema verification: passed
 - Dependency lock verification: passed
-- Research-memory events: `38`
+- Research-memory events: `41`
 - Research-memory head:
-  `fce24f4b8f488c05bde245904f1eb8cadc5993078eef1e5283dfc3cc66d55edc`
+  `6ca73e7c9b2ec991443bc37f03c0918e3bbcb5e420d5493cde02f943b934dec8`
 
 The full coverage failure is a real quality block, not a test failure hidden by reporting. The
 focused post-hardening matrix does not replace the required final full matrix.
@@ -133,7 +136,7 @@ uv run ruff check .
 uv run pytest --cov --cov-report=term-missing
 ```
 
-First confirm commit `b79f2d1`, a verified 38-event memory prefix, and canonical bootstrap status.
+First confirm commit `f599b34`, a verified 41-event memory prefix, and canonical bootstrap status.
 Then close the unresolved blockers in severity order. Do not generate or sign the production
 control bundle merely because the behavioral tests pass.
 
