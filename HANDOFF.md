@@ -24,8 +24,8 @@ research memory. Do not hand-edit this file.
 - Product boundary: Offline and shadow-mode evidence dossier compiler with human-reviewed safe-test ranking; no command authority.
 - Canonical control authority: `bootstrap`
 - Publication transition: `blocked`
-- Active handoff: `inbar-hardened-recovery-handoff-v1` at sequence 80
-- Active handoff event hash: `453db33c5ac2d395608ccc7f43b588c84f018fa58fe93cc782119eb3a9c1ccd6`
+- Active handoff: `inbar-ci-portability-recovery-handoff-v1` at sequence 90
+- Active handoff event hash: `a8f912aa7d924781dd6e22ff194ab8e3f98ece398afe1312ac6c00e5d0799143`
 - Handoff status: `blocked`
 - State: Inbar remains in bootstrap with iter001-acquisition-contract blocked and no mission authority active.
 
@@ -33,19 +33,19 @@ research memory. Do not hand-edit this file.
 
 ## Linked checkpoint
 
-- Checkpoint event: `inbar-hardened-recovery-checkpoint-v1`
-- Checkpoint event hash: `a5fa7cfe092e945534a7c93f106b5564f906b3b6b9932e7538023116d650e563`
-- Implementation commit: `edf69e929ba94bf1179526e084acd6fcd62e2c98`
+- Checkpoint event: `inbar-ci-portability-recovery-checkpoint-v1`
+- Checkpoint event hash: `f08f6953462e2940993b496f0d7dd28843bc0547e7ebc9ef6f5ecdf3798b1a1c`
+- Implementation commit: `4f2d413a0c26ced08fde7bb7cf04db454f2fbdc9`
 - Action: Hardened the deterministic Inbar recovery contract and verified its internal consistency.
 - Outcome: Recovery inputs and the blocked mission state are reproducibly bound to committed evidence.
 - Authority effect: No authority was granted; iter001-acquisition-contract remains blocked.
 
 ## Historical checkpoint validation
 
-These are ledger-recorded validation assertions for implementation commit `edf69e929ba94bf1179526e084acd6fcd62e2c98`. They are not live test results.
+These are ledger-recorded validation assertions for implementation commit `4f2d413a0c26ced08fde7bb7cf04db454f2fbdc9`. They are not live test results.
 
-- Tests: 963 passed, 1 skipped
-- Branch-aware coverage: 90.75 percent
+- Tests: 986 passed, 1 skipped
+- Branch-aware coverage: 90.65 percent
 - Ruff: `pass`
 - Strict mypy source files: 31
 - Reproducible package build: `pass`
@@ -57,11 +57,11 @@ These are ledger-recorded validation assertions for implementation commit `edf69
 
 - Generated schemas: 108
 - Mission checks: 21 passed, 1 registered blocker
-- Research-memory events: 81
-- Research-memory head: `453db33c5ac2d395608ccc7f43b588c84f018fa58fe93cc782119eb3a9c1ccd6`
+- Research-memory events: 91
+- Research-memory head: `a8f912aa7d924781dd6e22ff194ab8e3f98ece398afe1312ac6c00e5d0799143`
 - Renderer contract: `inbar.generated-handoff.v2`
 - Renderer source SHA-256: `a1b6b0ba0be34c2601a4d58778ee017f349f4f04b7ab1bc06f9e8eb75fb13b28`
-- Generated-input digest: `feb68ecd3471ab7272a516c4aac4d172c712aeb79461e7ba582ee58657205858`
+- Generated-input digest: `6fc905f0b64b83b9915d561a63e50a261668a3b685a586cb94f7ae3fe4c53477`
 
 ## Remaining activation gates
 
