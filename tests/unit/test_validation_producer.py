@@ -228,14 +228,18 @@ def _init_repo(root: Path) -> None:
         ("config", "user.email", "t@example.invalid"),
         ("config", "user.name", "t"),
     ):
-        subprocess.run(["/usr/bin/git", *args], cwd=root, check=True)
+        subprocess.run(  # noqa: S603 - fixed trusted Git path, fixed argv
+            ["/usr/bin/git", *args], cwd=root, check=True
+        )
     (root / "a.txt").write_text("one", encoding="utf-8")
     _commit_all(root, "init")
 
 
 def _commit_all(root: Path, message: str) -> None:
     subprocess.run(["/usr/bin/git", "add", "-A"], cwd=root, check=True)
-    subprocess.run(["/usr/bin/git", "commit", "-qm", message], cwd=root, check=True)
+    subprocess.run(  # noqa: S603 - fixed trusted Git path, fixed argv
+        ["/usr/bin/git", "commit", "-qm", message], cwd=root, check=True
+    )
 
 
 def _stub_plan(receipt_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
