@@ -241,7 +241,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     ),
     "src/fieldtrue/domain.py": ("7648d416e3843dac5d1cf9c3c3be81b8d7cba235ec33c135d2697383a3d8474a"),
     "src/fieldtrue/handoff.py": (
-        "3be1982f0e93cf621366c017df7c723cc469e1ad6ea7e670fe7bcca0dcc85af5"
+        "d70df422bb7a473094e0d08791b6b1e2b9e7062140cef25567ae9fa117bb821a"
     ),
     "src/fieldtrue/schemas.py": (
         "e810a51bbe4f150eceb75cdef1c0207289552aae5b29e8584bcfc6df4fea837d"

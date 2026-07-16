@@ -8,6 +8,8 @@ a run it did not perform, would reopen it.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,7 +23,15 @@ from fieldtrue.validation_producer import (
     _observe_pytest,
     plan_argv,
     produce_validation_receipt,
+    write_validation_receipt,
 )
+
+
+def _head(root: Path) -> str:
+    return subprocess.run(
+        ["/usr/bin/git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
 
 RECEIPT_ID = "inbar-core-validation-test"
 
@@ -207,6 +217,123 @@ def test_observation_cannot_name_a_blocker_that_is_not_a_mission_check(tmp_path:
     _write(evidence / "mission-validate.stdout.txt", json.dumps(report))
     with pytest.raises(ValidationError, match="must name registered mission checks"):
         _observe_mission(tmp_path, RECEIPT_ID)
+
+
+# --- End-to-end execution controls --------------------------------------------------
+
+
+def _init_repo(root: Path) -> None:
+    for args in (
+        ("init", "-q"),
+        ("config", "user.email", "t@example.invalid"),
+        ("config", "user.name", "t"),
+    ):
+        subprocess.run(["/usr/bin/git", *args], cwd=root, check=True)
+    (root / "a.txt").write_text("one", encoding="utf-8")
+    _commit_all(root, "init")
+
+
+def _commit_all(root: Path, message: str) -> None:
+    subprocess.run(["/usr/bin/git", "add", "-A"], cwd=root, check=True)
+    subprocess.run(["/usr/bin/git", "commit", "-qm", message], cwd=root, check=True)
+
+
+def _stub_plan(receipt_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """A fast stand-in that produces the same artifacts the real plan produces.
+
+    The real plan shells out to uv and pytest. This keeps the producer's own execution,
+    artifact writing, and observation path honest without running the suite inside itself.
+    Crucially each step emits its own output, because the producer overwrites every step's
+    stdout — a stub that stayed silent would be validating a fiction.
+    """
+    evidence = f"evidence/validation/{receipt_id}"
+    mission = json.dumps(
+        {
+            "checks": [
+                {"check_id": "iter001-acquisition-contract", "passed": False},
+                {"check_id": "schemas", "passed": True},
+            ]
+        }
+    )
+    junit = _junit(tests=10, failures=0, errors=0, skipped=0)
+    cov = _coverage()
+    steps: list[tuple[str, tuple[str, ...]]] = []
+    for step_id, _ in plan_argv(receipt_id):
+        if step_id == "mission-validate":
+            code = f"import sys; sys.stdout.write({mission!r})"
+        elif step_id == "pytest-cov":
+            code = (
+                f"import pathlib; d = pathlib.Path({evidence!r}); "
+                f"d.mkdir(parents=True, exist_ok=True); "
+                f"(d / 'pytest.junit.xml').write_text({junit!r}); "
+                f"(d / 'coverage.json').write_text({cov!r})"
+            )
+        else:
+            code = "pass"
+        steps.append((step_id, (sys.executable, "-c", code)))
+    return tuple(steps)
+
+
+def test_producer_executes_the_plan_and_binds_every_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    monkeypatch.setattr("fieldtrue.validation_producer.plan_argv", _stub_plan)
+    receipt = produce_validation_receipt(
+        tmp_path, receipt_id=RECEIPT_ID, producer_actor_id="claude"
+    )
+
+    assert receipt.result == "pass"
+    assert len(receipt.steps) == 8
+    assert receipt.producer_actor_id == "claude"
+    # The receipt must describe the exact commit it validated.
+    assert receipt.subject_commit == _head(tmp_path)
+    # Its plan hash must be derived from its own steps, not asserted.
+    assert receipt.plan_sha256 == engineering_validation_plan_sha256(receipt.steps)
+    # Every step binds distinct stdout and stderr artifacts by content.
+    for step in receipt.steps:
+        assert step.stdout.path != step.stderr.path
+        assert len(step.stdout.sha256) == 64
+    # Engineering validation is deliberately unmetered; the producer must not imply otherwise.
+    assert receipt.resource_accounting.measurement_status == "not_metered"
+    assert receipt.resource_accounting.gpu_seconds is None
+    assert receipt.independent_attestation is False
+    assert receipt.scientific_result == "not_evaluated"
+    assert receipt.authority_effect == "none"
+    assert receipt.mission_observation.observed_blockers == ("iter001-acquisition-contract",)
+    assert receipt.mission_observation.unexpected_blockers == ()
+
+
+def test_producer_records_a_failing_step_rather_than_hiding_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+
+    def failing_plan(receipt_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        steps = list(_stub_plan(receipt_id))
+        steps[1] = ("ruff-check", (sys.executable, "-c", "raise SystemExit(1)"))
+        return tuple(steps)
+
+    monkeypatch.setattr("fieldtrue.validation_producer.plan_argv", failing_plan)
+    receipt = produce_validation_receipt(
+        tmp_path, receipt_id=RECEIPT_ID, producer_actor_id="claude"
+    )
+    assert receipt.result == "fail"
+    failed = [s for s in receipt.steps if s.result == "fail"]
+    assert [s.step_id for s in failed] == ["ruff-check"]
+    assert failed[0].observed_exit_code == 1
+
+
+def test_write_validation_receipt_emits_canonical_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+    monkeypatch.setattr("fieldtrue.validation_producer.plan_argv", _stub_plan)
+    path = write_validation_receipt(tmp_path, receipt_id=RECEIPT_ID, producer_actor_id="claude")
+    payload = json.loads(path.read_bytes())
+    assert payload["receipt_id"] == RECEIPT_ID
+    assert payload["schema_version"] == "inbar.engineering-validation-receipt.v1"
+    assert path.read_bytes().endswith(b"\n")
 
 
 # --- Subject-binding control -------------------------------------------------------

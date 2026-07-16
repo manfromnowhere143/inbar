@@ -92,6 +92,9 @@ _HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES = frozenset(
         "fieldtrue.diagnosis",
         "fieldtrue.experiment",
         "fieldtrue.ports",
+        # A producer tool, not an authority source: nothing in the renderer's import closure
+        # depends on it, so it is captured as bound wrapper source rather than bound authority.
+        "fieldtrue.validation_producer",
     }
 )
 _HANDOFF_PATH = "HANDOFF.md"
