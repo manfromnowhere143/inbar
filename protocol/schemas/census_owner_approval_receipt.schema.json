@@ -1,0 +1,106 @@
+{
+  "additionalProperties": false,
+  "description": "The Amendment 002 owner approval.\n\nSchema v2 widens the frozen decision literal only; every other field, the hash rule, and\nthe signature rule are byte-identical in construction to v1. A v1 receipt is never\nreinterpreted under this model.",
+  "properties": {
+    "amendment_document_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Amendment Document Artifact Sha256",
+      "type": "string"
+    },
+    "approval_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Approval Id",
+      "type": "string"
+    },
+    "decision": {
+      "const": "approve_source_census_implementation_only",
+      "title": "Decision",
+      "type": "string"
+    },
+    "issued_at": {
+      "format": "date-time",
+      "title": "Issued At",
+      "type": "string"
+    },
+    "machine_proposal_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Machine Proposal Artifact Sha256",
+      "type": "string"
+    },
+    "nonce": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Nonce",
+      "type": "string"
+    },
+    "owner_actor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Owner Actor Id",
+      "type": "string"
+    },
+    "owner_ed25519_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Owner Ed25519 Public Key",
+      "type": "string"
+    },
+    "owner_key_trust_basis": {
+      "minLength": 1,
+      "title": "Owner Key Trust Basis",
+      "type": "string"
+    },
+    "owner_signer_anchor_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Owner Signer Anchor Artifact Sha256",
+      "type": "string"
+    },
+    "owner_signing_key_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Owner Signing Key Id",
+      "type": "string"
+    },
+    "previous_approval_receipt_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Previous Approval Receipt Sha256",
+      "type": "string"
+    },
+    "proposal_git_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Proposal Git Commit",
+      "type": "string"
+    },
+    "receipt_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Receipt Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.owner-amendment-approval-receipt.v2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "signature": {
+      "pattern": "^[0-9a-f]{128}$",
+      "title": "Signature",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "approval_id",
+    "owner_actor_id",
+    "owner_signing_key_id",
+    "owner_signer_anchor_artifact_sha256",
+    "owner_key_trust_basis",
+    "owner_ed25519_public_key",
+    "proposal_git_commit",
+    "amendment_document_artifact_sha256",
+    "machine_proposal_artifact_sha256",
+    "decision",
+    "previous_approval_receipt_sha256",
+    "nonce",
+    "issued_at",
+    "receipt_hash",
+    "signature"
+  ],
+  "title": "OwnerCensusApprovalReceipt",
+  "type": "object"
+}

@@ -217,6 +217,23 @@ def produce_validation_receipt(
         )
     finished_at = datetime.now(UTC)
 
+    # Re-verify the subject after execution. The pre-run clean check alone leaves a window in
+    # which an edit during the run would make the receipt bind a commit whose bytes were never
+    # the bytes tested. Only this run's own evidence artifacts may appear.
+    if _git(repo_root, "rev-parse", "HEAD") != subject_commit:
+        raise ValidationProducerError(
+            "subject commit changed during validation; the receipt would describe the wrong tree"
+        )
+    # -uall lists every untracked file individually, so a collapsed directory entry can never
+    # hide a stray path that merely shares an ancestor with the evidence directory.
+    evidence_prefix = f"{_evidence_dir(receipt_id)}/"
+    for line in _git(repo_root, "status", "--porcelain", "-uall").splitlines():
+        changed_path = line[3:].strip().strip('"')
+        if not changed_path.startswith(evidence_prefix):
+            raise ValidationProducerError(
+                "tree changed outside the evidence directory during validation: " + changed_path
+            )
+
     step_tuple = tuple(steps)
     receipt = EngineeringValidationReceipt(
         schema_version="inbar.engineering-validation-receipt.v1",

@@ -67,6 +67,7 @@ from fieldtrue.census import (
     CensusReport,
     CensusResourceUsage,
     ChronologyAssessment,
+    OwnerCensusApprovalReceipt,
     RoleInheritanceAssessment,
     SourceFactLocator,
 )
@@ -223,6 +224,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "census_candidate_screening.schema.json": CandidateScreening,
     "census_chronology_assessment.schema.json": ChronologyAssessment,
     "census_gate_result.schema.json": CensusGateResult,
+    "census_owner_approval_receipt.schema.json": OwnerCensusApprovalReceipt,
     "census_report.schema.json": CensusReport,
     "census_resource_usage.schema.json": CensusResourceUsage,
     "census_role_inheritance.schema.json": RoleInheritanceAssessment,

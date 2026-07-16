@@ -360,3 +360,42 @@ def test_dirty_tree_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(ValidationProducerError, match="dirty tree"):
         produce_validation_receipt(tmp_path, receipt_id=RECEIPT_ID, producer_actor_id="claude")
+
+
+def test_a_step_that_writes_outside_the_evidence_directory_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The pre-run clean check alone leaves a window in which an edit during the run makes the
+    # receipt bind a commit whose bytes were never the bytes tested.
+    _init_repo(tmp_path)
+
+    def stray_plan(receipt_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        steps = list(_stub_plan(receipt_id))
+        steps[1] = (
+            "ruff-check",
+            (sys.executable, "-c", "import pathlib; pathlib.Path('stray.txt').write_text('x')"),
+        )
+        return tuple(steps)
+
+    monkeypatch.setattr("fieldtrue.validation_producer.plan_argv", stray_plan)
+    with pytest.raises(ValidationProducerError, match="outside the evidence directory"):
+        produce_validation_receipt(tmp_path, receipt_id=RECEIPT_ID, producer_actor_id="claude")
+
+
+def test_a_head_change_during_the_run_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _init_repo(tmp_path)
+
+    def head_moving_plan(receipt_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        steps = list(_stub_plan(receipt_id))
+        commit = (
+            "import subprocess; "
+            "subprocess.run(['/usr/bin/git', 'commit', '-qm', 'm', '--allow-empty'], check=True)"
+        )
+        steps[1] = ("ruff-check", (sys.executable, "-c", commit))
+        return tuple(steps)
+
+    monkeypatch.setattr("fieldtrue.validation_producer.plan_argv", head_moving_plan)
+    with pytest.raises(ValidationProducerError, match="subject commit changed"):
+        produce_validation_receipt(tmp_path, receipt_id=RECEIPT_ID, producer_actor_id="claude")

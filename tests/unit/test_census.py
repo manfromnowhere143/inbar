@@ -6,13 +6,17 @@ paper-only review and is not a gate.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from fieldtrue.canonical import sha256_value
 from fieldtrue.census import (
     AMENDMENT_DOCUMENT_SHA256,
+    APPROVED_PROPOSAL_COMMIT,
     CEILING_CPU_SECONDS,
     CEILING_PEAK_MEMORY_BYTES,
     CEILING_PEAK_STAGED_BYTES,
@@ -21,10 +25,12 @@ from fieldtrue.census import (
     GATE_ORDER,
     MACHINE_PROPOSAL_SHA256,
     OWNER_APPROVAL_RECEIPT_HASH,
+    PREVIOUS_APPROVAL_RECEIPT_HASH,
     STRATUM_B_DOMAINS,
     CandidateScreening,
     CensusError,
     CensusGate,
+    CensusImplementationAuthorityVerification,
     CensusReport,
     CensusResourceUsage,
     CensusVerdict,
@@ -35,11 +41,14 @@ from fieldtrue.census import (
     LocatorKind,
     MutabilityClass,
     ObjectClass,
+    OwnerCensusApprovalReceipt,
     RoleInheritanceAssessment,
     SourceFactLocator,
     SourceLocator,
     Stratum,
+    _verify_census_receipt_scope_and_signature,
     census_subject_hash,
+    load_census_implementation_authority,
     measure_census_resources,
     reject_unreachable_verdict,
     verify_census_report,
@@ -809,3 +818,171 @@ def test_census_subject_hash_is_domain_separated_and_stable() -> None:
     other = census_subject_hash("report", {"source_id": "a"})
     assert first == second
     assert first != other
+
+
+# --- Owner-approval authority verification controls ---------------------------------
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+VERIFIED_AT = datetime(2026, 7, 18, tzinfo=UTC)
+
+
+def _authority() -> CensusImplementationAuthorityVerification:
+    return load_census_implementation_authority(REPO_ROOT, verified_at=VERIFIED_AT)
+
+
+def test_committed_census_approval_authorizes_implementation_only() -> None:
+    authority = _authority()
+    assert authority.authorized_action == "source_census_implementation_only"
+    assert authority.proposal_git_commit == APPROVED_PROPOSAL_COMMIT
+    assert authority.amendment_document_artifact_sha256 == AMENDMENT_DOCUMENT_SHA256
+    assert authority.machine_proposal_artifact_sha256 == MACHINE_PROPOSAL_SHA256
+    assert authority.owner_approval_receipt_hash == OWNER_APPROVAL_RECEIPT_HASH
+    assert authority.previous_approval_receipt_hash == PREVIOUS_APPROVAL_RECEIPT_HASH
+    assert "census_execution" in authority.denied_authorities
+    assert "retrieval" in authority.denied_authorities
+
+
+def test_census_approval_chains_to_the_committed_amendment_001_receipt() -> None:
+    # The predecessor is verified against committed bytes, not a constant: the Amendment 001
+    # receipt is read at HEAD and its derived hash must equal the declared predecessor.
+    raw = (REPO_ROOT / "protocol/approvals/iter001_001_owner_approval.json").read_bytes()
+    previous = json.loads(raw)
+    assert previous["receipt_hash"] == PREVIOUS_APPROVAL_RECEIPT_HASH
+    assert _authority().previous_approval_receipt_hash == previous["receipt_hash"]
+
+
+def test_census_receipt_model_rejects_hash_and_time_forgery() -> None:
+    raw = json.loads((REPO_ROOT / "protocol/approvals/iter001_002_owner_approval.json").read_text())
+    OwnerCensusApprovalReceipt.model_validate(raw)
+    tampered = dict(raw)
+    tampered["nonce"] = "f" * 64
+    with pytest.raises(ValidationError, match="receipt hash mismatch"):
+        OwnerCensusApprovalReceipt.model_validate(tampered)
+    naive = dict(raw)
+    naive["issued_at"] = "2026-07-16T22:00:00"
+    with pytest.raises(ValidationError):
+        OwnerCensusApprovalReceipt.model_validate(naive)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("owner_actor_id", "not-daniel"),
+        ("owner_signing_key_id", "iter999-governance"),
+        ("owner_signer_anchor_artifact_sha256", "e" * 64),
+        ("owner_ed25519_public_key", "e" * 64),
+        ("proposal_git_commit", "e" * 40),
+        ("amendment_document_artifact_sha256", "e" * 64),
+        ("machine_proposal_artifact_sha256", "e" * 64),
+        ("previous_approval_receipt_sha256", "e" * 64),
+    ],
+)
+def test_census_scope_forgery_fails_closed(field: str, value: str) -> None:
+    raw = json.loads((REPO_ROOT / "protocol/approvals/iter001_002_owner_approval.json").read_text())
+    body = {k: v for k, v in raw.items() if k not in ("receipt_hash", "signature")}
+    body[field] = value
+    forged_hash = sha256_value(body)
+    forged = {**body, "receipt_hash": forged_hash, "signature": raw["signature"]}
+    receipt = OwnerCensusApprovalReceipt.model_validate(forged)
+    with pytest.raises(CensusError, match=r"approved census scope|signature mismatch"):
+        _verify_census_receipt_scope_and_signature(receipt)
+
+
+def test_census_genesis_predecessor_is_forbidden() -> None:
+    raw = json.loads((REPO_ROOT / "protocol/approvals/iter001_002_owner_approval.json").read_text())
+    body = {k: v for k, v in raw.items() if k not in ("receipt_hash", "signature")}
+    body["previous_approval_receipt_sha256"] = "0" * 64
+    forged = {**body, "receipt_hash": sha256_value(body), "signature": raw["signature"]}
+    receipt = OwnerCensusApprovalReceipt.model_validate(forged)
+    with pytest.raises(CensusError, match="approved census scope"):
+        _verify_census_receipt_scope_and_signature(receipt)
+
+
+def test_census_signature_substitution_fails_closed() -> None:
+    raw = json.loads((REPO_ROOT / "protocol/approvals/iter001_002_owner_approval.json").read_text())
+    forged = dict(raw)
+    forged["signature"] = "a" * 128
+    receipt = OwnerCensusApprovalReceipt.model_validate(forged)
+    with pytest.raises(CensusError, match="signature mismatch"):
+        _verify_census_receipt_scope_and_signature(receipt)
+
+
+def test_census_loader_rejects_uncommitted_receipt_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import fieldtrue.census as census_module
+
+    real = census_module._git_blob
+
+    def substituted(repo_root: Path, commit: str, relative: str, label: str) -> bytes:
+        data = real(repo_root, commit, relative, label)
+        if relative == census_module.OWNER_APPROVAL_PATH:
+            return data + b" "
+        return data
+
+    monkeypatch.setattr(census_module, "_git_blob", substituted)
+    with pytest.raises(CensusError, match="not committed at HEAD"):
+        _authority()
+
+
+def test_census_loader_rejects_substituted_proposal_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import fieldtrue.census as census_module
+
+    real = census_module._git_blob
+
+    def substituted(repo_root: Path, commit: str, relative: str, label: str) -> bytes:
+        data = real(repo_root, commit, relative, label)
+        if relative == census_module.MACHINE_PROPOSAL_PATH:
+            return data + b"\n"
+        return data
+
+    monkeypatch.setattr(census_module, "_git_blob", substituted)
+    with pytest.raises(CensusError, match="machine proposal hash mismatch"):
+        _authority()
+
+
+def test_census_loader_rejects_head_change_during_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import subprocess
+
+    import fieldtrue.census as census_module
+
+    real = census_module._verify_census_git_history
+    head = real(REPO_ROOT)
+    parent = subprocess.run(
+        ["/usr/bin/git", "rev-parse", "HEAD~1"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    heads = iter([head, parent])
+
+    def unstable(repo_root: Path) -> str:
+        real(repo_root)
+        return next(heads)
+
+    monkeypatch.setattr(census_module, "_verify_census_git_history", unstable)
+    with pytest.raises(CensusError, match="changed during verification"):
+        _authority()
+
+
+def test_census_loader_rejects_naive_and_premature_verification_time() -> None:
+    with pytest.raises(CensusError, match="timezone-aware"):
+        load_census_implementation_authority(
+            REPO_ROOT,
+            verified_at=datetime(2026, 7, 18),  # noqa: DTZ001
+        )
+    with pytest.raises(CensusError, match="predates owner approval"):
+        load_census_implementation_authority(
+            REPO_ROOT, verified_at=datetime(2026, 7, 1, tzinfo=UTC)
+        )
+
+
+def test_census_authority_report_is_marked_non_portable() -> None:
+    documentation = CensusImplementationAuthorityVerification.__doc__ or ""
+    assert "not authorization evidence" in documentation

@@ -13,19 +13,53 @@ census artifact contributes a scientific unit or counts toward the thirty-incide
 
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 import resource
+import stat
+import subprocess
 import sys
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Final, Literal, Self
+from pathlib import Path
+from typing import Any, Final, Literal, Self
 
+from nacl.exceptions import BadSignatureError
+from nacl.signing import VerifyKey
 from pydantic import Field, model_validator
 
-from fieldtrue.canonical import sha256_value
-from fieldtrue.domain import FrozenModel, Identifier, Sha256
+from fieldtrue.canonical import canonical_json_pretty, sha256_value
+from fieldtrue.domain import (
+    Ed25519PublicKey,
+    FrozenModel,
+    GitObjectId,
+    HexSignature,
+    Identifier,
+    Sha256,
+)
+from fieldtrue.git_trust import (
+    GitTrustError,
+    git_environment,
+    trusted_git_executable,
+    verify_repository_trust,
+)
+from fieldtrue.shortcut_contracts import (
+    OWNER_ACTOR_ID,
+    OWNER_ANCHOR_COMMIT,
+    OWNER_ANCHOR_PATH,
+    OWNER_ANCHOR_SHA256,
+    OWNER_PUBLIC_KEY,
+    OWNER_SIGNING_KEY_ID,
+    OWNER_TRUST_BASIS,
+    OwnerAmendmentApprovalReceipt,
+)
+from fieldtrue.shortcut_contracts import (
+    OWNER_APPROVAL_PATH as AMENDMENT_001_RECEIPT_PATH,
+)
 
 AMENDMENT_ID: Final = "iter001_002"
 ITERATION_ID: Final = "iter001_physical_causal_evidence_acquisition"
@@ -604,3 +638,315 @@ def verify_census_report(report: CensusReport) -> CensusReport:
     if report.produced_at > datetime.now(UTC):
         raise CensusError("census report is dated in the future")
     return report
+
+
+# --- Owner-approval authority verification ------------------------------------------
+#
+# Amendment 001's approval has a committed verifier; without the block below, Amendment 002's
+# approval would rest on prose plus a hash constant, which is exactly the unreconstructible
+# authority this mission rejects. The owner identity, anchor, and public key are imported from
+# the Amendment 001 contract module so the two approvals provably share one trust root.
+
+PREVIOUS_APPROVAL_PATH: Final = AMENDMENT_001_RECEIPT_PATH
+APPROVAL_GENESIS: Final = "0" * 64
+CENSUS_DECISION_LITERAL = Literal["approve_source_census_implementation_only"]
+_MAX_AUTHORITY_FILE_BYTES: Final = 2 * 1024 * 1024
+_GIT_OBJECT_ID: Final = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+CENSUS_DENIED_AUTHORITIES: Final = (
+    "retrieval",
+    "census_execution",
+    "corpus_acquisition",
+    "resource_spend",
+    "physical_action",
+    "training",
+    "scientific_result",
+    "canonical_seal",
+    "publication_transition",
+)
+
+
+class OwnerCensusApprovalReceipt(FrozenModel):
+    """The Amendment 002 owner approval.
+
+    Schema v2 widens the frozen decision literal only; every other field, the hash rule, and
+    the signature rule are byte-identical in construction to v1. A v1 receipt is never
+    reinterpreted under this model.
+    """
+
+    schema_version: Literal["inbar.owner-amendment-approval-receipt.v2"]
+    approval_id: Identifier
+    owner_actor_id: Identifier
+    owner_signing_key_id: Identifier
+    owner_signer_anchor_artifact_sha256: Sha256
+    owner_key_trust_basis: str = Field(min_length=1)
+    owner_ed25519_public_key: Ed25519PublicKey
+    proposal_git_commit: GitObjectId
+    amendment_document_artifact_sha256: Sha256
+    machine_proposal_artifact_sha256: Sha256
+    decision: CENSUS_DECISION_LITERAL
+    previous_approval_receipt_sha256: Sha256
+    nonce: Sha256
+    issued_at: datetime
+    receipt_hash: Sha256
+    signature: HexSignature
+
+    @model_validator(mode="after")
+    def issued_time_is_aware(self) -> Self:
+        if self.issued_at.tzinfo is None or self.issued_at.utcoffset() is None:
+            raise ValueError("owner approval timestamp must be timezone-aware")
+        return self
+
+    @model_validator(mode="after")
+    def receipt_hash_is_derived(self) -> Self:
+        if sha256_value(census_owner_approval_body(self)) != self.receipt_hash:
+            raise ValueError("owner approval receipt hash mismatch")
+        return self
+
+
+class CensusImplementationAuthorityVerification(FrozenModel):
+    """Non-portable report returned by a fresh repository verification.
+
+    This model is not authorization evidence and must never be accepted as a gate input.
+    A consumer crossing a trust boundary must call
+    :func:`load_census_implementation_authority` against its own repository.
+    """
+
+    schema_version: Literal["inbar.verified-census-implementation-authority.v1"] = (
+        "inbar.verified-census-implementation-authority.v1"
+    )
+    proposal_git_commit: GitObjectId
+    amendment_document_artifact_sha256: Sha256
+    machine_proposal_artifact_sha256: Sha256
+    owner_approval_receipt_artifact_sha256: Sha256
+    owner_approval_receipt_hash: Sha256
+    previous_approval_receipt_hash: Sha256
+    authorized_action: Literal["source_census_implementation_only"] = (
+        "source_census_implementation_only"
+    )
+    denied_authorities: tuple[str, ...] = CENSUS_DENIED_AUTHORITIES
+    verified_at: datetime
+
+
+def census_owner_approval_body(
+    receipt: OwnerCensusApprovalReceipt | dict[str, Any],
+) -> dict[str, Any]:
+    body = (
+        receipt.model_dump(mode="json")
+        if isinstance(receipt, OwnerCensusApprovalReceipt)
+        else dict(receipt)
+    )
+    body.pop("receipt_hash", None)
+    body.pop("signature", None)
+    return body
+
+
+def _read_regular_file(path: Path, label: str) -> bytes:
+    try:
+        file_stat = path.lstat()
+    except OSError as error:
+        raise CensusError(f"{label} is unavailable") from error
+    if stat.S_ISLNK(file_stat.st_mode) or not stat.S_ISREG(file_stat.st_mode):
+        raise CensusError(f"{label} must be a regular file")
+    if file_stat.st_size > _MAX_AUTHORITY_FILE_BYTES:
+        raise CensusError(f"{label} exceeds its byte limit")
+    try:
+        data = path.read_bytes()
+    except OSError as error:
+        raise CensusError(f"{label} cannot be read") from error
+    if len(data) != file_stat.st_size:
+        raise CensusError(f"{label} changed while being read")
+    return data
+
+
+def _canonical_json_object(
+    data: bytes,
+    label: str,
+    *,
+    require_pretty: bool = True,
+) -> dict[str, Any]:
+    def object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise CensusError(f"{label} contains duplicate object keys")
+            value[key] = item
+        return value
+
+    try:
+        parsed = json.loads(data, object_pairs_hook=object_pairs)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CensusError(f"{label} is not valid UTF-8 JSON") from error
+    if not isinstance(parsed, dict):
+        raise CensusError(f"{label} must be a JSON object")
+    if require_pretty and canonical_json_pretty(parsed) != data:
+        raise CensusError(f"{label} is not canonical pretty JSON")
+    return parsed
+
+
+def _git_blob(repo_root: Path, commit: str, relative: str, label: str) -> bytes:
+    git = str(trusted_git_executable())
+    try:
+        completed = subprocess.run(  # noqa: S603 - fixed Git object read
+            [git, "show", f"{commit}:{relative}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=git_environment(),
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise CensusError(f"committed {label} is unavailable") from error
+    if len(completed.stdout) > _MAX_AUTHORITY_FILE_BYTES:
+        raise CensusError(f"committed {label} exceeds its byte limit")
+    return completed.stdout
+
+
+def _verify_census_git_history(repo_root: Path) -> str:
+    git = str(trusted_git_executable())
+    environment = git_environment()
+    try:
+        verify_repository_trust(repo_root, git)
+    except GitTrustError as error:
+        raise CensusError(f"authority Git trust failed: {error}") from error
+    try:
+        head_result = subprocess.run(  # noqa: S603 - fixed Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise CensusError("authority Git HEAD cannot be verified") from error
+    head = head_result.stdout.strip()
+    if _GIT_OBJECT_ID.fullmatch(head) is None:
+        raise CensusError("authority Git HEAD has an invalid object identity")
+    for ancestor in (OWNER_ANCHOR_COMMIT, APPROVED_PROPOSAL_COMMIT):
+        try:
+            completed = subprocess.run(  # noqa: S603 - fixed Git ancestry query
+                [git, "merge-base", "--is-ancestor", ancestor, head],
+                cwd=repo_root,
+                check=False,
+                capture_output=True,
+                env=environment,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            raise CensusError("approved Git ancestry cannot be verified") from error
+        if completed.returncode != 0:
+            raise CensusError("approved Git history is not an ancestor of HEAD")
+    return head
+
+
+def _verify_census_receipt_scope_and_signature(receipt: OwnerCensusApprovalReceipt) -> None:
+    expected = {
+        "owner_actor_id": OWNER_ACTOR_ID,
+        "owner_signing_key_id": OWNER_SIGNING_KEY_ID,
+        "owner_signer_anchor_artifact_sha256": OWNER_ANCHOR_SHA256,
+        "owner_key_trust_basis": OWNER_TRUST_BASIS,
+        "owner_ed25519_public_key": OWNER_PUBLIC_KEY,
+        "proposal_git_commit": APPROVED_PROPOSAL_COMMIT,
+        "amendment_document_artifact_sha256": AMENDMENT_DOCUMENT_SHA256,
+        "machine_proposal_artifact_sha256": MACHINE_PROPOSAL_SHA256,
+        "decision": CENSUS_DECISION,
+        "previous_approval_receipt_sha256": PREVIOUS_APPROVAL_RECEIPT_HASH,
+    }
+    observed = receipt.model_dump(mode="json")
+    if any(observed[field] != value for field, value in expected.items()):
+        raise CensusError("owner approval differs from the approved census scope")
+    if receipt.previous_approval_receipt_sha256 == APPROVAL_GENESIS:
+        raise CensusError("census approval must chain to a predecessor, not genesis")
+    try:
+        VerifyKey(bytes.fromhex(OWNER_PUBLIC_KEY)).verify(
+            bytes.fromhex(receipt.receipt_hash), bytes.fromhex(receipt.signature)
+        )
+    except (BadSignatureError, ValueError) as error:
+        raise CensusError("owner approval signature mismatch") from error
+
+
+def _verify_census_proposal_chain_and_anchor(
+    repo_root: Path,
+    head: str,
+    receipt: OwnerCensusApprovalReceipt,
+) -> None:
+    amendment = _git_blob(
+        repo_root, APPROVED_PROPOSAL_COMMIT, AMENDMENT_DOCUMENT_PATH, "amendment document"
+    )
+    machine = _git_blob(
+        repo_root, APPROVED_PROPOSAL_COMMIT, MACHINE_PROPOSAL_PATH, "machine proposal"
+    )
+    anchor = _git_blob(repo_root, OWNER_ANCHOR_COMMIT, OWNER_ANCHOR_PATH, "owner anchor")
+    if hashlib.sha256(amendment).hexdigest() != AMENDMENT_DOCUMENT_SHA256:
+        raise CensusError("committed amendment document hash mismatch")
+    if hashlib.sha256(machine).hexdigest() != MACHINE_PROPOSAL_SHA256:
+        raise CensusError("committed machine proposal hash mismatch")
+    if hashlib.sha256(anchor).hexdigest() != OWNER_ANCHOR_SHA256:
+        raise CensusError("committed owner anchor hash mismatch")
+    # The machine proposal's raw bytes are frozen by the owner's signature and are not
+    # canonical pretty JSON; it is bound as a grandfathered raw-byte artifact exactly as the
+    # Amendment 001 hash-modes section defines. Duplicate keys are still rejected.
+    machine_value = _canonical_json_object(machine, "machine proposal", require_pretty=False)
+    anchor_value = _canonical_json_object(anchor, "owner anchor", require_pretty=False)
+    if machine_value.get("amendment_document") != {
+        "artifact_sha256": receipt.amendment_document_artifact_sha256,
+        "path": AMENDMENT_DOCUMENT_PATH,
+    }:
+        raise CensusError("machine proposal does not bind the amendment document")
+    if anchor_value.get("trust_anchor_public_key") != OWNER_PUBLIC_KEY:
+        raise CensusError("owner anchor does not bind the approved public key")
+    # The chain predecessor is verified against the committed Amendment 001 receipt itself,
+    # not against a constant: the prior receipt is read at HEAD, parsed strictly under its
+    # own v1 model, and its derived hash must equal this receipt's declared predecessor.
+    previous_raw = _git_blob(repo_root, head, PREVIOUS_APPROVAL_PATH, "predecessor receipt")
+    try:
+        previous = OwnerAmendmentApprovalReceipt.model_validate_json(previous_raw, strict=True)
+    except ValueError as error:
+        raise CensusError("predecessor approval receipt violates its typed contract") from error
+    if previous.receipt_hash != receipt.previous_approval_receipt_sha256:
+        raise CensusError("census approval does not chain to the committed predecessor")
+
+
+def load_census_implementation_authority(
+    repo_root: Path,
+    *,
+    verified_at: datetime | None = None,
+) -> CensusImplementationAuthorityVerification:
+    """Reconstruct the Amendment 002 implementation authority from committed bytes.
+
+    Mirrors the Amendment 001 verifier: nothing here trusts a constant that the committed
+    artifacts cannot corroborate, and any Git, byte, scope, chain, or signature mismatch
+    fails closed.
+    """
+    root = repo_root.resolve(strict=True)
+    head = _verify_census_git_history(root)
+    receipt_path = root / OWNER_APPROVAL_PATH
+    raw_receipt = _read_regular_file(receipt_path, "owner approval receipt")
+    _canonical_json_object(raw_receipt, "owner approval receipt")
+    try:
+        receipt = OwnerCensusApprovalReceipt.model_validate_json(raw_receipt, strict=True)
+    except ValueError as error:
+        raise CensusError("owner approval receipt violates its typed contract") from error
+    head_receipt = _git_blob(root, head, OWNER_APPROVAL_PATH, "owner approval receipt")
+    if head_receipt != raw_receipt:
+        raise CensusError("owner approval receipt is not committed at HEAD")
+    _verify_census_proposal_chain_and_anchor(root, head, receipt)
+    _verify_census_receipt_scope_and_signature(receipt)
+    if _verify_census_git_history(root) != head:
+        raise CensusError("authority Git HEAD changed during verification")
+
+    checked_at = verified_at or datetime.now(UTC)
+    if checked_at.tzinfo is None or checked_at.utcoffset() is None:
+        raise CensusError("authority verification time must be timezone-aware")
+    if checked_at < receipt.issued_at:
+        raise CensusError("authority verification predates owner approval")
+    return CensusImplementationAuthorityVerification(
+        proposal_git_commit=receipt.proposal_git_commit,
+        amendment_document_artifact_sha256=receipt.amendment_document_artifact_sha256,
+        machine_proposal_artifact_sha256=receipt.machine_proposal_artifact_sha256,
+        owner_approval_receipt_artifact_sha256=hashlib.sha256(raw_receipt).hexdigest(),
+        owner_approval_receipt_hash=receipt.receipt_hash,
+        previous_approval_receipt_hash=receipt.previous_approval_receipt_sha256,
+        verified_at=checked_at,
+    )
