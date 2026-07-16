@@ -121,6 +121,9 @@ def _source_census(
     repo: Path,
     authority_commit: str,
     repository_head: str,
+    *,
+    working_source_root: Path | None = None,
+    working_source_private_read_only: bool = False,
 ) -> acquisition_module.AcquisitionSourceClosure:
     git = trusted_repository_git(repo)
     validator_path = repo / "src" / "fieldtrue" / "acquisition.py"
@@ -136,6 +139,8 @@ def _source_census(
             f"{authority_commit}:src/fieldtrue/acquisition.py",
         ),
         expected_validator_sha256=acquisition_module.sha256_bytes(validator_path.read_bytes()),
+        working_source_root=working_source_root,
+        working_source_private_read_only=working_source_private_read_only,
     )
 
 
@@ -228,15 +233,68 @@ def test_source_census_rejects_ignored_sourceless_bytecode(tmp_path: Path) -> No
         _source_census(repo, authority, authority)
 
 
-def test_private_read_only_source_modes_require_explicit_census_policy(tmp_path: Path) -> None:
-    source = tmp_path / "source.py"
-    source.write_text("VALUE = 1\n")
-    source.chmod(0o400)
-    metadata = source.stat()
+def test_private_read_only_snapshot_requires_exact_source_mode_policy(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _initialize_source_repository(
+        repo,
+        {
+            "src/fieldtrue/__init__.py": "",
+            "src/fieldtrue/acquisition.py": "VALUE = 1\n",
+            "src/fieldtrue/runner.py": "VALUE = 2\n",
+        },
+    )
+    (repo / "src/fieldtrue/runner.py").chmod(0o755)
+    _git(repo, "add", "src/fieldtrue/runner.py")
+    _git(repo, "commit", "--quiet", "-m", "mark runner executable")
+    authority = _git(repo, "rev-parse", "HEAD")
+
+    snapshot = tmp_path / "snapshot"
+    for relative, mode in (
+        ("src/fieldtrue/__init__.py", 0o400),
+        ("src/fieldtrue/acquisition.py", 0o400),
+        ("src/fieldtrue/runner.py", 0o500),
+    ):
+        source = repo / relative
+        target = snapshot / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
+        target.chmod(mode)
+
+    closure = _source_census(
+        repo,
+        authority,
+        authority,
+        working_source_root=snapshot,
+        working_source_private_read_only=True,
+    )
+    assert {path: mode for path, mode, *_ in closure.sources} == {
+        "src/fieldtrue/__init__.py": "100644",
+        "src/fieldtrue/acquisition.py": "100644",
+        "src/fieldtrue/runner.py": "100755",
+    }
 
     with pytest.raises(AcquisitionAuditError, match="noncanonical permissions"):
-        acquisition_module._source_file_mode(metadata)
-    assert acquisition_module._source_file_mode(metadata, private_read_only=True) == "100644"
+        _source_census(repo, authority, authority, working_source_root=snapshot)
+
+    (snapshot / "src/fieldtrue/runner.py").chmod(0o400)
+    with pytest.raises(AcquisitionAuditError, match="working acquisition source census differs"):
+        _source_census(
+            repo,
+            authority,
+            authority,
+            working_source_root=snapshot,
+            working_source_private_read_only=True,
+        )
+
+    (snapshot / "src/fieldtrue/runner.py").chmod(0o440)
+    with pytest.raises(AcquisitionAuditError, match="noncanonical permissions"):
+        _source_census(
+            repo,
+            authority,
+            authority,
+            working_source_root=snapshot,
+            working_source_private_read_only=True,
+        )
 
 
 def test_source_census_rejects_ignored_symlink_descendant(tmp_path: Path) -> None:
