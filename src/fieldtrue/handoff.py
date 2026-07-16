@@ -58,6 +58,7 @@ _HANDOFF_AUTHORITY_MODULE_NAMES = (
     "fieldtrue.adapters.adapt",
     "fieldtrue.approvals",
     "fieldtrue.canonical",
+    "fieldtrue.census",
     "fieldtrue.control_authority",
     "fieldtrue.control_observation",
     "fieldtrue.control_protocol",
