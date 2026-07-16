@@ -228,6 +228,17 @@ def test_source_census_rejects_ignored_sourceless_bytecode(tmp_path: Path) -> No
         _source_census(repo, authority, authority)
 
 
+def test_private_read_only_source_modes_require_explicit_census_policy(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("VALUE = 1\n")
+    source.chmod(0o400)
+    metadata = source.stat()
+
+    with pytest.raises(AcquisitionAuditError, match="noncanonical permissions"):
+        acquisition_module._source_file_mode(metadata)
+    assert acquisition_module._source_file_mode(metadata, private_read_only=True) == "100644"
+
+
 def test_source_census_rejects_ignored_symlink_descendant(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     authority = _initialize_source_repository(

@@ -267,6 +267,7 @@ def test_source_closure_accepts_exact_snapshot_and_committed_import_census(
 
     def source_closure(*_args: Any, **kwargs: Any) -> Any:
         assert kwargs["working_source_root"] == snapshot
+        assert kwargs["working_source_private_read_only"] is True
         return closure
 
     monkeypatch.setattr(producer, "_acquisition_source_closure", source_closure)

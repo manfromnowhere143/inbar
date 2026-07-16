@@ -349,6 +349,7 @@ def _verify_source_closure(
         expected_validator_blob=validator.git_blob,
         expected_validator_sha256=validator.sha256,
         working_source_root=runner.snapshot_root,
+        working_source_private_read_only=True,
     )
     for relative, _mode, _blob, digest, size in closure.sources:
         snapshot_bytes = runner_trust.stable_regular_bytes(

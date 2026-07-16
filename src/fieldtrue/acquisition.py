@@ -3970,17 +3970,23 @@ def _git_source_contents(
     return contents
 
 
-def _source_file_mode(metadata: os.stat_result) -> str:
+def _source_file_mode(
+    metadata: os.stat_result,
+    *,
+    private_read_only: bool = False,
+) -> str:
     permissions = stat.S_IMODE(metadata.st_mode)
-    if permissions == 0o644:
+    if permissions == (0o400 if private_read_only else 0o644):
         return "100644"
-    if permissions == 0o755:
+    if permissions == (0o500 if private_read_only else 0o755):
         return "100755"
     raise AcquisitionAuditError("acquisition source file has noncanonical permissions")
 
 
 def _working_source_census(
     repo_root: Path,
+    *,
+    private_read_only: bool = False,
 ) -> tuple[tuple[tuple[str, str, bytes], ...], tuple[str, ...]]:
     root_path = repo_root / "src" / "fieldtrue"
     if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
@@ -4156,7 +4162,11 @@ def _working_source_census(
                 )
         source_files = tuple(
             sorted(
-                (relative, _source_file_mode(opened), content)
+                (
+                    relative,
+                    _source_file_mode(opened, private_read_only=private_read_only),
+                    content,
+                )
                 for _, opened, _, _, relative, content in files
             )
         )
@@ -4185,6 +4195,7 @@ def _acquisition_source_closure(
     expected_validator_blob: str,
     expected_validator_sha256: str,
     working_source_root: Path | None = None,
+    working_source_private_read_only: bool = False,
 ) -> AcquisitionSourceClosure:
     authority_census = _git_source_census(
         git,
@@ -4208,7 +4219,10 @@ def _acquisition_source_closure(
         environment,
         authority_census,
     )
-    working_files, working_directories = _working_source_census(working_source_root or repo_root)
+    working_files, working_directories = _working_source_census(
+        working_source_root or repo_root,
+        private_read_only=working_source_private_read_only,
+    )
     expected_directories = {"src/fieldtrue"}
     expected_working: list[tuple[str, str, bytes]] = []
     sources: list[tuple[str, str, str, str, int]] = []
