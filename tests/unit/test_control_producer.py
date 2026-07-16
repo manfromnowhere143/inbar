@@ -264,7 +264,12 @@ def test_source_closure_accepts_exact_snapshot_and_committed_import_census(
             ),
         ),
     )
-    monkeypatch.setattr(producer, "_acquisition_source_closure", lambda *_args, **_kw: closure)
+
+    def source_closure(*_args: Any, **kwargs: Any) -> Any:
+        assert kwargs["working_source_root"] == snapshot
+        return closure
+
+    monkeypatch.setattr(producer, "_acquisition_source_closure", source_closure)
     runner = cast(AuthenticatedRunner, SimpleNamespace(snapshot_root=snapshot))
 
     assert producer._verify_source_closure(repo, runner, commit, sources) == ("5" * 64, 1)

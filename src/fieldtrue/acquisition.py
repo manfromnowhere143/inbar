@@ -4184,6 +4184,7 @@ def _acquisition_source_closure(
     repository_head: str,
     expected_validator_blob: str,
     expected_validator_sha256: str,
+    working_source_root: Path | None = None,
 ) -> AcquisitionSourceClosure:
     authority_census = _git_source_census(
         git,
@@ -4207,7 +4208,7 @@ def _acquisition_source_closure(
         environment,
         authority_census,
     )
-    working_files, working_directories = _working_source_census(repo_root)
+    working_files, working_directories = _working_source_census(working_source_root or repo_root)
     expected_directories = {"src/fieldtrue"}
     expected_working: list[tuple[str, str, bytes]] = []
     sources: list[tuple[str, str, str, str, int]] = []
