@@ -68,6 +68,12 @@ The current mission inventory, Git anchors, memory head, and activation gates ar
 as historical results from their linked implementation commit. This continuity document does not
 duplicate those volatile values.
 
+Repository trust admits the inert sparse-checkout residue created by GitHub's pinned checkout action
+only when stable bounded bytes parse through the fixed system Git as a known all-false disabled
+configuration and `extensions.worktreeConfig` is absent. Any active extension, include, duplicate,
+unknown key, non-false value, redirection, special file, unsafe permission, or read race remains a
+hard failure.
+
 ## Conditional research interest
 
 Daniel's deep interest in Einstein field equations, Ricci curvature, and general relativity is

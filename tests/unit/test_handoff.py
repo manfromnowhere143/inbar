@@ -15,6 +15,9 @@ from fieldtrue.handoff import HandoffError, check_handoff, render_handoff, write
 from fieldtrue.memory import MemoryStatus, ResearchMemoryRecord, load_memory_records
 from fieldtrue.mission import MissionValidation, ValidationCheck
 
+_LEGACY_CHECKPOINT_EVENT_ID = "iter001-shortcut-v2-implementation-checkpoint-v1"
+_LEGACY_HANDOFF_EVENT_ID = "iter001-shortcut-v2-activation-gates-v1"
+
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -165,17 +168,42 @@ def _replace_record(
     )
 
 
+def _selected_recovery_records(
+    records: tuple[ResearchMemoryRecord, ...],
+) -> tuple[ResearchMemoryRecord, ResearchMemoryRecord]:
+    handoff = max(
+        (
+            record
+            for record in records
+            if record.mission_id == "inbar"
+            and record.event_type == handoff_module.MemoryEventType.HANDOFF
+        ),
+        key=lambda record: record.sequence,
+    )
+    checkpoint_id = handoff.links["checkpoint"]
+    checkpoint = next(record for record in records if record.event_id == checkpoint_id)
+    return checkpoint, handoff
+
+
+def _legacy_recovery_memory(
+    records: tuple[ResearchMemoryRecord, ...],
+) -> tuple[ResearchMemoryRecord, ...]:
+    legacy_handoff = next(
+        record for record in records if record.event_id == _LEGACY_HANDOFF_EVENT_ID
+    )
+    engine_boundary = next(
+        record
+        for record in records
+        if record.event_id == "future-research-engine-shortcut-v2-lessons-v1"
+    )
+    cutoff = max(legacy_handoff.sequence, engine_boundary.sequence)
+    return tuple(record for record in records if record.sequence <= cutoff)
+
+
 def _versioned_recovery_records(
     records: tuple[ResearchMemoryRecord, ...],
 ) -> tuple[ResearchMemoryRecord, ResearchMemoryRecord]:
-    prior_checkpoint = next(
-        item
-        for item in records
-        if item.event_id == "iter001-shortcut-v2-implementation-checkpoint-v1"
-    )
-    prior_handoff = next(
-        item for item in records if item.event_id == "iter001-shortcut-v2-activation-gates-v1"
-    )
+    prior_checkpoint, prior_handoff = _selected_recovery_records(records)
     validation = {
         **prior_checkpoint.payload["validation"],
         "mission_check_ids": list(handoff_module._EXPECTED_MISSION_CHECK_IDS),
@@ -277,6 +305,7 @@ def test_render_includes_current_memory_checkpoint_and_public_substrate_finding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_verified_dependencies(monkeypatch, memory_records)
+    checkpoint, handoff = _selected_recovery_records(memory_records)
 
     document = render_handoff(handoff_repo).decode("utf-8")
 
@@ -292,12 +321,13 @@ def test_render_includes_current_memory_checkpoint_and_public_substrate_finding(
         in document
     )
     assert "Compute consequence: GPU training remains blocked." in document
-    assert "iter001-shortcut-v2-activation-gates-v1" in document
-    assert "iter001-shortcut-v2-implementation-checkpoint-v1" in document
-    assert "1abbdea48b5f5d04605fca52ac3e8e7b02cbf015" in document
-    assert "513 passed, 1 skipped" in document
-    assert "91.63 percent" in document
-    assert "Research-memory events: 63" in document
+    assert handoff.event_id in document
+    assert checkpoint.event_id in document
+    assert checkpoint.payload["implementation_commit"] in document
+    validation = checkpoint.payload["validation"]
+    assert f"{validation['tests_passed']} passed, {validation['tests_skipped']} skipped" in document
+    assert f"{validation['branch_coverage_percent']:.2f} percent" in document
+    assert f"Research-memory events: {len(memory_records)}" in document
     assert memory_records[-1].event_hash in document
     assert "Canonical control authority: `bootstrap`" in document
     assert "Publication transition: `blocked`" in document
@@ -569,20 +599,19 @@ def test_render_rejects_missing_or_invalid_checkpoint_links(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    handoff_id = "iter001-shortcut-v2-activation-gates-v1"
-    checkpoint_id = "iter001-shortcut-v2-implementation-checkpoint-v1"
+    checkpoint, handoff = _selected_recovery_records(memory_records)
     if mutation == "missing":
-        records = _replace_record(memory_records, handoff_id, links={})
+        records = _replace_record(memory_records, handoff.event_id, links={})
     elif mutation == "unknown":
-        records = _replace_record(memory_records, handoff_id, links={"checkpoint": "absent"})
+        records = _replace_record(memory_records, handoff.event_id, links={"checkpoint": "absent"})
     elif mutation == "future":
         records = _replace_record(
             memory_records,
-            checkpoint_id,
+            checkpoint.event_id,
             sequence=memory_records[-1].sequence + 1,
         )
     else:
-        records = _replace_record(memory_records, checkpoint_id, status=MemoryStatus.BLOCKED)
+        records = _replace_record(memory_records, checkpoint.event_id, status=MemoryStatus.BLOCKED)
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match=message):
@@ -590,39 +619,50 @@ def test_render_rejects_missing_or_invalid_checkpoint_links(
 
 
 @pytest.mark.parametrize(
-    ("event_id", "payload_update"),
+    ("target", "payload_update", "message"),
     [
         (
-            "iter001-shortcut-v2-activation-gates-v1",
+            "handoff",
             {"remaining_gates": []},
+            "payload violates",
         ),
         (
-            "iter001-shortcut-v2-activation-gates-v1",
-            {"next_action": "line one\nline two"},
+            "source",
+            {"product_wedge": "line one\nline two"},
+            "must be one trimmed line",
         ),
         (
-            "iter001-shortcut-v2-implementation-checkpoint-v1",
+            "checkpoint",
             {"unexpected": "not admitted"},
+            "payload violates",
         ),
         (
-            "iter001-public-substrate-verdict-v1",
+            "source",
             {"finding": "PASS_PUBLIC_SUBSTRATE"},
+            "payload violates",
         ),
     ],
 )
 def test_render_rejects_malformed_display_payloads(
-    event_id: str,
+    target: str,
     payload_update: dict[str, object],
+    message: str,
     handoff_repo: Path,
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    checkpoint, handoff = _selected_recovery_records(memory_records)
+    event_id = {
+        "checkpoint": checkpoint.event_id,
+        "handoff": handoff.event_id,
+        "source": "iter001-public-substrate-verdict-v1",
+    }[target]
     record = next(item for item in memory_records if item.event_id == event_id)
     payload = {**record.payload, **payload_update}
     records = _replace_record(memory_records, event_id, payload=payload)
     _install_verified_dependencies(monkeypatch, records)
 
-    with pytest.raises(HandoffError, match=r"payload violates|must be one trimmed line"):
+    with pytest.raises(HandoffError, match=message):
         render_handoff(handoff_repo)
 
 
@@ -631,11 +671,10 @@ def test_render_rejects_coerced_checkpoint_metrics(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    checkpoint_id = "iter001-shortcut-v2-implementation-checkpoint-v1"
-    checkpoint = next(item for item in memory_records if item.event_id == checkpoint_id)
+    checkpoint, _handoff = _selected_recovery_records(memory_records)
     validation = {**checkpoint.payload["validation"], "tests_passed": "513"}
     payload = {**checkpoint.payload, "validation": validation}
-    records = _replace_record(memory_records, checkpoint_id, payload=payload)
+    records = _replace_record(memory_records, checkpoint.event_id, payload=payload)
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match="payload violates its exact contract"):
@@ -647,14 +686,16 @@ def test_render_rejects_a_corrected_selected_event(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    checkpoint, handoff = _versioned_recovery_records(memory_records)
     correction = memory_records[59].model_copy(
         update={
-            "sequence": memory_records[-1].sequence + 1,
+            "sequence": checkpoint.sequence + 1,
             "event_id": "fixture-handoff-correction",
-            "corrects_event_id": "iter001-shortcut-v2-activation-gates-v1",
+            "corrects_event_id": checkpoint.event_id,
         }
     )
-    records = (*memory_records, correction)
+    handoff = handoff.model_copy(update={"sequence": correction.sequence + 1})
+    records = (*memory_records, checkpoint, correction, handoff)
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match="selected recovery events were corrected"):
@@ -666,12 +707,8 @@ def test_render_rejects_an_unversioned_newer_handoff(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    prior = next(
-        item
-        for item in memory_records
-        if item.event_id == "iter001-shortcut-v2-activation-gates-v1"
-    )
-    payload = {**prior.payload, "state": "Newest valid handoff state."}
+    _checkpoint, prior = _selected_recovery_records(memory_records)
+    payload = {**prior.payload, "handoff_contract": None}
     newest = prior.model_copy(
         update={
             "sequence": memory_records[-1].sequence + 1,
@@ -806,11 +843,10 @@ def test_render_rejects_checkpoint_that_changes_bootstrap_blocker_policy(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    checkpoint_id = "iter001-shortcut-v2-implementation-checkpoint-v1"
-    checkpoint = next(item for item in memory_records if item.event_id == checkpoint_id)
+    checkpoint, _handoff = _selected_recovery_records(memory_records)
     validation = {**checkpoint.payload["validation"], "expected_blockers": ["different-blocker"]}
     payload = {**checkpoint.payload, "validation": validation}
-    records = _replace_record(memory_records, checkpoint_id, payload=payload)
+    records = _replace_record(memory_records, checkpoint.event_id, payload=payload)
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match="blocker policy differs"):
@@ -889,12 +925,14 @@ def test_render_escapes_memory_text_before_markdown_emission(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    handoff_id = "iter001-shortcut-v2-activation-gates-v1"
-    record = next(item for item in memory_records if item.event_id == handoff_id)
+    legacy_records = _legacy_recovery_memory(memory_records)
+    handoff = next(
+        record for record in legacy_records if record.event_id == _LEGACY_HANDOFF_EVENT_ID
+    )
     records = _replace_record(
-        memory_records,
-        handoff_id,
-        payload={**record.payload, "next_action": "<!-- hide authority --> # forged"},
+        legacy_records,
+        handoff.event_id,
+        payload={**handoff.payload, "next_action": "<!-- hide authority --> # forged"},
     )
     _install_verified_dependencies(monkeypatch, records)
 
@@ -911,12 +949,14 @@ def test_render_rejects_unicode_line_and_direction_controls(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    handoff_id = "iter001-shortcut-v2-activation-gates-v1"
-    record = next(item for item in memory_records if item.event_id == handoff_id)
+    legacy_records = _legacy_recovery_memory(memory_records)
+    handoff = next(
+        record for record in legacy_records if record.event_id == _LEGACY_HANDOFF_EVENT_ID
+    )
     records = _replace_record(
-        memory_records,
-        handoff_id,
-        payload={**record.payload, "next_action": f"trusted{character}forged"},
+        legacy_records,
+        handoff.event_id,
+        payload={**handoff.payload, "next_action": f"trusted{character}forged"},
     )
     _install_verified_dependencies(monkeypatch, records)
 
@@ -1023,11 +1063,8 @@ def test_render_requires_commit_bound_recovery_evidence(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    event_id = (
-        "iter001-shortcut-v2-implementation-checkpoint-v1"
-        if target == "checkpoint"
-        else "iter001-shortcut-v2-activation-gates-v1"
-    )
+    checkpoint, handoff = _selected_recovery_records(memory_records)
+    event_id = checkpoint.event_id if target == "checkpoint" else handoff.event_id
     records = _replace_record(memory_records, event_id, evidence=())
     _install_verified_dependencies(monkeypatch, records)
 
@@ -1153,12 +1190,8 @@ def test_render_rejects_duplicate_checkpoint_and_handoff_lists(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    event_id = (
-        "iter001-shortcut-v2-implementation-checkpoint-v1"
-        if mode == "checkpoint"
-        else "iter001-shortcut-v2-activation-gates-v1"
-    )
-    record = next(item for item in memory_records if item.event_id == event_id)
+    checkpoint, handoff = _selected_recovery_records(memory_records)
+    record = checkpoint if mode == "checkpoint" else handoff
     if mode == "checkpoint":
         validation = {
             **record.payload["validation"],
@@ -1172,7 +1205,7 @@ def test_render_rejects_duplicate_checkpoint_and_handoff_lists(
         payload_update = {"remaining_gates": ["duplicate gate", "duplicate gate"]}
     records = _replace_record(
         memory_records,
-        event_id,
+        record.event_id,
         payload={**record.payload, **payload_update},
     )
     _install_verified_dependencies(monkeypatch, records)
@@ -1188,7 +1221,7 @@ def test_render_requires_a_blocked_inbar_handoff(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    handoff_id = "iter001-shortcut-v2-activation-gates-v1"
+    _checkpoint, handoff = _selected_recovery_records(memory_records)
     if mode == "absent":
         records = tuple(
             record
@@ -1196,7 +1229,7 @@ def test_render_requires_a_blocked_inbar_handoff(
             if record.event_type != handoff_module.MemoryEventType.HANDOFF
         )
     else:
-        records = _replace_record(memory_records, handoff_id, status=MemoryStatus.PASS)
+        records = _replace_record(memory_records, handoff.event_id, status=MemoryStatus.PASS)
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match=r"no Inbar handoff|preserve blocked"):
@@ -1249,11 +1282,8 @@ def test_render_rejects_checkpoint_commit_substitution(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    event_id = (
-        "iter001-shortcut-v2-implementation-checkpoint-v1"
-        if target == "checkpoint"
-        else "iter001-shortcut-v2-activation-gates-v1"
-    )
+    checkpoint, handoff = _selected_recovery_records(memory_records)
+    event_id = checkpoint.event_id if target == "checkpoint" else handoff.event_id
     records = _replace_record(memory_records, event_id, source_commit="f" * 40)
     _install_verified_dependencies(monkeypatch, records)
 
@@ -1268,9 +1298,8 @@ def test_render_rejects_checkpoint_validation_policy_drift(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    event_id = "iter001-shortcut-v2-implementation-checkpoint-v1"
-    record = next(item for item in memory_records if item.event_id == event_id)
-    validation = dict(record.payload["validation"])
+    checkpoint, _handoff = _selected_recovery_records(memory_records)
+    validation = dict(checkpoint.payload["validation"])
     if mode == "unexpected":
         validation["unexpected_blockers"] = ["unexpected-check"]
     elif mode == "policy":
@@ -1279,8 +1308,8 @@ def test_render_rejects_checkpoint_validation_policy_drift(
         validation["mission_checks"] = 23
     records = _replace_record(
         memory_records,
-        event_id,
-        payload={**record.payload, "validation": validation},
+        checkpoint.event_id,
+        payload={**checkpoint.payload, "validation": validation},
     )
     _install_verified_dependencies(monkeypatch, records)
 
@@ -1502,11 +1531,7 @@ def test_checkpoint_validation_rejects_ambiguous_blocker_and_check_sets(
     mode: str,
     memory_records: tuple[ResearchMemoryRecord, ...],
 ) -> None:
-    checkpoint = next(
-        record
-        for record in memory_records
-        if record.event_id == "iter001-shortcut-v2-implementation-checkpoint-v1"
-    )
+    checkpoint, _handoff = _selected_recovery_records(memory_records)
     validation = dict(checkpoint.payload["validation"])
     if mode == "unexpected-duplicate":
         validation["unexpected_blockers"] = ["other-blocker", "other-blocker"]
@@ -1522,11 +1547,7 @@ def test_checkpoint_validation_rejects_ambiguous_blocker_and_check_sets(
 def test_handoff_validation_rejects_noncanonical_remaining_gate_set(
     memory_records: tuple[ResearchMemoryRecord, ...],
 ) -> None:
-    handoff = next(
-        record
-        for record in memory_records
-        if record.event_id == "iter001-shortcut-v2-activation-gates-v1"
-    )
+    _checkpoint, handoff = _selected_recovery_records(memory_records)
 
     with pytest.raises(ValueError, match="remaining gates differ"):
         handoff_module._HandoffPayload.model_validate(
@@ -1981,15 +2002,14 @@ def test_render_rejects_unbound_recovery_evidence_uri(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    checkpoint_id = "iter001-shortcut-v2-implementation-checkpoint-v1"
-    checkpoint = next(record for record in memory_records if record.event_id == checkpoint_id)
+    checkpoint, _handoff = _selected_recovery_records(memory_records)
     evidence = tuple(
         item.model_copy(update={"uri": "https://example.invalid/substitution"})
         if index == 0
         else item
         for index, item in enumerate(checkpoint.evidence)
     )
-    records = _replace_record(memory_records, checkpoint_id, evidence=evidence)
+    records = _replace_record(memory_records, checkpoint.event_id, evidence=evidence)
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match="not commit and byte bound"):
@@ -2001,12 +2021,27 @@ def test_render_rejects_recovery_memory_identity_drift(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    checkpoint_id = "iter001-shortcut-v2-implementation-checkpoint-v1"
-    records = _replace_record(memory_records, checkpoint_id, mission_id="different-mission")
+    checkpoint, _handoff = _selected_recovery_records(memory_records)
+    records = _replace_record(memory_records, checkpoint.event_id, mission_id="different-mission")
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match="current Inbar memory identity"):
         render_handoff(handoff_repo)
+
+
+def test_render_accepts_frozen_legacy_recovery_contract(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    legacy_records = _legacy_recovery_memory(memory_records)
+    _install_verified_dependencies(monkeypatch, legacy_records)
+
+    document = render_handoff(handoff_repo).decode("utf-8")
+
+    assert f"Active handoff: `{_LEGACY_HANDOFF_EVENT_ID}`" in document
+    assert f"Checkpoint event: `{_LEGACY_CHECKPOINT_EVENT_ID}`" in document
+    assert "This frozen legacy list is non-exhaustive." in document
 
 
 def test_render_rejects_legacy_recovery_contract_drift(
@@ -2014,8 +2049,8 @@ def test_render_rejects_legacy_recovery_contract_drift(
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    checkpoint_id = "iter001-shortcut-v2-implementation-checkpoint-v1"
-    records = _replace_record(memory_records, checkpoint_id, stage="mission-handoff")
+    legacy_records = _legacy_recovery_memory(memory_records)
+    records = _replace_record(legacy_records, _LEGACY_CHECKPOINT_EVENT_ID, stage="mission-handoff")
     _install_verified_dependencies(monkeypatch, records)
 
     with pytest.raises(HandoffError, match="legacy recovery pair differs"):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -231,6 +232,208 @@ def test_git_trust_rejects_execution_capable_worktree_config(tmp_path: Path) -> 
     with pytest.raises(GitTrustError, match="execution-capable or authority-weakening"):
         verify_repository_trust(repo, trusted_git_executable())
     assert not marker.exists()
+
+
+def test_git_trust_accepts_actions_checkout_disabled_sparse_config(tmp_path: Path) -> None:
+    repo = _repository(tmp_path)
+    _git(repo, "sparse-checkout", "disable")
+    _git(repo, "config", "--local", "--unset-all", "extensions.worktreeConfig")
+
+    verify_repository_trust(repo, trusted_git_executable())
+
+    assert (repo / ".git" / "config.worktree").read_text(encoding="ascii") == (
+        "[core]\n"
+        "\tsparseCheckout = false\n"
+        "\tsparseCheckoutCone = false\n"
+        "[index]\n"
+        "\tsparse = false\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        (
+            b"[core]\r\n\tsparseCheckout = false\r\n\tsparseCheckoutCone = false\r\n"
+            b"[index]\r\n\tsparse = false\r\n"
+        ),
+    ],
+)
+def test_git_trust_accepts_known_disabled_worktree_config_variants(
+    content: bytes,
+    tmp_path: Path,
+) -> None:
+    repo = _repository(tmp_path)
+    (repo / ".git" / "config.worktree").write_bytes(content)
+
+    verify_repository_trust(repo, trusted_git_executable())
+
+
+@pytest.mark.parametrize("extension_value", ["false", "true"])
+def test_git_trust_rejects_disabled_worktree_config_when_extension_is_present(
+    extension_value: str,
+    tmp_path: Path,
+) -> None:
+    repo = _repository(tmp_path)
+    _git(repo, "sparse-checkout", "disable")
+    _git(repo, "config", "--local", "extensions.worktreeConfig", extension_value)
+
+    with pytest.raises(GitTrustError, match="authority-weakening local Git config"):
+        verify_repository_trust(repo, trusted_git_executable())
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"[index]\n\tsparse = false\n",
+        b"[core]\n\tsparseCheckout = false\n",
+        (
+            b"[core]\n\tsparseCheckout = true\n\tsparseCheckoutCone = false\n"
+            b"[index]\n\tsparse = false\n"
+        ),
+        (
+            b"[core]\n\tsparseCheckout = false\n\tsparseCheckoutCone = false\n"
+            b"\thooksPath = /tmp/evil\n[index]\n\tsparse = false\n"
+        ),
+        b"[include]\n\tpath = /tmp/evil\n",
+        b'[includeIf "gitdir:/tmp/**"]\n\tpath = /tmp/evil\n',
+        (
+            b"[core]\n\tsparseCheckout = false\n\tsparseCheckout = false\n"
+            b"\tsparseCheckoutCone = false\n[index]\n\tsparse = false\n"
+        ),
+        b"\xff",
+        b"x" * 4097,
+    ],
+)
+def test_git_trust_rejects_noncanonical_disabled_worktree_config(
+    content: bytes,
+    tmp_path: Path,
+) -> None:
+    repo = _repository(tmp_path)
+    (repo / ".git" / "config.worktree").write_bytes(content)
+
+    with pytest.raises(GitTrustError, match="worktree-config state is forbidden"):
+        verify_repository_trust(repo, trusted_git_executable())
+
+
+@pytest.mark.parametrize("fault", ["symlink", "hardlink", "fifo", "permissions"])
+def test_git_trust_rejects_unsafe_disabled_worktree_config_file(
+    fault: str,
+    tmp_path: Path,
+) -> None:
+    repo = _repository(tmp_path)
+    worktree_config = repo / ".git" / "config.worktree"
+    external = tmp_path / "external-config"
+    external.write_text("[index]\n\tsparse = false\n", encoding="ascii")
+    if fault == "symlink":
+        worktree_config.symlink_to(external)
+    elif fault == "hardlink":
+        worktree_config.hardlink_to(external)
+    elif fault == "fifo":
+        os.mkfifo(worktree_config)
+    else:
+        worktree_config.write_text("[index]\n\tsparse = false\n", encoding="ascii")
+        worktree_config.chmod(0o666)
+
+    with pytest.raises(GitTrustError, match=r"metadata is redirected|unsafe ownership or mode"):
+        verify_repository_trust(repo, trusted_git_executable())
+
+
+def test_git_trust_rejects_worktree_config_substitution_during_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _repository(tmp_path)
+    _git(repo, "sparse-checkout", "disable")
+    _git(repo, "config", "--local", "--unset-all", "extensions.worktreeConfig")
+    git_dir = repo / ".git"
+    worktree_config = git_dir / "config.worktree"
+    expected_directory = git_dir.lstat()
+    original_stat = git_trust_module.os.stat
+    substituted = False
+
+    def substitute(path: object, *args: object, **kwargs: object) -> os.stat_result:
+        nonlocal substituted
+        if path == "config.worktree" and kwargs.get("dir_fd") is not None and not substituted:
+            substituted = True
+            with worktree_config.open("ab") as handle:
+                handle.write(b"\n")
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(git_trust_module.os, "stat", substitute)
+
+    with pytest.raises(GitTrustError, match="changed while being read"):
+        git_trust_module._read_stable_worktree_config(git_dir, expected_directory)
+
+
+def test_git_trust_rejects_worktree_config_creation_during_absence_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _repository(tmp_path)
+    git_dir = repo / ".git"
+    worktree_config = git_dir / "config.worktree"
+    expected_directory = git_dir.lstat()
+    original_stat = git_trust_module.os.stat
+    created = False
+
+    def create(path: object, *args: object, **kwargs: object) -> os.stat_result:
+        nonlocal created
+        if path == "config.worktree" and kwargs.get("dir_fd") is not None and not created:
+            created = True
+            worktree_config.write_text("[index]\n\tsparse = false\n", encoding="ascii")
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(git_trust_module.os, "stat", create)
+
+    with pytest.raises(GitTrustError, match="changed while being read"):
+        git_trust_module._read_stable_worktree_config(git_dir, expected_directory)
+
+
+def test_git_trust_rejects_git_directory_substitution_during_config_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _repository(tmp_path)
+    _git(repo, "sparse-checkout", "disable")
+    _git(repo, "config", "--local", "--unset-all", "extensions.worktreeConfig")
+    git_dir = repo / ".git"
+    displaced = tmp_path / "displaced-git"
+    expected_directory = git_dir.lstat()
+    original_stat = git_trust_module.os.stat
+    substituted = False
+
+    def substitute(path: object, *args: object, **kwargs: object) -> os.stat_result:
+        nonlocal substituted
+        if Path(path) == git_dir and not substituted:
+            substituted = True
+            git_dir.rename(displaced)
+            git_dir.symlink_to(displaced, target_is_directory=True)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(git_trust_module.os, "stat", substitute)
+
+    with pytest.raises(GitTrustError, match="directory changed while being read"):
+        git_trust_module._read_stable_worktree_config(git_dir, expected_directory)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("core.worktree", "../../escape"),
+        ("includeIf.gitdir:../**.path", "../evil-config"),
+    ],
+)
+def test_git_trust_rejects_repository_redirection_before_repo_aware_commands(
+    key: str,
+    value: str,
+    tmp_path: Path,
+) -> None:
+    repo = _repository(tmp_path)
+    _git(repo, "config", "--local", key, value)
+
+    with pytest.raises(GitTrustError, match="authority-weakening local Git config"):
+        verify_repository_trust(repo, trusted_git_executable())
 
 
 def test_git_trust_rejects_partial_clone_configuration(tmp_path: Path) -> None:
