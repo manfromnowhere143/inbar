@@ -1,0 +1,308 @@
+{
+  "amendment_document": {
+    "artifact_sha256": "a0a152006542e475188342f0ba8524037472d50001406449edbb67a4364a3e82",
+    "path": "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_002.md"
+  },
+  "amendment_id": "iter001_002",
+  "approval": {
+    "approval_basis": "owner_delegation_not_owner_review",
+    "approval_basis_disclosed_in_amendment_document_section": "Approval basis",
+    "decision": "approve_source_census_implementation_only",
+    "delegation_authorized_at": "2026-07-16",
+    "delegation_weakens_proposer_signer_separation": true,
+    "owner_read_document_before_authorization": false,
+    "owner_retains_unrestricted_revocation": true,
+    "proposer_and_signer_are_same_agent": true,
+    "receipt_attests_approval_by_delegation_not_review": true,
+    "frozen_owner_actor_id": "daniel-wahnich",
+    "frozen_owner_ed25519_public_key": "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962",
+    "frozen_owner_key_trust_basis": "git-pinned-iter001-governance-ed25519-no-external-timestamp",
+    "frozen_owner_signer_anchor_artifact_sha256": "c5cf91b620ae3f34cc9ecebf936c4f48014f04cfa21e3fdc1cf0713f440b1804",
+    "frozen_owner_signer_anchor_commit": "2955c1bcca190430cd5c88c57187126bb7531d7a",
+    "frozen_owner_signer_anchor_path": "protocol/acquisition/iter001_contract.json",
+    "frozen_owner_signing_key_id": "iter001-governance",
+    "previous_receipt_genesis_forbidden": true,
+    "previous_receipt_sha256": "482575c10bb58da6b867ee60587cefa290512fa6f09529a324cea3002fd616c3",
+    "receipt_fields": [
+      "schema_version",
+      "approval_id",
+      "owner_actor_id",
+      "owner_signing_key_id",
+      "owner_signer_anchor_artifact_sha256",
+      "owner_key_trust_basis",
+      "owner_ed25519_public_key",
+      "proposal_git_commit",
+      "amendment_document_artifact_sha256",
+      "machine_proposal_artifact_sha256",
+      "decision",
+      "previous_approval_receipt_sha256",
+      "nonce",
+      "issued_at",
+      "receipt_hash",
+      "signature"
+    ],
+    "receipt_hash_algorithm": "sha256-compact-canonical-json-v1",
+    "receipt_hash_excludes": [
+      "receipt_hash",
+      "signature"
+    ],
+    "receipt_nonce": "fresh_32_bytes_lowercase_hex",
+    "receipt_path": "protocol/approvals/iter001_002_owner_approval.json",
+    "receipt_schema": "inbar.owner-amendment-approval-receipt.v2",
+    "receipt_signature": "ed25519_over_raw_receipt_hash_bytes",
+    "separate_signed_receipt_required": true,
+    "v1_receipt_immutable_and_not_reinterpreted": true,
+    "v2_widens_decision_literal_only": true
+  },
+  "authority_effect": {
+    "canonical_control_authority": "bootstrap",
+    "census_execution_authorized": false,
+    "census_pass_is_nomination_not_admission": true,
+    "proposal_alone_implementation_authorized": false,
+    "proposal_alone_publication_transition_authorized": false,
+    "proposal_alone_retrieval_authorized": false,
+    "proposal_alone_scientific_verdict_authorized": false,
+    "proposal_alone_truth_release_authorized": false,
+    "registered_blocker_remains": "iter001-acquisition-contract"
+  },
+  "census_unit": {
+    "counts_toward_incident_floor": false,
+    "id": "screened_source_candidate",
+    "new_candidate_requires_authority_issued_version": true,
+    "not_additional_candidates": [
+      "repeated_retrieval",
+      "mirror",
+      "derived_copy",
+      "re_release",
+      "describing_paper",
+      "documentation_page"
+    ],
+    "scientific_unit_unchanged": "root_incident_group"
+  },
+  "chronology_policy": {
+    "c1_hypothesis_artifact_content_frozen": true,
+    "c2_date_established_by_publishing_authority": true,
+    "c3_precedes_determination_artifact_by_authority_dating": true,
+    "c4_mechanism_set_stated_by_investigating_authority": true,
+    "c4_researcher_reconstruction_forbidden": true,
+    "c5_explicit_unknown_category_required": true,
+    "c5_unknown_mass_manufacture_forbidden": true,
+    "c6_extraction_reviewer_must_be_unexposed": true,
+    "c6_exposed_extraction_disposition": "contaminated_diagnostic_only_permanently_floor_ineligible",
+    "conjunctive": true,
+    "consequence_declared": "counted_historical_dossiers_require_a_second_unexposed_reviewer"
+  },
+  "fact_locator_policy": {
+    "content_frozen_requires_authority_issued_immutable_identifier": true,
+    "content_frozen_identifier_kinds": [
+      "doi",
+      "versioned_record",
+      "tagged_release",
+      "authority_assigned_docket_or_report_number",
+      "independent_archival_snapshot_publishing_its_own_content_hash"
+    ],
+    "excerpt_committed_only_when_terms_permit_quotation": true,
+    "gate_bearing_requires_content_frozen": true,
+    "locator_kinds": [
+      "pdf_page",
+      "section_path",
+      "line_range",
+      "record_field",
+      "table_cell"
+    ],
+    "mutability_classes": [
+      "content_frozen",
+      "mutable_page"
+    ],
+    "mutable_page_may_establish_gate": false,
+    "required_fields": [
+      "assertion_id",
+      "source_id",
+      "assertion_text",
+      "retrieval_uri",
+      "retrieval_method",
+      "retrieved_at",
+      "response_bytes_sha256",
+      "response_bytes",
+      "locator",
+      "excerpt_sha256",
+      "mutability_class"
+    ],
+    "response_bytes_sha256_over_exact_octet_stream": true,
+    "re_retrieval_drift_disposition": "record_distinct_observation_and_invalidate_dependent_gate",
+    "third_party_bytes_committed": false
+  },
+  "frame": {
+    "declared_incomplete_by_construction": true,
+    "extension_requires_prospective_amendment_before_retrieval": true,
+    "frozen_before_retrieval": true,
+    "object_classes": [
+      "dataset_release",
+      "investigation_record"
+    ],
+    "object_class_reassignment_after_gate_result_forbidden": true,
+    "stratum_a": {
+      "contaminated": true,
+      "failure_evidential_weight": "weak_reproduces_prior",
+      "id": "prior_exposed",
+      "pass_evidential_weight": "credible_against_prior_publish_as_legacy_correction",
+      "purpose": "documentation_repair_bind_reconstructible_locators",
+      "source": "docs/research/ITER001_SOURCE_ROLE_AUDIT.md"
+    },
+    "stratum_b": {
+      "central_hypothesis": "the_complete_incident_construct_is_the_shape_of_an_investigation_not_a_dataset_release",
+      "domains": [
+        "ntsb_public_investigation_dockets_all_modes",
+        "us_chemical_safety_board_completed_investigations",
+        "nrc_licensee_event_reports_and_information_notices",
+        "nasa_lessons_learned_and_unrestricted_anomaly_reporting_surfaces",
+        "gidep_alert_and_safe_alert_publications",
+        "faa_service_difficulty_reports_and_airworthiness_directive_cited_material",
+        "easa_and_esa_unrestricted_published_anomaly_and_safety_investigations",
+        "osha_robotic_and_automated_machinery_accident_investigations",
+        "doi_issuing_repositories_by_stated_query"
+      ],
+      "enumeration_method_recorded_before_screening": true,
+      "id": "prospective",
+      "retrieved_by_drafter": false
+    },
+    "verdict_scope": "frame_scoped_never_generalized"
+  },
+  "frozen_inputs": {
+    "amendment_001_and_receipt_in_force_unmodified": true,
+    "iter000_artifacts_cannot_be_relabeled_as_census": true,
+    "parent_hypothesis_byte_identical": true,
+    "parent_hypothesis_commit": "52d71e16a75df12adf47e943fd5c329f6e04d5c0",
+    "unchanged": [
+      "scientific_unit",
+      "complete_incident_contract",
+      "frozen_corpus_coverage_gates",
+      "execution_ceiling",
+      "safety_boundary",
+      "iteration_verdict_classes",
+      "forbidden_claims"
+    ]
+  },
+  "gate_order": [
+    "rights_and_terms",
+    "immutable_version_or_authority_identifier",
+    "physical_identity_and_system_family",
+    "object_class_appropriate_evidence_presence",
+    "mechanism_authority",
+    "pre_outcome_ambiguity_and_chronology",
+    "diagnostic_action_execution",
+    "recovery_execution",
+    "independent_settled_outcome",
+    "clock_contract",
+    "role_independence",
+    "size_and_staging_feasibility"
+  ],
+  "implementation_gate": {
+    "canonical_contract_must_fail_closed": true,
+    "census_control_suite_version_required": true,
+    "census_execution_requires_separate_resource_authority": true,
+    "owner_approval_required_before_code": true,
+    "permitted_implementation": [
+      "typed_census_contracts_and_schemas",
+      "frozen_frame_registry_and_enumeration_methods",
+      "fact_locator_and_retrieval_validator",
+      "stratum_object_class_chronology_and_role_inheritance_policies",
+      "gate_order_and_no_borrowing_validators",
+      "census_verdict_path",
+      "adversarial_control_suite",
+      "explicit_census_hashes_in_census_report"
+    ],
+    "production_artifacts_authorized": false
+  },
+  "iteration_id": "iter001_physical_causal_evidence_acquisition",
+  "no_borrowing_policy": {
+    "across_candidates": false,
+    "across_domains": false,
+    "across_object_classes": false,
+    "from_describing_paper": false,
+    "from_researcher_inference": false,
+    "within_record_across_root_events": false
+  },
+  "normative_relation": {
+    "conflict_disposition": "INVALID",
+    "document_and_machine_proposal_jointly_required": true,
+    "implementation_must_bind_both_artifact_hashes": true,
+    "machine_proposal_may_not_weaken_document": true,
+    "narrows_undefined_screening_discipline_only": true
+  },
+  "prior_exposure": {
+    "census_artifact_exists": false,
+    "eligible_iter001_physical_corpus_inspected": false,
+    "fact_locator_retrieved": false,
+    "reviewed_material": [
+      "iter001_source_role_audit",
+      "iter001_hypothesis_and_prior_exposure_disclosure",
+      "roadmap",
+      "readme",
+      "continuity",
+      "generated_handoff",
+      "iter000_nasa_adapt_result"
+    ],
+    "stratum_a_blocking_gaps_known_to_drafter": true,
+    "stratum_b_domains_inspected": false
+  },
+  "resource_ceiling": {
+    "bulk_download_forbidden": true,
+    "max_cpu_hours": 4,
+    "max_elapsed_hours": 2,
+    "max_peak_memory_gib": 16,
+    "max_peak_staged_gib": 2,
+    "max_retrieved_gib": 1,
+    "missing_measurement_invalidates_audit": true,
+    "retrieval_scope": [
+      "public_metadata",
+      "landing_records",
+      "documentation",
+      "governing_terms",
+      "individual_investigation_documents_for_unfailed_gates"
+    ],
+    "zero_authority": [
+      "gpu_hours",
+      "cloud_jobs",
+      "paid_provider_calls",
+      "live_system_authority",
+      "physical_actuation",
+      "provider_cost",
+      "third_party_redistribution"
+    ]
+  },
+  "role_inheritance_policy": {
+    "conjunctive": true,
+    "different_display_names_never_establish_independence": true,
+    "i1_authority_governance_documents_role_separation": true,
+    "i2_record_names_distinct_role_holders_or_organizations": true,
+    "i3_content_addressed_conflict_record_constructible": true,
+    "i4_outcome_adjudicator_disjoint_from_operator_proposer_executor": true,
+    "parent_rule_unchanged": "organizational_separation_is_supporting_metadata_not_proof_by_itself"
+  },
+  "schema_version": "inbar.iter001-source-census-proposal.v1",
+  "status": "immutable_proposal",
+  "stop_rules": [
+    "stop_candidate_at_first_failing_hard_gate",
+    "no_retrieval_after_earlier_hard_gate_failure",
+    "stop_census_on_unresolvable_written_rights_conflict",
+    "stop_census_when_frame_not_enumerable_by_stated_method",
+    "stop_census_on_control_failure",
+    "stop_census_at_resource_ceiling",
+    "no_gate_lowered_after_retrieval",
+    "corrections_prospective_explicit_append_only"
+  ],
+  "verdict_policy": {
+    "classes": [
+      "CENSUS_QUALIFYING_CANDIDATE",
+      "CENSUS_NULL_WITHIN_FRAME",
+      "CENSUS_BLOCKED_RIGHTS",
+      "CENSUS_INVALID",
+      "CENSUS_INFRASTRUCTURE_NULL"
+    ],
+    "frame_scope_required_in_every_verdict": true,
+    "kill_public_substrate_unreachable_by_this_instrument": true,
+    "null_within_frame_is_full_weight_result": true,
+    "qualifying_candidate_effect": "nomination_for_separately_authorized_acquisition_only"
+  }
+}
