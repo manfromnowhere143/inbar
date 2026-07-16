@@ -224,8 +224,23 @@
   },
   "additionalProperties": false,
   "properties": {
+    "acquisition_contract_git_blob": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Acquisition Contract Git Blob",
+      "type": "string"
+    },
+    "acquisition_contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Acquisition Contract Sha256",
+      "type": "string"
+    },
     "attestation": {
       "$ref": "#/$defs/SignedAttestation"
+    },
+    "authority_profile": {
+      "const": "test_fixture",
+      "title": "Authority Profile",
+      "type": "string"
     },
     "control_test_git_blob": {
       "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
@@ -293,8 +308,8 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "fieldtrue.admission-control-suite-receipt.v1",
-      "default": "fieldtrue.admission-control-suite-receipt.v1",
+      "const": "fieldtrue.admission-control-suite-receipt.v2",
+      "default": "fieldtrue.admission-control-suite-receipt.v2",
       "title": "Schema Version",
       "type": "string"
     },
@@ -316,6 +331,9 @@
   },
   "required": [
     "suite_id",
+    "authority_profile",
+    "acquisition_contract_git_blob",
+    "acquisition_contract_sha256",
     "validator_git_blob",
     "validator_source_sha256",
     "fixture_builder_git_blob",

@@ -77,7 +77,7 @@ def test_canonical_authority_rejects_synthetic_test_root(tmp_path: Path) -> None
         audit_acquisition(canonical_contract, input_root)
 
     assert isinstance(error.value.__cause__, AcquisitionAuditError)
-    assert str(error.value.__cause__) == "trust registry is not signed by the contract anchor"
+    assert str(error.value.__cause__) == "control suite authority profile differs from the contract"
 
 
 def test_production_cli_fails_closed_for_synthetic_test_root(

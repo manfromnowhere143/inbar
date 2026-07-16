@@ -59,7 +59,7 @@ from fieldtrue.acquisition import (
     write_admission_output,
 )
 from fieldtrue.canonical import read_json, sha256_file, sha256_value, write_json
-from fieldtrue.control_authority import record_control_observation
+from fieldtrue.control_observation import record_control_observation
 from fieldtrue.git_trust import git_environment, trusted_repository_git
 from fieldtrue.splits import SplitUnit, freeze_group_split
 from tests.acquisition_helpers import (
@@ -791,6 +791,54 @@ def test_sealed_binding_rejects_ordinary_interpreter(
         verify_preregistration_binding(repo, contract)
 
 
+def test_sealed_binding_rejects_disconnected_preregistration_history(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(acquisition_module, "_isolated_launcher_flags_present", lambda: True)
+    monkeypatch.setattr(
+        acquisition_module,
+        "_executing_validator_matches_source",
+        lambda *_: True,
+    )
+    source_repo = Path(__file__).resolve().parents[2]
+    repo = tmp_path / "repo"
+    _git(tmp_path, "clone", "--quiet", "--no-hardlinks", str(source_repo), str(repo))
+    _git(repo, "config", "user.name", "Acquisition Ancestry Test")
+    _git(repo, "config", "user.email", "acquisition-ancestry@example.invalid")
+    disconnected = _git(
+        repo,
+        "commit-tree",
+        _git(repo, "rev-parse", "HEAD^{tree}"),
+        "-m",
+        "disconnected preregistration",
+    )
+    _git(repo, "checkout", "--quiet", "--detach", disconnected)
+
+    contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
+    contract_value = read_json(contract_path)
+    contract_value.update(
+        {
+            "control_authority_status": "sealed",
+            "validator_git_blob": _git(
+                repo,
+                "rev-parse",
+                "HEAD:src/fieldtrue/acquisition.py",
+            ),
+            "validator_source_sha256": sha256_file(repo / "src" / "fieldtrue" / "acquisition.py"),
+            "dependency_lock_sha256": sha256_file(repo / "uv.lock"),
+            "control_suite_sha256": "1" * 64,
+        }
+    )
+    contract = AcquisitionContract.model_validate(contract_value)
+    write_json(contract_path, contract)
+    _git(repo, "add", "protocol/acquisition/iter001_contract.json")
+    _git(repo, "commit", "--quiet", "-m", "seal disconnected authority")
+
+    with pytest.raises(AcquisitionAuditError, match="not control execution ancestry"):
+        verify_preregistration_binding(repo, contract, _git(repo, "rev-parse", "HEAD"))
+
+
 def test_isolated_python_flags_can_satisfy_launcher_contract() -> None:
     result = subprocess.run(
         [
@@ -1138,6 +1186,19 @@ def test_complete_conjunctive_pilot_passes(tmp_path: Path) -> None:
         "system-family-2": 10,
     }
     assert coverage.observed["maximum_share"] == 0.4
+
+
+def test_audit_rejects_fixture_receipt_under_a_different_authority_profile(
+    tmp_path: Path,
+) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    mismatched = contract.model_copy(update={"authority_profile": "canonical"})
+
+    with pytest.raises(AcquisitionAuditError, match="trust or control authority") as error:
+        audit_acquisition(mismatched, tmp_path)
+
+    assert isinstance(error.value.__cause__, AcquisitionAuditError)
+    assert str(error.value.__cause__) == "control suite authority profile differs from the contract"
 
 
 def test_29_complete_dossiers_are_blocked_not_promoted_by_rows(tmp_path: Path) -> None:

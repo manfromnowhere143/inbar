@@ -66,13 +66,16 @@ from fieldtrue.control_authority import (
     ControlExecutionEvidence,
     ControlExecutionManifest,
     ControlManifestEntry,
+    GitBoundSource,
+)
+from fieldtrue.control_observation import (
     ControlObservation,
     FixtureFile,
     FixtureSnapshot,
-    GitBoundSource,
     PytestLifecycle,
     PytestPhase,
 )
+from fieldtrue.control_protocol import ControlProducerRequest, ControlProducerResponse
 from fieldtrue.domain import (
     AssuranceCertificate,
     ClaimRecord,
@@ -159,6 +162,8 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "control_git_bound_source.schema.json": GitBoundSource,
     "control_manifest_entry.schema.json": ControlManifestEntry,
     "control_observation.schema.json": ControlObservation,
+    "control_producer_request.schema.json": ControlProducerRequest,
+    "control_producer_response.schema.json": ControlProducerResponse,
     "control_pytest_lifecycle.schema.json": PytestLifecycle,
     "control_pytest_phase.schema.json": PytestPhase,
     "discriminating_test.schema.json": DiscriminatingTest,

@@ -1,49 +1,39 @@
-"""Outcome-bound admission-control execution and receipt generation.
+"""Shared admission-control execution primitives and read-only fixture verification.
 
-The generator is intentionally separate from the acquisition validator.  It executes the
-frozen controls in isolated pytest processes and requires each control to emit one machine
-observation through :func:`record_control_observation` or
-:func:`record_control_exception`.  A passing pytest exit code without that evidence cannot
-produce a signed receipt.
+The signing producer lives in :mod:`fieldtrue.control_producer`, while pytest observation capture
+lives in :mod:`fieldtrue.control_observation`. A passing pytest exit without a bound observation and
+lifecycle record cannot contribute to a fixture receipt.
 """
 
 from __future__ import annotations
 
-import argparse
-import ctypes
-import errno
 import json
 import os
 import selectors
-import shutil
 import signal
 import subprocess
-import sys
 import tempfile
 import time
 from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal, NoReturn, Self, TypeVar
+from typing import Any, Literal, Self, TypeVar
 
 from nacl.exceptions import BadSignatureError
-from nacl.signing import SigningKey, VerifyKey
+from nacl.signing import VerifyKey
 from pydantic import BaseModel, Field, model_validator
 
 import fieldtrue.runner_trust as runner_trust
 from fieldtrue.acquisition import (
     _CONTROL_REQUIREMENTS,
     _REQUIRED_CONTROL_IDS,
-    AcquisitionAdmissionReport,
-    AcquisitionCandidateRegistry,
     AcquisitionContract,
-    AcquisitionGateResult,
     AdmissionControlResult,
     AdmissionControlSuiteReceipt,
     ArtifactBinding,
     AttestationSubjectKind,
+    _acquisition_source_closure,
     attestation_subject_hash,
-    issue_attestation,
 )
 from fieldtrue.canonical import (
     atomic_write,
@@ -53,16 +43,16 @@ from fieldtrue.canonical import (
     sha256_file,
     sha256_value,
 )
+from fieldtrue.control_observation import (
+    ControlObservation,
+    PytestLifecycle,
+)
+from fieldtrue.control_protocol import CONTROL_PRODUCER_SNAPSHOT_PATHS
+from fieldtrue.control_protocol import ControlAuthorityError as ControlAuthorityError
 from fieldtrue.domain import FrozenModel, GitObjectId, Identifier, Sha256
 from fieldtrue.git_trust import GitTrustError, git_environment, trusted_repository_git
-from fieldtrue.receipts import load_or_create_signing_key
 from fieldtrue.runner_trust import (
-    MAX_RUNNER_FILE_BYTES,
-    MAX_RUNNER_TREE_BYTES,
-    MAX_RUNNER_TREE_ENTRIES,
-    RUNNER_PYTHON_FULL_VERSION,
     AuthenticatedRunner,
-    RunnerTrustError,
 )
 
 _OBSERVATION_ENV = "FIELDTRUE_CONTROL_OBSERVATION_PATH"
@@ -70,12 +60,18 @@ _OUTCOME_ENV = "FIELDTRUE_CONTROL_PYTEST_OUTCOME_PATH"
 _CONTROL_ENV = "FIELDTRUE_CONTROL_ID"
 _NODE_ENV = "FIELDTRUE_CONTROL_NODE_ID"
 _SUITE_ID: Literal["iter001-admission-controls-v1"] = "iter001-admission-controls-v1"
-_GENERATOR_PATH = "src/fieldtrue/control_authority.py"
+_GENERATOR_PATH = "src/fieldtrue/control_producer.py"
 _SOURCE_PATHS = (
+    ("acquisition_contract", "protocol/acquisition/iter001_contract.json"),
     ("validator", "src/fieldtrue/acquisition.py"),
     ("fixture_builder", "tests/acquisition_helpers.py"),
     ("control_test", "tests/unit/test_acquisition.py"),
+    ("project_config", "pyproject.toml"),
+    ("tests_package_init", "tests/__init__.py"),
+    ("unit_tests_package_init", "tests/unit/__init__.py"),
+    ("observer", "src/fieldtrue/control_observation.py"),
     ("generator", _GENERATOR_PATH),
+    ("launcher", "src/fieldtrue/control_launcher.py"),
     ("dependency_lock", "uv.lock"),
 )
 _MAX_CAPTURE_BYTES = 4 * 1024 * 1024
@@ -85,15 +81,7 @@ _CAPTURE_READ_BYTES = 64 * 1024
 _PROCESS_TERMINATION_GRACE_SECONDS = 0.25
 _PROCESS_GROUP_POLL_SECONDS = 0.01
 _RUNNER_ROOT_DISTRIBUTIONS = frozenset({"certifi", "networkx", "pydantic", "pynacl", "pytest"})
-_RUNNER_SNAPSHOT_PATHS = (
-    "pyproject.toml",
-    "uv.lock",
-    "src/fieldtrue",
-    "tests/__init__.py",
-    "tests/acquisition_helpers.py",
-    "tests/unit/__init__.py",
-    "tests/unit/test_acquisition.py",
-)
+_RUNNER_SNAPSHOT_PATHS = CONTROL_PRODUCER_SNAPSHOT_PATHS
 _PARENT_SOURCE_MODULES = (
     ("fieldtrue.acquisition", "src/fieldtrue/acquisition.py"),
     ("fieldtrue.approvals", "src/fieldtrue/approvals.py"),
@@ -116,60 +104,6 @@ Verdict = Literal[
 ]
 
 ControlSidecarT = TypeVar("ControlSidecarT", bound=BaseModel)
-
-
-class ControlAuthorityError(RuntimeError):
-    """The production control evidence is incomplete, ambiguous, or untrusted."""
-
-
-class FixtureFile(FrozenModel):
-    path: str = Field(min_length=1)
-    sha256: Sha256
-    bytes: int = Field(ge=0)
-
-
-class FixtureSnapshot(FrozenModel):
-    algorithm: Literal["fieldtrue.fixture-tree.v1"] = "fieldtrue.fixture-tree.v1"
-    files: tuple[FixtureFile, ...] = Field(min_length=1)
-    root_sha256: Sha256
-
-    @model_validator(mode="after")
-    def root_is_derived(self) -> Self:
-        expected = sha256_value([item.model_dump(mode="json") for item in self.files])
-        if self.root_sha256 != expected:
-            raise ValueError("fixture tree digest is not derived from its file inventory")
-        paths = [item.path for item in self.files]
-        if paths != sorted(paths) or len(paths) != len(set(paths)):
-            raise ValueError("fixture file inventory must be sorted and unique")
-        return self
-
-
-class ControlObservation(FrozenModel):
-    schema_version: Literal["fieldtrue.control-observation.v1"] = "fieldtrue.control-observation.v1"
-    control_id: Identifier
-    pytest_node_id: str
-    fixture: FixtureSnapshot
-    report_sha256: Sha256
-    report: dict[str, Any]
-    observed_verdict: Verdict
-    observed_gate_id: Identifier
-    observed_failure_code: Identifier | None
-
-
-class PytestPhase(FrozenModel):
-    when: Literal["setup", "call", "teardown"]
-    outcome: Literal["passed", "failed", "skipped"]
-    was_xfail: bool
-
-
-class PytestLifecycle(FrozenModel):
-    schema_version: Literal["fieldtrue.pytest-control-lifecycle.v1"] = (
-        "fieldtrue.pytest-control-lifecycle.v1"
-    )
-    requested_node_id: str
-    collected_node_ids: tuple[str, ...]
-    phases: tuple[PytestPhase, ...]
-    exit_status: int
 
 
 class GitBoundSource(FrozenModel):
@@ -207,8 +141,8 @@ class ControlManifestEntry(FrozenModel):
 
 
 class ControlExecutionManifest(FrozenModel):
-    schema_version: Literal["fieldtrue.control-execution-manifest.v1"] = (
-        "fieldtrue.control-execution-manifest.v1"
+    schema_version: Literal["fieldtrue.control-execution-manifest.v2"] = (
+        "fieldtrue.control-execution-manifest.v2"
     )
     suite_id: Literal["iter001-admission-controls-v1"]
     execution_commit: GitObjectId
@@ -225,6 +159,8 @@ class ControlExecutionManifest(FrozenModel):
     python_version: str
     runner_environment_sha256: Sha256
     artifact_set_sha256: Sha256
+    source_closure_sha256: Sha256
+    source_file_count: int = Field(ge=1)
     environment_policy: tuple[str, ...]
     sources: tuple[GitBoundSource, ...]
     controls: tuple[ControlManifestEntry, ...]
@@ -248,292 +184,6 @@ def _control_requirement(control_id: str) -> tuple[str, Verdict, str, str | None
     except KeyError as error:
         raise ControlAuthorityError(f"unknown admission control: {control_id}") from error
     return node_id, verdict, gate_id, failure_code  # type: ignore[return-value]
-
-
-def snapshot_fixture_tree(root: Path) -> FixtureSnapshot:
-    """Hash every regular file in one fixture tree; reject links and special files."""
-
-    root = root.resolve(strict=True)
-    if not root.is_dir():
-        raise ControlAuthorityError("control fixture root is not a directory")
-    files: list[FixtureFile] = []
-    for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
-        relative = path.relative_to(root).as_posix()
-        if path.is_symlink():
-            raise ControlAuthorityError(f"control fixture contains a symbolic link: {relative}")
-        if path.is_dir():
-            continue
-        if not path.is_file():
-            raise ControlAuthorityError(f"control fixture contains a special file: {relative}")
-        files.append(
-            FixtureFile(
-                path=relative,
-                sha256=sha256_file(path),
-                bytes=path.stat().st_size,
-            )
-        )
-    if not files:
-        raise ControlAuthorityError("control fixture tree is empty")
-    return FixtureSnapshot(
-        files=tuple(files),
-        root_sha256=sha256_value([item.model_dump(mode="json") for item in files]),
-    )
-
-
-def _gate(report: AcquisitionAdmissionReport, gate_id: str) -> AcquisitionGateResult:
-    matches = [gate for gate in report.gates if gate.gate_id == gate_id]
-    if len(matches) != 1:
-        raise ControlAuthorityError(f"control report does not contain one {gate_id} gate")
-    return matches[0]
-
-
-def _failure_text(gate: AcquisitionGateResult) -> str:
-    return canonical_json_pretty(gate.observed).decode("utf-8").lower()
-
-
-def _supports_failure_code(
-    report: AcquisitionAdmissionReport,
-    gate_id: str,
-    failure_code: str | None,
-    *,
-    fixture_root: Path,
-) -> bool:
-    if failure_code is None:
-        return gate_id == "admission" and all(gate.status == "pass" for gate in report.gates)
-    gate = _gate(report, gate_id)
-    text = _failure_text(gate)
-    tokens: dict[str, tuple[str, ...]] = {
-        "duplicate-full-capture": ("identical full-capture bytes",),
-        "nonphysical-root": ("not one claim-bearing physical root event",),
-        "commercial-research-rights": ("commercial_research",),
-        "model-visible-forbidden-field": ("forbidden fields are model-visible",),
-        "one-modality": ("one-modality:", "insufficient distinct operational modality"),
-        "duplicate-modality-content": (
-            "modelvisibleprojection",
-            "distinct operational modality",
-        ),
-        "stationary-image-proxy": ("stationary-image-proxy:",),
-        "shuffled-modality": ("shuffled-modality:", "source sequence receipt"),
-        "clock-transform-bound": ("clock alignment or missingness",),
-        "truth-chronology": ("truth custody", "chronology"),
-        "known-only-hypotheses": ("invalid hypothesisset",),
-        "forbidden-role-overlap": ("forbidden role independence overlap",),
-        "forged-approval": ("forged-approval:", "diagnostic approval"),
-        "diagnostic-realization": ("diagnostic-realization:",),
-        "recovery-realization": ("recovery and settled outcome are not cross-bound",),
-        "shortcut-resolves-mechanism": ("resolving_rules", "source-identity"),
-        "missing-no-op-comparator": ("comparators/no_op/implementation.txt",),
-        "missing-random-safe-comparator": ("comparators/random_safe/implementation.txt",),
-        "missing-cheapest-safe-comparator": ("comparators/cheapest_safe/implementation.txt",),
-        "missing-wrong-safe-comparator": ("comparators/wrong_safe/implementation.txt",),
-    }
-    if failure_code == "count-intersection":
-        checks = gate.observed.get("checks") if isinstance(gate.observed, dict) else None
-        try:
-            registry = AcquisitionCandidateRegistry.model_validate(
-                read_json(fixture_root / "candidate_registry.json")
-            )
-        except (OSError, ValueError):
-            return False
-        candidate_ids = tuple(candidate.incident_id for candidate in registry.candidates)
-        return (
-            isinstance(checks, dict)
-            and checks.get("complete_count") is False
-            and len(candidate_ids) >= 30
-            and report.candidate_registry_sha256 == sha256_value(registry)
-            and report.candidate_incident_ids == tuple(sorted(candidate_ids))
-            and len(report.eligible_incident_ids) < len(candidate_ids)
-        )
-    if failure_code == "duplicate-modality-content":
-        return any(token in text for token in tokens[failure_code])
-    if failure_code == "known-only-hypotheses":
-        for dossier_path in sorted((fixture_root / "dossiers").glob("*.json")):
-            dossier = read_json(dossier_path)
-            if not isinstance(dossier, dict):
-                continue
-            binding = dossier.get("hypothesis_set")
-            if not isinstance(binding, dict) or not isinstance(binding.get("path"), str):
-                continue
-            hypothesis_set = read_json(fixture_root / binding["path"])
-            hypotheses = (
-                hypothesis_set.get("hypotheses") if isinstance(hypothesis_set, dict) else None
-            )
-            if (
-                isinstance(hypotheses, list)
-                and hypotheses
-                and not any(
-                    isinstance(hypothesis, dict) and hypothesis.get("unknown") is True
-                    for hypothesis in hypotheses
-                )
-            ):
-                return all(token in text for token in tokens[failure_code])
-        return False
-    required = tokens.get(failure_code)
-    return required is not None and all(token in text for token in required)
-
-
-def _control_environment() -> tuple[str, str, Path] | None:
-    values = (
-        os.environ.get(_CONTROL_ENV),
-        os.environ.get(_NODE_ENV),
-        os.environ.get(_OBSERVATION_ENV),
-    )
-    if all(value is None for value in values):
-        return None
-    if any(value is None or not value for value in values):
-        raise ControlAuthorityError("control observation environment is incomplete")
-    control_id, node_id, output = values
-    if control_id is None or node_id is None or output is None:
-        raise ControlAuthorityError("control observation environment is incomplete")
-    expected_node, _, _, _ = _control_requirement(control_id)
-    if node_id != expected_node:
-        raise ControlAuthorityError("control observation node differs from frozen authority")
-    return control_id, node_id, Path(output)
-
-
-def _write_exclusive(path: Path, data: bytes, *, mode: int = 0o600) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags, mode)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            descriptor = -1
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-
-
-def record_control_observation(
-    input_root: Path,
-    report: AcquisitionAdmissionReport,
-) -> None:
-    """Emit one generator-bound observation when a frozen control is executing.
-
-    The function is a no-op in ordinary test runs.  In a production control run it derives
-    the expected gate and failure from frozen authority and refuses mismatched semantics.
-    """
-
-    environment = _control_environment()
-    if environment is None:
-        return
-    control_id, node_id, output_path = environment
-    _, expected_verdict, gate_id, failure_code = _control_requirement(control_id)
-    if report.verdict != expected_verdict:
-        raise ControlAuthorityError(
-            f"{control_id} observed {report.verdict}, expected {expected_verdict}"
-        )
-    if not _supports_failure_code(
-        report,
-        gate_id,
-        failure_code,
-        fixture_root=input_root,
-    ):
-        raise ControlAuthorityError(
-            f"{control_id} did not demonstrate {gate_id}:{failure_code or 'none'}"
-        )
-    report_value = report.model_dump(mode="json")
-    observation = ControlObservation(
-        control_id=control_id,
-        pytest_node_id=node_id,
-        fixture=snapshot_fixture_tree(input_root),
-        report_sha256=sha256_value(report_value),
-        report=report_value,
-        observed_verdict=report.verdict,
-        observed_gate_id=gate_id,
-        observed_failure_code=failure_code,
-    )
-    _write_exclusive(output_path, canonical_json_pretty(observation))
-
-
-def record_control_exception(input_root: Path, error: BaseException) -> None:
-    """Emit one validation-error observation for a frozen control that cannot return a report."""
-
-    environment = _control_environment()
-    if environment is None:
-        return
-    control_id, node_id, output_path = environment
-    _, expected_verdict, gate_id, failure_code = _control_requirement(control_id)
-    if expected_verdict != "INVALID" or failure_code is None:
-        raise ControlAuthorityError("exception evidence is authorized only for INVALID controls")
-    message = str(error).lower()
-    exception_tokens = {
-        "truth-chronology": ("truth", "chronology"),
-        "known-only-hypotheses": ("known mechanism hypotheses",),
-    }.get(failure_code)
-    if exception_tokens is None or not all(token in message for token in exception_tokens):
-        raise ControlAuthorityError(f"{control_id} exception did not demonstrate {failure_code}")
-    report_value = {
-        "exception_type": f"{type(error).__module__}.{type(error).__qualname__}",
-        "message": str(error),
-    }
-    observation = ControlObservation(
-        control_id=control_id,
-        pytest_node_id=node_id,
-        fixture=snapshot_fixture_tree(input_root),
-        report_sha256=sha256_value(report_value),
-        report=report_value,
-        observed_verdict="INVALID",
-        observed_gate_id=gate_id,
-        observed_failure_code=failure_code,
-    )
-    _write_exclusive(output_path, canonical_json_pretty(observation))
-
-
-_PYTEST_REQUESTED_NODE: str | None = None
-_PYTEST_COLLECTED: list[str] = []
-_PYTEST_PHASES: list[PytestPhase] = []
-
-
-def pytest_configure(config: Any) -> None:
-    """Initialize lifecycle capture when this module is loaded as an explicit pytest plugin."""
-
-    del config
-    global _PYTEST_REQUESTED_NODE, _PYTEST_COLLECTED, _PYTEST_PHASES
-    requested = os.environ.get(_NODE_ENV)
-    outcome_path = os.environ.get(_OUTCOME_ENV)
-    if requested is None and outcome_path is None:
-        return
-    if not requested or not outcome_path:
-        raise ControlAuthorityError("pytest control lifecycle environment is incomplete")
-    _PYTEST_REQUESTED_NODE = requested
-    _PYTEST_COLLECTED = []
-    _PYTEST_PHASES = []
-
-
-def pytest_collection_finish(session: Any) -> None:
-    if _PYTEST_REQUESTED_NODE is None:
-        return
-    global _PYTEST_COLLECTED
-    _PYTEST_COLLECTED = [item.nodeid for item in session.items]
-
-
-def pytest_runtest_logreport(report: Any) -> None:
-    if _PYTEST_REQUESTED_NODE is None or report.nodeid != _PYTEST_REQUESTED_NODE:
-        return
-    was_xfail = bool(getattr(report, "wasxfail", False))
-    _PYTEST_PHASES.append(
-        PytestPhase(when=report.when, outcome=report.outcome, was_xfail=was_xfail)
-    )
-
-
-def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
-    del session
-    if _PYTEST_REQUESTED_NODE is None:
-        return
-    output = os.environ.get(_OUTCOME_ENV)
-    if not output:
-        raise ControlAuthorityError("pytest lifecycle output path is missing")
-    lifecycle = PytestLifecycle(
-        requested_node_id=_PYTEST_REQUESTED_NODE,
-        collected_node_ids=tuple(_PYTEST_COLLECTED),
-        phases=tuple(_PYTEST_PHASES),
-        exit_status=int(exitstatus),
-    )
-    _write_exclusive(Path(output), canonical_json_pretty(lifecycle))
 
 
 def _run_git(repo: Path, *arguments: str, text: bool = True) -> str | bytes:
@@ -593,34 +243,6 @@ def _git_bound_source(repo: Path, commit: str, name: str, relative: str) -> GitB
     )
 
 
-def _assert_parent_process_trusted(repo: Path) -> None:
-    if any(name in os.environ for name in ("PYTHONHOME", "PYTHONPATH")):
-        raise ControlAuthorityError("parent Python startup injection environment is present")
-    if any(sys.modules.get(name) is not None for name in ("sitecustomize", "usercustomize")):
-        raise ControlAuthorityError("parent Python startup customization is loaded")
-    for module_name, relative in _PARENT_SOURCE_MODULES:
-        module = sys.modules.get(module_name)
-        origin = getattr(module, "__file__", None) if module is not None else None
-        if not isinstance(origin, str):
-            raise ControlAuthorityError(f"parent source module has no file origin: {module_name}")
-        candidate = Path(origin)
-        expected = repo / relative
-        try:
-            if (
-                candidate.is_symlink()
-                or expected.is_symlink()
-                or candidate.resolve(strict=True) != expected.resolve(strict=True)
-                or not candidate.is_file()
-            ):
-                raise ControlAuthorityError(
-                    f"parent source module origin is unexpected: {module_name}"
-                )
-        except OSError as error:
-            raise ControlAuthorityError(
-                f"parent source module origin cannot be verified: {module_name}"
-            ) from error
-
-
 def _sanitized_environment(
     *,
     control_id: str,
@@ -643,99 +265,6 @@ def _sanitized_environment(
         _OBSERVATION_ENV: str(observation_path),
         _OUTCOME_ENV: str(outcome_path),
     }
-
-
-def _materialize_commit_snapshot(repo: Path, commit: str, destination: Path) -> bool:
-    try:
-        raw = _run_git(
-            repo,
-            "ls-tree",
-            "-r",
-            "-z",
-            "--full-tree",
-            commit,
-            "--",
-            *_RUNNER_SNAPSHOT_PATHS,
-            text=False,
-        )
-    except ControlAuthorityError:
-        return False
-    if not isinstance(raw, bytes):
-        return False
-    records = raw.split(b"\0")
-    if records[-1:] != [b""] or len(records) > MAX_RUNNER_TREE_ENTRIES:
-        return False
-    observed: set[str] = set()
-    total_bytes = 0
-    try:
-        destination.mkdir(mode=0o700)
-        for record in records[:-1]:
-            header, raw_path = record.split(b"\t", 1)
-            mode, object_type, object_id = header.decode("ascii").split(" ")
-            relative = raw_path.decode("utf-8")
-            pure = PurePosixPath(relative)
-            if (
-                mode not in {"100644", "100755"}
-                or object_type != "blob"
-                or pure.is_absolute()
-                or ".." in pure.parts
-                or relative != pure.as_posix()
-                or relative in observed
-                or not any(
-                    relative == prefix or relative.startswith(f"{prefix}/")
-                    for prefix in _RUNNER_SNAPSHOT_PATHS
-                )
-            ):
-                return False
-            payload = _run_git(repo, "cat-file", "blob", object_id, text=False)
-            if not isinstance(payload, bytes) or len(payload) > MAX_RUNNER_FILE_BYTES:
-                return False
-            total_bytes += len(payload)
-            if total_bytes > MAX_RUNNER_TREE_BYTES:
-                return False
-            target = destination.joinpath(*pure.parts)
-            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            descriptor = os.open(
-                target,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
-                0o500 if mode == "100755" else 0o400,
-            )
-            try:
-                view = memoryview(payload)
-                while view:
-                    written = os.write(descriptor, view)
-                    if written <= 0:
-                        return False
-                    view = view[written:]
-            finally:
-                os.close(descriptor)
-            observed.add(relative)
-    except (OSError, UnicodeDecodeError, ValueError):
-        return False
-    required_files = {"pyproject.toml", "uv.lock", "tests/unit/test_acquisition.py"}
-    return required_files.issubset(observed) and any(
-        path.startswith("src/fieldtrue/") for path in observed
-    )
-
-
-def _prepare_authenticated_runner(
-    repo: Path,
-    commit: str,
-    root: Path,
-) -> AuthenticatedRunner:
-    snapshot_root = root / "snapshot"
-    if not _materialize_commit_snapshot(repo, commit, snapshot_root):
-        raise ControlAuthorityError("committed control source snapshot cannot be materialized")
-    try:
-        return runner_trust.prepare_authenticated_runner(
-            root,
-            snapshot_root,
-            root_distributions=_RUNNER_ROOT_DISTRIBUTIONS,
-            required_imports=("nacl", "pytest"),
-            artifact_cache_root=root / "artifact-cache",
-        )
-    except RunnerTrustError as error:
-        raise ControlAuthorityError(str(error)) from error
 
 
 def _authenticated_runner_is_unchanged(runner: AuthenticatedRunner) -> bool:
@@ -779,7 +308,7 @@ def _normalized_control_command(node_id: str) -> tuple[str, ...]:
         "<execution-commit>/src",
         "<lock-hash-authenticated-site-packages>",
         "-p",
-        "fieldtrue.control_authority",
+        "fieldtrue.control_observation",
         "-p",
         "no:cacheprovider",
         "-o",
@@ -996,7 +525,7 @@ def _run_control(
         str(runner.snapshot_root / "src"),
         str(runner.site_packages),
         "-p",
-        "fieldtrue.control_authority",
+        "fieldtrue.control_observation",
         "-p",
         "no:cacheprovider",
         "-o",
@@ -1100,48 +629,6 @@ def _run_control(
     return result, manifest_entry
 
 
-def _load_existing_key(path: Path) -> SigningKey:
-    if not path.exists():
-        raise ControlAuthorityError(f"governance signing key does not exist: {path}")
-    return load_or_create_signing_key(path)
-
-
-def _rename_no_replace(source: Path, target: Path) -> None:
-    """Atomically publish a directory while refusing an existing destination."""
-
-    libc = ctypes.CDLL(None, use_errno=True)
-    source_bytes = os.fsencode(source)
-    target_bytes = os.fsencode(target)
-    if sys.platform == "darwin":
-        rename_exclusive = 0x00000004
-        result = libc.renamex_np(source_bytes, target_bytes, rename_exclusive)
-    elif sys.platform.startswith("linux"):
-        at_fdcwd = -100
-        rename_no_replace = 1
-        result = libc.renameat2(
-            at_fdcwd,
-            source_bytes,
-            at_fdcwd,
-            target_bytes,
-            rename_no_replace,
-        )
-    else:
-        raise ControlAuthorityError("atomic no-replace publication is unsupported on this platform")
-    if result != 0:
-        error_number = ctypes.get_errno()
-        if error_number in (errno.EEXIST, errno.ENOTEMPTY):
-            raise FileExistsError(target)
-        raise OSError(error_number, os.strerror(error_number), target)
-
-
-def _fsync_directory(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
 def _read_bound_json(input_root: Path, binding: ArtifactBinding) -> dict[str, Any]:
     root = input_root.resolve(strict=True)
     candidate = root.joinpath(*PurePosixPath(binding.path).parts)
@@ -1173,10 +660,13 @@ def _verify_control_attestation(
         mode="json",
         exclude={"attestation_hash", "signature"},
     )
+    expected_attestation_id = "iter001-admission-controls-fixture-attestation"
+    expected_signer_id = "iter001-control-fixture-root"
     expected_subject = attestation_subject_hash(AttestationSubjectKind.CONTROL_SUITE, subject)
     if (
-        attestation.attestation_id != "iter001-admission-controls-attestation"
-        or attestation.signer_id != "iter001-governance-root"
+        receipt.authority_profile != contract.authority_profile
+        or attestation.attestation_id != expected_attestation_id
+        or attestation.signer_id != expected_signer_id
         or attestation.subject_kind != AttestationSubjectKind.CONTROL_SUITE
         or attestation.subject_sha256 != expected_subject
         or attestation.issued_at != receipt.executed_at
@@ -1224,6 +714,10 @@ def _verify_historical_sources(
     manifest: ControlExecutionManifest,
 ) -> None:
     receipt_bindings = {
+        "acquisition_contract": (
+            receipt.acquisition_contract_git_blob,
+            receipt.acquisition_contract_sha256,
+        ),
         "validator": (receipt.validator_git_blob, receipt.validator_source_sha256),
         "fixture_builder": (
             receipt.fixture_builder_git_blob,
@@ -1236,11 +730,8 @@ def _verify_historical_sources(
             receipt.dependency_lock_sha256,
         ),
     }
-    for source, (expected_blob, expected_sha256) in zip(
-        manifest.sources,
-        receipt_bindings.values(),
-        strict=True,
-    ):
+    for source in manifest.sources:
+        receipt_binding = receipt_bindings.get(source.name)
         try:
             committed_blob = str(
                 _run_git(repo, "rev-parse", f"{receipt.execution_commit}:{source.path}")
@@ -1254,14 +745,68 @@ def _verify_historical_sources(
             raise ControlAuthorityError("Git returned non-binary control source bytes")
         if (
             source.git_blob != committed_blob
-            or source.git_blob != expected_blob
             or source.sha256 != sha256_bytes(committed_bytes)
-            or source.sha256 != expected_sha256
             or source.bytes != len(committed_bytes)
+            or (receipt_binding is not None and (source.git_blob, source.sha256) != receipt_binding)
         ):
             raise ControlAuthorityError(
                 f"control authority source differs at execution commit: {source.path}"
             )
+    validator = next(source for source in manifest.sources if source.name == "validator")
+    try:
+        git = trusted_repository_git(repo)
+        head = str(_run_git(repo, "rev-parse", "HEAD"))
+        closure = _acquisition_source_closure(
+            git,
+            repo,
+            git_environment(),
+            authority_commit=receipt.execution_commit,
+            repository_head=head,
+            expected_validator_blob=validator.git_blob,
+            expected_validator_sha256=validator.sha256,
+        )
+    except (GitTrustError, ValueError) as error:
+        raise ControlAuthorityError("control source closure cannot be reconstructed") from error
+    if (
+        closure.closure_sha256 != manifest.source_closure_sha256
+        or len(closure.sources) != manifest.source_file_count
+    ):
+        raise ControlAuthorityError("control source closure differs from the signed manifest")
+
+
+def _verify_execution_contract_transition(
+    repo: Path,
+    receipt: AdmissionControlSuiteReceipt,
+    contract: AcquisitionContract,
+) -> None:
+    try:
+        blob = str(
+            _run_git(
+                repo,
+                "rev-parse",
+                f"{receipt.execution_commit}:protocol/acquisition/iter001_contract.json",
+            )
+        )
+        raw = _run_git(repo, "cat-file", "blob", blob, text=False)
+        if not isinstance(raw, bytes):
+            raise ControlAuthorityError("Git returned non-binary execution contract bytes")
+        execution_contract = AcquisitionContract.model_validate_json(raw, strict=True)
+    except (ControlAuthorityError, ValueError) as error:
+        raise ControlAuthorityError(
+            "execution acquisition contract cannot be reconstructed"
+        ) from error
+    expected = execution_contract.model_copy(
+        update={
+            "control_suite_sha256": sha256_value(receipt),
+            "validator_git_blob": receipt.validator_git_blob,
+            "validator_source_sha256": receipt.validator_source_sha256,
+            "dependency_lock_sha256": receipt.dependency_lock_sha256,
+        }
+    )
+    if contract != expected:
+        raise ControlAuthorityError(
+            "selected acquisition contract differs beyond receipt-derived bindings"
+        )
 
 
 def _expected_control_command(manifest: ControlExecutionManifest, node_id: str) -> tuple[str, ...]:
@@ -1330,7 +875,7 @@ def verify_admission_control_bundle(
     input_root: Path,
     contract: AcquisitionContract,
 ) -> AdmissionControlSuiteReceipt:
-    """Verify one production control bundle against Git and contract authority, read-only."""
+    """Verify one V1 fixture control bundle against Git and contract authority, read-only."""
 
     repo = repo_root.resolve(strict=True)
     root = input_root.resolve(strict=True)
@@ -1346,8 +891,10 @@ def verify_admission_control_bundle(
         raise ControlAuthorityError("control receipt or canonical contract is invalid") from error
     if canonical_contract != contract:
         raise ControlAuthorityError("selected acquisition contract is not canonical")
-    if contract.authority_profile == "canonical" and contract.control_authority_status != "sealed":
-        raise ControlAuthorityError("canonical control authority is not sealed")
+    if contract.authority_profile == "canonical":
+        raise ControlAuthorityError("V1 control receipts are structurally test-fixture only")
+    if receipt.authority_profile != contract.authority_profile:
+        raise ControlAuthorityError("control receipt authority profile differs from the contract")
     if (
         sha256_value(receipt) != contract.control_suite_sha256
         or receipt.validator_git_blob != contract.validator_git_blob
@@ -1370,193 +917,12 @@ def verify_admission_control_bundle(
         raise ControlAuthorityError("control receipt and execution manifest differ")
     _verify_execution_ancestry(repo, receipt.execution_commit, receipt.execution_tree)
     _verify_historical_sources(repo, receipt, manifest)
+    _verify_execution_contract_transition(repo, receipt, contract)
     _verify_control_evidence(root, receipt, manifest)
     return receipt
 
 
-def generate_admission_control_bundle(
-    repo_root: Path,
-    output_directory: Path,
-    signing_key_path: Path,
-    *,
-    timeout_seconds: int = 600,
-) -> Path:
-    """Execute, bind, root-sign, and atomically publish the production control bundle."""
-
-    repo = repo_root.resolve(strict=True)
-    if output_directory.exists() or output_directory.is_symlink():
-        raise FileExistsError(output_directory)
-    _assert_parent_process_trusted(repo)
-    output_parent = output_directory.parent.resolve(strict=True)
-    target = output_parent / output_directory.name
-    _assert_clean_repo(repo)
-    commit, tree = _git_identity(repo)
-    sources = tuple(_git_bound_source(repo, commit, name, path) for name, path in _SOURCE_PATHS)
-    contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
-    contract = AcquisitionContract.model_validate(read_json(contract_path))
-    runner_temporary = tempfile.TemporaryDirectory(prefix="fieldtrue-control-runner-")
-    try:
-        runner = _prepare_authenticated_runner(repo, commit, Path(runner_temporary.name))
-        started_at = datetime.now(UTC)
-        staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.tmp-", dir=output_parent))
-        published = False
-        try:
-            results: list[AdmissionControlResult] = []
-            entries: list[ControlManifestEntry] = []
-            for control_id in _REQUIRED_CONTROL_IDS:
-                if not _authenticated_runner_is_unchanged(runner):
-                    raise ControlAuthorityError("authenticated runner changed before control")
-                result, entry = _run_control(
-                    staging,
-                    commit=commit,
-                    tree=tree,
-                    control_id=control_id,
-                    runner=runner,
-                    timeout_seconds=timeout_seconds,
-                )
-                if not _authenticated_runner_is_unchanged(runner):
-                    raise ControlAuthorityError("authenticated runner changed after control")
-                results.append(result)
-                entries.append(entry)
-            _assert_clean_repo(repo)
-            if _git_identity(repo) != (commit, tree):
-                raise ControlAuthorityError("repository identity changed during control execution")
-            rebound_sources = tuple(
-                _git_bound_source(repo, commit, name, path) for name, path in _SOURCE_PATHS
-            )
-            if rebound_sources != sources:
-                raise ControlAuthorityError(
-                    "authority source bytes changed during control execution"
-                )
-            if not _authenticated_runner_is_unchanged(runner):
-                raise ControlAuthorityError("authenticated runner changed before signing")
-            finished_at = datetime.now(UTC)
-            manifest = ControlExecutionManifest(
-                suite_id=_SUITE_ID,
-                execution_commit=commit,
-                execution_tree=tree,
-                started_at=started_at,
-                finished_at=finished_at,
-                repository_clean_before=True,
-                repository_clean_after=True,
-                dependency_mode="lock-hash-authenticated-wheels",
-                uv_executable=str(runner.uv.executable.resolved_path),
-                uv_executable_sha256=runner.uv.executable.sha256,
-                uv_version=runner.uv.version,
-                python_executable_sha256=runner.python.sha256,
-                python_version=RUNNER_PYTHON_FULL_VERSION,
-                runner_environment_sha256=runner.environment_sha256,
-                artifact_set_sha256=runner.artifact_set_sha256,
-                environment_policy=(
-                    "committed-source-snapshot",
-                    "fresh-private-managed-python",
-                    "lock-hash-authenticated-wheels",
-                    "isolated-python-no-site",
-                    "explicit-environment-allowlist",
-                    "pytest-plugin-autoload-disabled",
-                    "runner-rebound-before-and-after-each-control",
-                ),
-                sources=sources,
-                controls=tuple(entries),
-            )
-            manifest_path = staging / "execution_manifest.json"
-            atomic_write(manifest_path, canonical_json_pretty(manifest), mode=0o444)
-            manifest_binding = _artifact_binding(staging, manifest_path)
-            source_by_name = {item.name: item for item in sources}
-            receipt_body: dict[str, Any] = {
-                "schema_version": "fieldtrue.admission-control-suite-receipt.v1",
-                "suite_id": _SUITE_ID,
-                "validator_git_blob": source_by_name["validator"].git_blob,
-                "validator_source_sha256": source_by_name["validator"].sha256,
-                "fixture_builder_git_blob": source_by_name["fixture_builder"].git_blob,
-                "fixture_builder_sha256": source_by_name["fixture_builder"].sha256,
-                "control_test_git_blob": source_by_name["control_test"].git_blob,
-                "control_test_sha256": source_by_name["control_test"].sha256,
-                "generator_git_blob": source_by_name["generator"].git_blob,
-                "generator_sha256": source_by_name["generator"].sha256,
-                "dependency_lock_git_blob": source_by_name["dependency_lock"].git_blob,
-                "dependency_lock_sha256": source_by_name["dependency_lock"].sha256,
-                "execution_commit": commit,
-                "execution_tree": tree,
-                "execution_manifest": manifest_binding.model_dump(mode="json"),
-                "executed_at": finished_at,
-                "controls": [result.model_dump(mode="json") for result in results],
-            }
-            _assert_parent_process_trusted(repo)
-            key = _load_existing_key(signing_key_path.resolve(strict=True))
-            if key.verify_key.encode().hex() != contract.trust_anchor_public_key:
-                raise ControlAuthorityError(
-                    "governance signing key differs from the acquisition contract"
-                )
-            attestation = issue_attestation(
-                key,
-                attestation_id="iter001-admission-controls-attestation",
-                signer_id="iter001-governance-root",
-                subject_kind=AttestationSubjectKind.CONTROL_SUITE,
-                subject_sha256=attestation_subject_hash(
-                    AttestationSubjectKind.CONTROL_SUITE,
-                    receipt_body,
-                ),
-                issued_at=finished_at,
-            )
-            receipt = AdmissionControlSuiteReceipt.model_validate(
-                {**receipt_body, "attestation": attestation.model_dump(mode="json")}
-            )
-            receipt_path = staging / "control_suite_receipt.json"
-            atomic_write(receipt_path, canonical_json_pretty(receipt), mode=0o444)
-            _fsync_directory(staging / "controls")
-            _fsync_directory(staging)
-            _rename_no_replace(staging, target)
-            published = True
-            _fsync_directory(output_parent)
-            return target / "control_suite_receipt.json"
-        finally:
-            if not published:
-                shutil.rmtree(staging, ignore_errors=True)
-    finally:
-        runner_temporary.cleanup()
-
-
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate the Iter001 admission-control receipt")
-    parser.add_argument("--repo", type=Path, default=Path.cwd())
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument(
-        "--signing-key",
-        type=Path,
-        default=Path(".local/keys/iter001-governance.ed25519"),
-    )
-    parser.add_argument("--timeout-seconds", type=int, default=600)
-    return parser
-
-
-def _die(message: str) -> NoReturn:
-    raise SystemExit(message)
-
-
-def main(argv: list[str] | None = None) -> int:
-    arguments = _parser().parse_args(argv)
-    if arguments.timeout_seconds <= 0:
-        _die("--timeout-seconds must be positive")
-    repo = arguments.repo.resolve()
-    output = arguments.output
-    if not output.is_absolute():
-        output = repo / output
-    signing_key = arguments.signing_key
-    if not signing_key.is_absolute():
-        signing_key = repo / signing_key
-    try:
-        receipt = generate_admission_control_bundle(
-            repo,
-            output,
-            signing_key,
-            timeout_seconds=arguments.timeout_seconds,
-        )
-    except (ControlAuthorityError, FileExistsError, OSError, subprocess.SubprocessError) as error:
-        _die(f"admission-control generation failed: {error}")
-    print(receipt)
-    return 0
-
-
 if __name__ == "__main__":
+    from fieldtrue.control_launcher import main
+
     raise SystemExit(main())

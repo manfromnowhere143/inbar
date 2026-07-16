@@ -111,6 +111,8 @@ GENERATOR_SHA256 = "b" * 64
 DEPENDENCY_LOCK_GIT_BLOB = "c" * 40
 EXECUTION_COMMIT = "d" * 40
 EXECUTION_TREE = "e" * 40
+ACQUISITION_CONTRACT_GIT_BLOB = "1" * 40
+ACQUISITION_CONTRACT_SHA256 = "2" * 64
 
 M = TypeVar("M", bound=BaseModel)
 
@@ -354,6 +356,9 @@ def _build_control_suite(root: Path | None = None) -> AdmissionControlSuiteRecei
         AdmissionControlSuiteReceipt,
         {
             "suite_id": "iter001-admission-controls-v1",
+            "authority_profile": "test_fixture",
+            "acquisition_contract_git_blob": ACQUISITION_CONTRACT_GIT_BLOB,
+            "acquisition_contract_sha256": ACQUISITION_CONTRACT_SHA256,
             "validator_git_blob": VALIDATOR_GIT_BLOB,
             "validator_source_sha256": VALIDATOR_SOURCE_SHA256,
             "fixture_builder_git_blob": FIXTURE_BUILDER_GIT_BLOB,

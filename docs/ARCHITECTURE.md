@@ -74,6 +74,28 @@ Local Ed25519 signatures prove key possession, not historical immutability by th
 authorship requires an external timestamp or governed key anchor. Verification must state which
 trust level is present.
 
+## Control production
+
+The ambient admission-control launcher is a preparation and observation process, not an authority.
+It materializes a clean committed snapshot, prepares the hash-authenticated runner, sends one bounded
+typed request, and checks the returned request, commit, tree, and durable receipt-byte bindings. It
+does not import signing code, open a private key, assemble a receipt, or publish authority artifacts.
+
+The fixture producer runs as a fresh isolated child under the committed launcher. It checks the exact
+committed snapshot census, distribution inventory, source closure, contract, Git identity, and
+preregistration ancestry and bytes; executes the frozen controls; assembles all signed fields; opens
+the fixed fixture key only after final rebinding; and publishes an exact bundle with
+descriptor-relative no-replace semantics. Producer V1 receipts use V2 wire schemas, are structurally
+`test_fixture`, use a distinct signer and key path, and reject the canonical trust anchor. The
+canonical `bootstrap` contract cannot reach key access or publication.
+
+The fresh process does not inherit ambient live Python objects, but it cannot authenticate itself
+against an ambient process that controls its arguments or prepared dependency bytes before import.
+Nor is it an independent custody boundary: a hostile process with the same operating-system identity
+can access a mode-0600 key. Production authority therefore requires an independently enforced
+supervisor and signer that reconstruct the subject, plus an exact authenticated read-only verifier
+and terminal mission integration.
+
 ## Proof adjudication
 
 Iteration proof bundles retain the exact data lock, signed resource receipts, coverage, the

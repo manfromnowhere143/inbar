@@ -14,6 +14,9 @@ from typing import Any
 import pytest
 
 import fieldtrue.control_authority as authority
+import fieldtrue.control_launcher as launcher
+import fieldtrue.control_observation as observation_plugin
+import fieldtrue.control_producer as producer
 from fieldtrue.acquisition import (
     _ACTIONS,
     _CONTROL_REQUIREMENTS,
@@ -35,17 +38,20 @@ from fieldtrue.canonical import (
 )
 from fieldtrue.control_authority import (
     ControlAuthorityError,
-    ControlObservation,
-    FixtureFile,
-    FixtureSnapshot,
-    PytestLifecycle,
-    PytestPhase,
     _assert_clean_repo,
     _git_bound_source,
     _git_identity,
     _run_control,
     _validate_lifecycle,
-    generate_admission_control_bundle,
+    verify_admission_control_bundle,
+)
+from fieldtrue.control_launcher import generate_admission_control_bundle
+from fieldtrue.control_observation import (
+    ControlObservation,
+    FixtureFile,
+    FixtureSnapshot,
+    PytestLifecycle,
+    PytestPhase,
     pytest_collection_finish,
     pytest_configure,
     pytest_runtest_logreport,
@@ -53,8 +59,8 @@ from fieldtrue.control_authority import (
     record_control_exception,
     record_control_observation,
     snapshot_fixture_tree,
-    verify_admission_control_bundle,
 )
+from fieldtrue.control_protocol import CONTROL_PRODUCER_KEY_PATH
 from fieldtrue.receipts import load_or_create_signing_key
 
 ZERO_HASH = "0" * 64
@@ -78,6 +84,8 @@ def _execution_manifest_value() -> dict[str, Any]:
         "python_version": "3.12.13",
         "runner_environment_sha256": ZERO_HASH,
         "artifact_set_sha256": ZERO_HASH,
+        "source_closure_sha256": ZERO_HASH,
+        "source_file_count": 1,
         "environment_policy": (),
         "sources": [
             {
@@ -113,6 +121,12 @@ def test_execution_manifest_binds_exact_ordered_source_name_path_pairs() -> None
     assert tuple((source.name, source.path) for source in manifest.sources) == (
         authority._SOURCE_PATHS
     )
+    assert {
+        ("acquisition_contract", "protocol/acquisition/iter001_contract.json"),
+        ("project_config", "pyproject.toml"),
+        ("tests_package_init", "tests/__init__.py"),
+        ("unit_tests_package_init", "tests/unit/__init__.py"),
+    }.issubset(set(authority._SOURCE_PATHS))
 
     substituted = _execution_manifest_value()
     substituted["sources"][0]["path"] = "src/fieldtrue/substituted.py"
@@ -329,23 +343,26 @@ def test_control_environment_rejects_partial_unknown_and_substituted_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for name in (
-        authority._CONTROL_ENV,
-        authority._NODE_ENV,
-        authority._OBSERVATION_ENV,
+        observation_plugin._CONTROL_ENV,
+        observation_plugin._NODE_ENV,
+        observation_plugin._OBSERVATION_ENV,
     ):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv(authority._CONTROL_ENV, "valid-conjunctive-pilot")
+    monkeypatch.setenv(observation_plugin._CONTROL_ENV, "valid-conjunctive-pilot")
     with pytest.raises(ControlAuthorityError, match="environment is incomplete"):
-        authority._control_environment()
+        observation_plugin._control_environment()
 
-    monkeypatch.setenv(authority._NODE_ENV, "tests/unit/test_acquisition.py::test_substituted")
-    monkeypatch.setenv(authority._OBSERVATION_ENV, str(tmp_path / "observation.json"))
+    monkeypatch.setenv(
+        observation_plugin._NODE_ENV,
+        "tests/unit/test_acquisition.py::test_substituted",
+    )
+    monkeypatch.setenv(observation_plugin._OBSERVATION_ENV, str(tmp_path / "observation.json"))
     with pytest.raises(ControlAuthorityError, match="node differs"):
-        authority._control_environment()
+        observation_plugin._control_environment()
 
-    monkeypatch.setenv(authority._CONTROL_ENV, "unknown-control")
+    monkeypatch.setenv(observation_plugin._CONTROL_ENV, "unknown-control")
     with pytest.raises(ControlAuthorityError, match="unknown admission control"):
-        authority._control_environment()
+        observation_plugin._control_environment()
 
 
 def test_sanitized_control_environment_is_an_explicit_allowlist(
@@ -372,29 +389,6 @@ def test_sanitized_control_environment_is_an_explicit_allowlist(
     assert "TMPDIR" not in environment
     assert "UV_CACHE_DIR" not in environment
     assert "CLOUD_API_TOKEN" not in environment
-
-
-def test_parent_process_preflight_rejects_startup_injection_and_origin_substitution(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    repo = Path(__file__).parents[2]
-    authority._assert_parent_process_trusted(repo)
-
-    with monkeypatch.context() as scoped:
-        scoped.setenv("PYTHONPATH", str(tmp_path))
-        with pytest.raises(ControlAuthorityError, match="startup injection"):
-            authority._assert_parent_process_trusted(repo)
-
-    with monkeypatch.context() as scoped:
-        scoped.setitem(sys.modules, "sitecustomize", SimpleNamespace())
-        with pytest.raises(ControlAuthorityError, match="startup customization"):
-            authority._assert_parent_process_trusted(repo)
-
-    with monkeypatch.context() as scoped:
-        scoped.setattr(authority.runner_trust, "__file__", str(tmp_path / "runner_trust.py"))
-        with pytest.raises(ControlAuthorityError, match="origin"):
-            authority._assert_parent_process_trusted(repo)
 
 
 def test_generator_bound_observation_records_actual_report(
@@ -583,9 +577,9 @@ def test_exception_observation_is_noop_without_authority_and_rejects_positive_co
     assert tuple(fixture.iterdir()) == (fixture / "artifact",)
 
     node = _CONTROL_REQUIREMENTS["valid-conjunctive-pilot"][0]
-    monkeypatch.setenv(authority._CONTROL_ENV, "valid-conjunctive-pilot")
-    monkeypatch.setenv(authority._NODE_ENV, node)
-    monkeypatch.setenv(authority._OBSERVATION_ENV, str(tmp_path / "observation.json"))
+    monkeypatch.setenv(observation_plugin._CONTROL_ENV, "valid-conjunctive-pilot")
+    monkeypatch.setenv(observation_plugin._NODE_ENV, node)
+    monkeypatch.setenv(observation_plugin._OBSERVATION_ENV, str(tmp_path / "observation.json"))
     with pytest.raises(ControlAuthorityError, match="only for INVALID"):
         record_control_exception(fixture, ValueError("not an invalid control"))
 
@@ -598,14 +592,14 @@ def test_observation_rejects_wrong_verdict_and_missing_gate(
     fixture.mkdir()
     (fixture / "artifact").write_bytes(b"bound")
     node = _CONTROL_REQUIREMENTS["valid-conjunctive-pilot"][0]
-    monkeypatch.setenv(authority._CONTROL_ENV, "valid-conjunctive-pilot")
-    monkeypatch.setenv(authority._NODE_ENV, node)
-    monkeypatch.setenv(authority._OBSERVATION_ENV, str(tmp_path / "observation.json"))
+    monkeypatch.setenv(observation_plugin._CONTROL_ENV, "valid-conjunctive-pilot")
+    monkeypatch.setenv(observation_plugin._NODE_ENV, node)
+    monkeypatch.setenv(observation_plugin._OBSERVATION_ENV, str(tmp_path / "observation.json"))
 
     with pytest.raises(ControlAuthorityError, match="observed BLOCKED_RIGHTS"):
         record_control_observation(fixture, _report("BLOCKED_RIGHTS"))
     with pytest.raises(ControlAuthorityError, match="does not contain one missing gate"):
-        authority._gate(SimpleNamespace(gates=()), "missing")
+        observation_plugin._gate(SimpleNamespace(gates=()), "missing")
 
 
 def test_pytest_plugin_writes_an_exact_lifecycle(
@@ -631,11 +625,11 @@ def test_pytest_plugin_is_inert_without_authority_and_rejects_partial_environmen
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(authority, "_PYTEST_REQUESTED_NODE", None)
-    monkeypatch.setattr(authority, "_PYTEST_COLLECTED", [])
-    monkeypatch.setattr(authority, "_PYTEST_PHASES", [])
-    monkeypatch.delenv(authority._NODE_ENV, raising=False)
-    monkeypatch.delenv(authority._OUTCOME_ENV, raising=False)
+    monkeypatch.setattr(observation_plugin, "_PYTEST_REQUESTED_NODE", None)
+    monkeypatch.setattr(observation_plugin, "_PYTEST_COLLECTED", [])
+    monkeypatch.setattr(observation_plugin, "_PYTEST_PHASES", [])
+    monkeypatch.delenv(observation_plugin._NODE_ENV, raising=False)
+    monkeypatch.delenv(observation_plugin._OUTCOME_ENV, raising=False)
 
     pytest_configure(SimpleNamespace())
     pytest_collection_finish(SimpleNamespace(items=[SimpleNamespace(nodeid="untrusted")]))
@@ -643,7 +637,10 @@ def test_pytest_plugin_is_inert_without_authority_and_rejects_partial_environmen
     pytest_sessionfinish(SimpleNamespace(), 1)
     assert not list(tmp_path.iterdir())
 
-    monkeypatch.setenv(authority._NODE_ENV, "tests/unit/test_acquisition.py::test_partial")
+    monkeypatch.setenv(
+        observation_plugin._NODE_ENV,
+        "tests/unit/test_acquisition.py::test_partial",
+    )
     with pytest.raises(ControlAuthorityError, match="environment is incomplete"):
         pytest_configure(SimpleNamespace())
 
@@ -652,9 +649,9 @@ def test_pytest_plugin_ignores_other_nodes_and_requires_output_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     node = _CONTROL_REQUIREMENTS["valid-conjunctive-pilot"][0]
-    monkeypatch.setattr(authority, "_PYTEST_REQUESTED_NODE", node)
-    monkeypatch.setattr(authority, "_PYTEST_PHASES", [])
-    monkeypatch.delenv(authority._OUTCOME_ENV, raising=False)
+    monkeypatch.setattr(observation_plugin, "_PYTEST_REQUESTED_NODE", node)
+    monkeypatch.setattr(observation_plugin, "_PYTEST_PHASES", [])
+    monkeypatch.delenv(observation_plugin._OUTCOME_ENV, raising=False)
 
     pytest_runtest_logreport(
         SimpleNamespace(
@@ -663,7 +660,7 @@ def test_pytest_plugin_ignores_other_nodes_and_requires_output_path(
             outcome="passed",
         )
     )
-    assert authority._PYTEST_PHASES == []
+    assert observation_plugin._PYTEST_PHASES == []
     with pytest.raises(ControlAuthorityError, match="output path is missing"):
         pytest_sessionfinish(SimpleNamespace(), 0)
 
@@ -693,8 +690,10 @@ def test_git_binding_detects_working_byte_drift(tmp_path: Path) -> None:
 
 
 def test_missing_signing_key_fails_closed(tmp_path: Path) -> None:
-    with pytest.raises(ControlAuthorityError, match="signing key does not exist"):
-        authority._load_existing_key(tmp_path / "missing-key")
+    repo = tmp_path / "repo"
+    (repo / ".local" / "keys").mkdir(parents=True)
+    with pytest.raises(ControlAuthorityError, match="cannot be opened"):
+        producer._read_existing_key(repo, ZERO_HASH)
 
 
 def test_git_identifiers_reject_malformed_substitutions(
@@ -736,11 +735,11 @@ def test_commit_snapshot_rejects_aggregate_bytes_before_exceeding_bound(
         assert not text
         return payloads[arguments[2]]
 
-    monkeypatch.setattr(authority, "_run_git", fake_git)
-    monkeypatch.setattr(authority, "MAX_RUNNER_TREE_BYTES", 10)
+    monkeypatch.setattr(launcher, "_run_git", fake_git)
+    monkeypatch.setattr(launcher, "MAX_RUNNER_TREE_BYTES", 10)
     destination = tmp_path / "snapshot"
 
-    assert not authority._materialize_commit_snapshot(tmp_path, ZERO_BLOB, destination)
+    assert not launcher._materialize_commit_snapshot(tmp_path, ZERO_BLOB, destination)
     assert destination.joinpath("pyproject.toml").read_bytes() == b"123456"
     assert not destination.joinpath("uv.lock").exists()
 
@@ -751,16 +750,6 @@ def test_fake_ambient_uv_cannot_emit_control_evidence_or_reach_signing(
 ) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
-    contract_path.parent.mkdir(parents=True)
-    atomic_write(
-        contract_path,
-        canonical_json_pretty(
-            read_json(
-                Path(__file__).parents[2] / "protocol" / "acquisition" / "iter001_contract.json"
-            )
-        ),
-    )
     forged_control = tmp_path / "forged-control.json"
     forged_signature = tmp_path / "forged-signature.txt"
     fake_uv = tmp_path / "uv"
@@ -772,39 +761,28 @@ def test_fake_ambient_uv_cannot_emit_control_evidence_or_reach_signing(
     )
     fake_uv.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path))
-    monkeypatch.setattr(authority, "_assert_clean_repo", lambda _repo: None)
-    monkeypatch.setattr(authority, "_assert_parent_process_trusted", lambda _repo: None)
-    monkeypatch.setattr(authority, "_git_identity", lambda _repo: (ZERO_BLOB, "1" * 40))
-    monkeypatch.setattr(
-        authority,
-        "_git_bound_source",
-        lambda _repo, _commit, name, path: authority.GitBoundSource(
-            name=name,
-            path=path,
-            git_blob=ZERO_BLOB,
-            sha256=ZERO_HASH,
-            bytes=0,
-        ),
-    )
-
-    def materialize_hostile_snapshot(_repo: Path, _commit: str, destination: Path) -> bool:
-        destination.mkdir(mode=0o700, parents=True)
-        destination.chmod(0o700)
-        return True
-
-    monkeypatch.setattr(authority, "_materialize_commit_snapshot", materialize_hostile_snapshot)
+    monkeypatch.setattr(launcher, "_clean_head", lambda _repo: (ZERO_BLOB, "1" * 40))
 
     signing_reached = False
 
-    def reject_signing(_path: Path) -> Any:
+    def reject_signing(*_args: Any, **_kwargs: Any) -> Any:
         nonlocal signing_reached
         signing_reached = True
         raise AssertionError("hostile runner reached signing")
 
-    monkeypatch.setattr(authority, "_load_existing_key", reject_signing)
-    output = tmp_path / "bundle"
+    monkeypatch.setattr(producer, "_read_existing_key", reject_signing)
+
+    def reject_runner(*_args: Any, **_kwargs: Any) -> Any:
+        raise ControlAuthorityError("uv acquisition source is untrusted")
+
+    monkeypatch.setattr(launcher, "_prepare_authenticated_runner", reject_runner)
+    output = repo / ".local" / "admission-controls"
     with pytest.raises(ControlAuthorityError, match="uv acquisition source"):
-        generate_admission_control_bundle(repo, output, tmp_path / "key")
+        generate_admission_control_bundle(
+            repo,
+            output,
+            repo / CONTROL_PRODUCER_KEY_PATH,
+        )
 
     assert not forged_control.exists()
     assert not forged_signature.exists()
@@ -1234,7 +1212,7 @@ def test_run_control_fails_closed_on_process_and_evidence_faults(
                 exit_status=0,
             )
             atomic_write(
-                Path(environment[authority._OUTCOME_ENV]),
+                Path(environment[observation_plugin._OUTCOME_ENV]),
                 canonical_json_pretty(lifecycle),
             )
         if mode == "wrong-observation":
@@ -1242,7 +1220,7 @@ def test_run_control_fails_closed_on_process_and_evidence_faults(
                 update={"observed_gate_id": "substituted-gate"}
             )
             atomic_write(
-                Path(environment[authority._OBSERVATION_ENV]),
+                Path(environment[observation_plugin._OBSERVATION_ENV]),
                 canonical_json_pretty(observation),
             )
         return subprocess.CompletedProcess(
@@ -1349,19 +1327,13 @@ def generated_bundle(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespac
     root = tmp_path_factory.mktemp("control-authority-bundle")
     repo = root / "repo"
     repo.mkdir()
-    source_paths = (
-        "src/fieldtrue/acquisition.py",
-        "src/fieldtrue/control_authority.py",
-        "tests/acquisition_helpers.py",
-        "tests/unit/test_acquisition.py",
-        "uv.lock",
-    )
+    source_paths = tuple(path for _name, path in authority._SOURCE_PATHS)
     for relative in source_paths:
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f"fixture:{relative}\n")
     (repo / ".gitignore").write_text(".local/\n")
-    key_path = repo / ".local" / "keys" / "iter001-governance.ed25519"
+    key_path = repo / CONTROL_PRODUCER_KEY_PATH
     key = load_or_create_signing_key(key_path)
     contract = read_json(
         Path(__file__).parents[2] / "protocol" / "acquisition" / "iter001_contract.json"
@@ -1370,13 +1342,25 @@ def generated_bundle(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespac
     contract["control_authority_status"] = "test_fixture"
     contract["trust_anchor_public_key"] = key.verify_key.encode().hex()
     contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
-    contract_path.parent.mkdir(parents=True)
+    contract_path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(contract_path, canonical_json_pretty(contract))
     _git(repo, "init", "-q")
     _git(repo, "config", "user.email", "controls@example.invalid")
     _git(repo, "config", "user.name", "Control Test")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "freeze authority")
+    fixture_commit = str(authority._run_git(repo, "rev-parse", "HEAD"))
+    validator_blob = str(authority._run_git(repo, "rev-parse", "HEAD:src/fieldtrue/acquisition.py"))
+    validator_sha256 = sha256_file(repo / "src/fieldtrue/acquisition.py")
+    fixture_closure = authority._acquisition_source_closure(
+        authority.trusted_repository_git(repo),
+        repo,
+        authority.git_environment(),
+        authority_commit=fixture_commit,
+        repository_head=fixture_commit,
+        expected_validator_blob=validator_blob,
+        expected_validator_sha256=validator_sha256,
+    )
 
     def fake_control(
         staging: Path,
@@ -1396,20 +1380,39 @@ def generated_bundle(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespac
         )
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(authority, "_run_control", fake_control)
-    monkeypatch.setattr(authority, "_assert_parent_process_trusted", lambda _repo: None)
+    monkeypatch.setattr(producer, "_run_control", fake_control)
+    monkeypatch.setattr(producer, "_authenticated_runner_is_unchanged", lambda _runner: True)
     monkeypatch.setattr(
-        authority,
-        "_prepare_authenticated_runner",
-        lambda _repo, _commit, root: _test_runner(root),
+        producer,
+        "_verify_source_closure",
+        lambda _repo, _runner, _commit, _sources: (
+            fixture_closure.closure_sha256,
+            len(fixture_closure.sources),
+        ),
     )
-    monkeypatch.setattr(authority, "_authenticated_runner_is_unchanged", lambda _runner: True)
+    monkeypatch.setattr(
+        producer,
+        "_verify_preregistration_ancestry",
+        lambda _repo, _contract, _commit: None,
+    )
+    monkeypatch.setattr(
+        producer,
+        "_verify_preregistration_bytes",
+        lambda _repo, _contract, _commit: None,
+    )
     output = repo / ".local" / "admission-controls"
     try:
-        receipt_path = generate_admission_control_bundle(repo, output, key_path)
+        receipt_path, _commit, _tree, receipt_sha256 = producer._produce_fixture_bundle(
+            repo,
+            _test_runner(root),
+            expected_commit=fixture_commit,
+            expected_tree=str(authority._run_git(repo, "rev-parse", "HEAD^{tree}")),
+            timeout_seconds=600,
+        )
     finally:
         monkeypatch.undo()
     receipt = AdmissionControlSuiteReceipt.model_validate(read_json(receipt_path))
+    assert receipt_sha256 == sha256_file(receipt_path)
     contract["control_suite_sha256"] = sha256_value(receipt)
     contract["validator_git_blob"] = receipt.validator_git_blob
     contract["validator_source_sha256"] = receipt.validator_source_sha256
@@ -1453,6 +1456,37 @@ def test_generator_signs_only_a_complete_clean_head_bundle(
         verify_admission_control_bundle(repo, tampered_output, contract_model)
     with pytest.raises(FileExistsError):
         generate_admission_control_bundle(repo, output, key_path)
+
+
+def test_v1_control_receipt_is_structurally_fixture_only(
+    generated_bundle: SimpleNamespace,
+) -> None:
+    value = generated_bundle.receipt.model_dump(mode="json")
+    value["authority_profile"] = "canonical"
+    with pytest.raises(ValueError, match="test_fixture"):
+        AdmissionControlSuiteReceipt.model_validate(value)
+
+
+def test_fixture_receipt_cannot_be_replayed_under_changed_contract_authority(
+    generated_bundle: SimpleNamespace,
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "replayed-repo"
+    shutil.copytree(generated_bundle.repo, repo)
+    contract_value = generated_bundle.contract.model_dump(mode="json")
+    contract_value["preregistration_commit"] = "f" * 40
+    changed_contract = AcquisitionContract.model_validate(contract_value)
+    atomic_write(
+        repo / "protocol" / "acquisition" / "iter001_contract.json",
+        canonical_json_pretty(changed_contract),
+    )
+
+    with pytest.raises(ControlAuthorityError, match="differs beyond receipt-derived bindings"):
+        verify_admission_control_bundle(
+            repo,
+            repo / ".local" / "admission-controls",
+            changed_contract,
+        )
 
 
 def test_bound_json_rejects_missing_unsafe_tampered_and_non_object_artifacts(
@@ -1607,19 +1641,23 @@ def test_atomic_publication_maps_no_replace_failures(
         def renameat2(self, *_args: Any) -> int:
             return -1
 
-    monkeypatch.setattr(authority.sys, "platform", "linux")
-    monkeypatch.setattr(authority.ctypes, "CDLL", lambda *_args, **_kwargs: RefusingLibc())
-    monkeypatch.setattr(authority.ctypes, "get_errno", lambda: errno.EEXIST)
-    with pytest.raises(FileExistsError):
-        authority._rename_no_replace(source, target)
+    descriptor = os.open(tmp_path, os.O_RDONLY)
+    try:
+        monkeypatch.setattr(producer.sys, "platform", "linux")
+        monkeypatch.setattr(producer.ctypes, "CDLL", lambda *_args, **_kwargs: RefusingLibc())
+        monkeypatch.setattr(producer.ctypes, "get_errno", lambda: errno.EEXIST)
+        with pytest.raises(FileExistsError):
+            producer._rename_no_replace_at(descriptor, source.name, target.name)
 
-    monkeypatch.setattr(authority.ctypes, "get_errno", lambda: errno.EACCES)
-    with pytest.raises(OSError, match="Permission denied"):
-        authority._rename_no_replace(source, target)
+        monkeypatch.setattr(producer.ctypes, "get_errno", lambda: errno.EACCES)
+        with pytest.raises(OSError, match="Permission denied"):
+            producer._rename_no_replace_at(descriptor, source.name, target.name)
 
-    monkeypatch.setattr(authority.sys, "platform", "unsupported")
-    with pytest.raises(ControlAuthorityError, match="unsupported on this platform"):
-        authority._rename_no_replace(source, target)
+        monkeypatch.setattr(producer.sys, "platform", "unsupported")
+        with pytest.raises(ControlAuthorityError, match="unsupported"):
+            producer._rename_no_replace_at(descriptor, source.name, target.name)
+    finally:
+        os.close(descriptor)
 
 
 def test_verifier_rejects_non_directory_invalid_receipt_and_noncanonical_contract(
@@ -1671,16 +1709,12 @@ def test_control_authority_cli_resolves_paths_and_reports_failures(
         captured.update(repo=repo, output=output, key=key, timeout=timeout_seconds)
         return output / "control_suite_receipt.json"
 
-    monkeypatch.setattr(authority, "generate_admission_control_bundle", generate)
+    monkeypatch.setattr(launcher, "generate_admission_control_bundle", generate)
     assert (
-        authority.main(
+        launcher.main(
             [
                 "--repo",
                 str(tmp_path),
-                "--output",
-                "bundle",
-                "--signing-key",
-                "governance.key",
                 "--timeout-seconds",
                 "9",
             ]
@@ -1689,20 +1723,17 @@ def test_control_authority_cli_resolves_paths_and_reports_failures(
     )
     assert captured == {
         "repo": tmp_path,
-        "output": tmp_path / "bundle",
-        "key": tmp_path / "governance.key",
+        "output": tmp_path / ".local" / "admission-controls",
+        "key": tmp_path / CONTROL_PRODUCER_KEY_PATH,
         "timeout": 9,
     }
     assert capsys.readouterr().out.strip() == str(
-        tmp_path / "bundle" / "control_suite_receipt.json"
+        tmp_path / ".local" / "admission-controls" / "control_suite_receipt.json"
     )
-
-    with pytest.raises(SystemExit, match="timeout-seconds must be positive"):
-        authority.main(["--output", str(tmp_path / "unused"), "--timeout-seconds", "0"])
 
     def fail_generation(*_args: Any, **_kwargs: Any) -> Path:
         raise ControlAuthorityError("deliberate failure")
 
-    monkeypatch.setattr(authority, "generate_admission_control_bundle", fail_generation)
-    with pytest.raises(SystemExit, match="generation failed: deliberate failure"):
-        authority.main(["--repo", str(tmp_path), "--output", "bundle-2"])
+    monkeypatch.setattr(launcher, "generate_admission_control_bundle", fail_generation)
+    with pytest.raises(SystemExit, match="producer failed: deliberate failure"):
+        launcher.main(["--repo", str(tmp_path)])

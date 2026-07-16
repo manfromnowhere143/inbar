@@ -33,16 +33,22 @@ prospective, approved testbed work.
 The canonical acquisition contract remains `bootstrap`. No production control receipt, pilot
 verdict, training authority, or scientific claim exists.
 
-The control generator executes each registered control in a fresh private CPython, dependency, and
-committed-source snapshot whose downloaded artifacts are checked against frozen sizes and hashes.
-The child starts with `-I`, `-B`, and `-S`; the acquisition verifier separately binds an exact bounded
-`src/fieldtrue` census to the control execution commit. These controls authenticate the child control
-runner, but not the ambient parent that has already imported the orchestration code, assembles the
-production manifest, loads the governance key, and signs the result. Ordinary ambient invocation
-cannot authorize acquisition. That complete authority path must move inside the authenticated
-pre-import child, and the ambient process must never receive the signing key. This execution boundary
-remains part of the sole registered `iter001-acquisition-contract` blocker and must be closed
-prospectively before canonical authority can be sealed.
+The implementation-only committed launcher runs control execution, manifest and receipt assembly,
+fixture-key access, signing, and atomic no-replace publication in a fresh child started with `-I`,
+`-B`, and `-S` from a clean committed snapshot. The child checks an exact snapshot census, locked
+distribution inventory, complete source closure, Git identity, committed contract, preregistration
+ancestry and bytes, and descriptor-relative fixture-key and publication boundaries. The launcher has
+no signing import or key access and accepts only a bounded canonical acknowledgment tied to its
+request, selected commit and tree, and exact durable receipt bytes.
+
+This removes inherited live Python state when the unmodified committed launcher is used; it does not
+authenticate child arguments or prepared dependencies against a hostile same-user launcher. Producer
+V1 receipts use V2 wire schemas, are structurally `test_fixture`, use a distinct fixture signer and
+key path, and the child
+rejects every nonfixture contract before key or output access. Canonical V1 production remains
+impossible. An independently enforced launcher and signer, Shortcut Authority V2 controls, exact
+read-only bundle verification, terminal mission wiring, and a new owner-authorized sealing ceremony
+remain prospective parts of the sole registered `iter001-acquisition-contract` blocker.
 
 ## Implemented authority
 
@@ -62,6 +68,13 @@ Shortcut Authority V2 has an implementation-only checkpoint covering exact depth
 leave-one-group-out cross-fitting, recipient-scoped encrypted target envelopes, and adversarial
 authority checks. It remains dormant and grants no data, target, training, truth-release, execution,
 verdict, seal, or publication authority.
+
+Authenticated Control Producer V1 has an implementation-only contract and fixture path. Its fixed
+request and response schemas, fresh-process launcher, fixture-only signing domain, exact snapshot and
+source-closure bindings, committed-contract and preregistration checks, fixture-key custody checks,
+and atomic publication logic do not grant canonical sealing authority. Hostile same-user bootstrap or
+dependency preparation, same-user key access, acknowledgment-loss recovery, and the absent exact
+independent terminal verifier are explicit residual boundaries.
 
 The current mission inventory, Git anchors, memory head, and activation gates are rendered into
 `HANDOFF.md` from verified machine state. Checkpoint metrics in that document are explicitly labeled

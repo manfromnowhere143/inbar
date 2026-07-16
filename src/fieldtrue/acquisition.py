@@ -1233,10 +1233,13 @@ class AdmissionControlResult(FrozenModel):
 
 
 class AdmissionControlSuiteReceipt(FrozenModel):
-    schema_version: Literal["fieldtrue.admission-control-suite-receipt.v1"] = (
-        "fieldtrue.admission-control-suite-receipt.v1"
+    schema_version: Literal["fieldtrue.admission-control-suite-receipt.v2"] = (
+        "fieldtrue.admission-control-suite-receipt.v2"
     )
     suite_id: Literal["iter001-admission-controls-v1"]
+    authority_profile: Literal["test_fixture"]
+    acquisition_contract_git_blob: GitObjectId
+    acquisition_contract_sha256: Sha256
     validator_git_blob: GitObjectId
     validator_source_sha256: Sha256
     fixture_builder_git_blob: GitObjectId
@@ -1397,6 +1400,11 @@ class ProtocolReviewRegistry(FrozenModel):
         return self
 
 
+_ITER001_CANONICAL_TRUST_ANCHOR_PUBLIC_KEY = (
+    "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962"
+)
+
+
 class AcquisitionContract(FrozenModel):
     schema_version: Literal["fieldtrue.acquisition-contract.v1"] = (
         "fieldtrue.acquisition-contract.v1"
@@ -1473,8 +1481,7 @@ class AcquisitionContract(FrozenModel):
             or self.preregistration_commit != "52d71e16a75df12adf47e943fd5c329f6e04d5c0"
             or self.preregistration_sha256
             != "47a1920b1b5326601c7404d17a6aac0df3309c2433fa76f56f0dffedf2511ad8"
-            or self.trust_anchor_public_key
-            != "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962"
+            or self.trust_anchor_public_key != _ITER001_CANONICAL_TRUST_ANCHOR_PUBLIC_KEY
         ):
             raise ValueError(
                 "canonical authority differs from its frozen trust and preregistration"
@@ -1483,6 +1490,11 @@ class AcquisitionContract(FrozenModel):
             "test_fixture"
         ):
             raise ValueError("test-fixture contracts require test-fixture control authority")
+        if (
+            self.authority_profile == "test_fixture"
+            and self.trust_anchor_public_key == _ITER001_CANONICAL_TRUST_ANCHOR_PUBLIC_KEY
+        ):
+            raise ValueError("test-fixture contracts require a distinct noncanonical trust key")
         if self.authority_profile == "canonical" and self.control_authority_status == (
             "test_fixture"
         ):
@@ -3188,6 +3200,8 @@ def audit_acquisition(
     integrity_failures: list[str] = []
     rights_failures: list[str] = []
     try:
+        if control_suite.authority_profile != contract.authority_profile:
+            raise AcquisitionAuditError("control suite authority profile differs from the contract")
         registry_dependent_times = (
             *(source.approved_at for source in sources),
             candidate_registry.produced_at,
@@ -4348,6 +4362,23 @@ def verify_preregistration_binding(
         )
         if commit_check.returncode != 0:
             raise AcquisitionAuditError("preregistration commit does not resolve")
+        preregistration_ancestry = subprocess.run(  # noqa: S603 - validated Git object IDs
+            [
+                git,
+                "merge-base",
+                "--is-ancestor",
+                contract.preregistration_commit,
+                authority_commit,
+            ],
+            cwd=repo_root,
+            check=False,
+            env=environment,
+            timeout=10,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if preregistration_ancestry.returncode != 0:
+            raise AcquisitionAuditError("preregistration commit is not control execution ancestry")
         committed = subprocess.run(  # noqa: S603 - fixed arguments and validated contract fields
             [
                 git,

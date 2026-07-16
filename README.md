@@ -76,15 +76,26 @@ primitives, but it grants no data access, target release, execution, result, sea
 authority. Its current boundaries are recorded in
 [the implementation checkpoint](docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md).
 
-The control generator now executes every registered control in a fresh private CPython, dependency,
-and committed-source snapshot whose downloaded artifacts are checked against frozen sizes and
-hashes. The child starts with `-I`, `-B`, and `-S`, and the acquisition verifier also compares an
-exact bounded census of the on-disk `src/fieldtrue` package with its control execution commit. These
-controls authenticate the child control runner, but not the ambient parent that has already imported
-the orchestration code, assembles the production manifest, loads the governance key, and signs the
-result. That complete authority path must move inside the authenticated pre-import child, and the
-ambient process must never receive the signing key. An ordinary ambient `inbar` invocation therefore
-cannot authorize acquisition. This unresolved execution boundary remains inside the sole registered
+The committed control launcher now runs control execution, manifest and receipt assembly, fixture-key
+access, signing, and no-replace publication in a fresh child built from a clean committed source
+snapshot. The child checks an exact snapshot census, locked distribution inventory, complete source
+closure, Git identity, committed contract, preregistration ancestry and bytes, and fixed filesystem
+boundaries before fixture-key access. The launcher imports no signing surface, receives no key
+material, and accepts only a bounded canonical response tied to the selected commit, tree, request,
+and exact durable receipt bytes.
+
+This is a fresh-process integrity property under the unmodified committed launcher, not a hostile
+same-user isolation claim. A process that controls child arguments or the prepared dependency tree
+before import can also alter live child objects, and another process with the same operating-system
+identity can read the fixture key. Those threats require an independently enforced supervisor and
+signer rather than child self-inspection.
+
+This implementation is deliberately fixture-only. The child rejects the canonical `bootstrap`
+contract before key or output access, and V1 cannot be relabeled as production authority. Canonical
+sealing still requires the approved Shortcut Authority V2 control suite, an independently enforced
+launcher and signer boundary outside the same operating-system identity, exact read-only bundle
+verification, and terminal mission integration. Until those artifacts and approvals exist, ordinary
+`inbar` invocation cannot authorize acquisition and CI must retain the sole
 `iter001-acquisition-contract` blocker.
 
 These blockers are preserved as blockers. CI accepts the checkpoint only when the mission validator

@@ -193,10 +193,20 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "fieldtrue.control-execution-manifest.v1",
-      "default": "fieldtrue.control-execution-manifest.v1",
+      "const": "fieldtrue.control-execution-manifest.v2",
+      "default": "fieldtrue.control-execution-manifest.v2",
       "title": "Schema Version",
       "type": "string"
+    },
+    "source_closure_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Closure Sha256",
+      "type": "string"
+    },
+    "source_file_count": {
+      "minimum": 1,
+      "title": "Source File Count",
+      "type": "integer"
     },
     "sources": {
       "items": {
@@ -245,6 +255,8 @@
     "python_version",
     "runner_environment_sha256",
     "artifact_set_sha256",
+    "source_closure_sha256",
+    "source_file_count",
     "environment_policy",
     "sources",
     "controls"
