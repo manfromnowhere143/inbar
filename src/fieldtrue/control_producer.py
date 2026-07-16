@@ -59,6 +59,7 @@ from fieldtrue.control_authority import (
 )
 from fieldtrue.control_protocol import (
     CONTROL_PRODUCER_KEY_PATH,
+    CONTROL_PRODUCER_PLATFORM_ENVIRONMENT,
     CONTROL_PRODUCER_RECEIPT_PATH,
     CONTROL_PRODUCER_SNAPSHOT_PATHS,
     MAX_CONTROL_PRODUCER_REQUEST_BYTES,
@@ -89,6 +90,7 @@ _EXPECTED_ENVIRONMENT_KEYS = frozenset(
         "TMPDIR",
         "TZ",
     }
+    | {name for name, _value in CONTROL_PRODUCER_PLATFORM_ENVIRONMENT}
 )
 _SAFE_PATH = "/usr/bin:/bin"
 _BUNDLE_DIRECTORY_NAME = "admission-controls"
@@ -236,6 +238,9 @@ def _reconstruct_runner() -> AuthenticatedRunner:
         or not python_path.is_relative_to(interpreter_root)
         or not interpreter_root.is_relative_to(root.resolve(strict=True))
         or set(os.environ) != _EXPECTED_ENVIRONMENT_KEYS
+        or any(
+            os.environ.get(name) != value for name, value in CONTROL_PRODUCER_PLATFORM_ENVIRONMENT
+        )
         or os.environ.get("PATH") != _SAFE_PATH
         or any(os.environ.get(name) != str(scratch_root) for name in ("TEMP", "TMP", "TMPDIR"))
     ):

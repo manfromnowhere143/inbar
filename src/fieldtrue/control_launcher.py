@@ -18,6 +18,7 @@ import fieldtrue.runner_trust as runner_trust
 from fieldtrue.canonical import canonical_json_pretty, sha256_bytes
 from fieldtrue.control_protocol import (
     CONTROL_PRODUCER_KEY_PATH,
+    CONTROL_PRODUCER_PLATFORM_ENVIRONMENT,
     CONTROL_PRODUCER_RECEIPT_PATH,
     CONTROL_PRODUCER_SNAPSHOT_PATHS,
     MAX_CONTROL_PRODUCER_RESPONSE_BYTES,
@@ -180,7 +181,7 @@ def _prepare_authenticated_runner(repo: Path, commit: str, root: Path) -> Authen
 
 
 def _producer_environment(runner: AuthenticatedRunner) -> dict[str, str]:
-    return {
+    environment = {
         "HOME": "/nonexistent",
         "LANG": "C",
         "LC_ALL": "C",
@@ -193,6 +194,8 @@ def _producer_environment(runner: AuthenticatedRunner) -> dict[str, str]:
         "TMPDIR": str(runner.scratch_root),
         "TZ": "UTC",
     }
+    environment.update(CONTROL_PRODUCER_PLATFORM_ENVIRONMENT)
+    return environment
 
 
 def _signal_process_group(process: subprocess.Popen[bytes], number: signal.Signals) -> None:
@@ -367,7 +370,8 @@ def generate_admission_control_bundle(
     request_bytes = canonical_json_pretty(request)
     runner_temporary = tempfile.TemporaryDirectory(prefix="fieldtrue-control-producer-")
     try:
-        runner = _prepare_authenticated_runner(repo, commit, Path(runner_temporary.name))
+        runner_root = Path(runner_temporary.name).resolve(strict=True)
+        runner = _prepare_authenticated_runner(repo, commit, runner_root)
         if not runner_trust.runner_is_unchanged(runner):
             raise ControlAuthorityError("authenticated producer runner changed before launch")
         bootstrap = (

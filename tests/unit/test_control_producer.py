@@ -106,6 +106,15 @@ def test_producer_request_and_response_are_closed_typed_contracts(tmp_path: Path
         )
 
 
+def test_launcher_and_child_share_the_exact_platform_environment(tmp_path: Path) -> None:
+    environment = launcher._producer_environment(SimpleNamespace(scratch_root=tmp_path))
+
+    assert set(environment) == producer._EXPECTED_ENVIRONMENT_KEYS
+    assert all(
+        environment[name] == value for name, value in producer.CONTROL_PRODUCER_PLATFORM_ENVIRONMENT
+    )
+
+
 def test_child_request_reader_rejects_duplicate_noncanonical_and_oversized_bytes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -341,6 +350,7 @@ def test_child_reconstructs_every_authenticated_runner_binding(
         "TMPDIR": str(scratch),
         "TZ": "UTC",
     }
+    environment.update(producer.CONTROL_PRODUCER_PLATFORM_ENVIRONMENT)
     platform_key = (
         producer.platform.system().casefold(),
         producer.platform.machine().casefold(),
@@ -631,7 +641,12 @@ def test_launcher_binds_response_to_snapshot_and_durable_receipt(
         directory.mkdir()
 
     monkeypatch.setattr(launcher, "_clean_head", lambda _repo: (commit, tree))
-    monkeypatch.setattr(launcher, "_prepare_authenticated_runner", lambda *_args: runner)
+
+    def prepare_runner(_repo: Path, _commit: str, root: Path) -> Any:
+        assert root == root.resolve(strict=True)
+        return runner
+
+    monkeypatch.setattr(launcher, "_prepare_authenticated_runner", prepare_runner)
     monkeypatch.setattr(launcher.runner_trust, "runner_is_unchanged", lambda _runner: True)
 
     def run_child(
