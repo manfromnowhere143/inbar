@@ -87,6 +87,12 @@ def test_stable_read_rejects_unsafe_inputs_and_open_races(
     with pytest.raises(RuntimeProvenanceError, match="unsafe"):
         runtime._stable_regular_bytes(link, maximum_bytes=10)
 
+    hard_link = tmp_path / "hard-link"
+    hard_link.hardlink_to(path)
+    with pytest.raises(RuntimeProvenanceError, match="unsafe"):
+        runtime._stable_regular_bytes(path, maximum_bytes=10)
+    hard_link.unlink()
+
     missing = tmp_path / "missing"
     with pytest.raises(RuntimeProvenanceError, match="cannot be read"):
         runtime._stable_regular_bytes(missing, maximum_bytes=10)

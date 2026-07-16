@@ -333,6 +333,19 @@ def _local_config_keys(
     return tuple(key for key, _value in _config_records(git, data, label="local-config"))
 
 
+def _git_metadata_entry_is_directory(metadata: os.stat_result) -> bool:
+    is_directory = stat.S_ISDIR(metadata.st_mode)
+    if (
+        stat.S_ISLNK(metadata.st_mode)
+        or (not is_directory and not stat.S_ISREG(metadata.st_mode))
+        or (stat.S_ISREG(metadata.st_mode) and metadata.st_nlink != 1)
+    ):
+        raise GitTrustError("Git metadata is redirected or nonregular")
+    if metadata.st_uid not in {0, os.geteuid()} or metadata.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise GitTrustError("Git metadata has unsafe ownership or mode")
+    return is_directory
+
+
 def _verify_git_metadata_tree(git_dir: Path) -> None:
     directories = [git_dir]
     discovered = 0
@@ -345,20 +358,11 @@ def _verify_git_metadata_tree(git_dir: Path) -> None:
                     if discovered > _GIT_METADATA_ENTRY_LIMIT:
                         raise GitTrustError("Git metadata exceeds the trust scan limit")
                     metadata = entry.stat(follow_symlinks=False)
-                    if metadata.st_uid not in {0, os.geteuid()} or metadata.st_mode & (
-                        stat.S_IWGRP | stat.S_IWOTH
-                    ):
-                        raise GitTrustError("Git metadata has unsafe ownership or mode")
+                    is_directory = _git_metadata_entry_is_directory(metadata)
                     if entry.name.endswith(".promisor"):
                         raise GitTrustError("Git promisor object state is forbidden")
-                    if stat.S_ISDIR(metadata.st_mode):
+                    if is_directory:
                         directories.append(Path(entry.path))
-                    elif (
-                        stat.S_ISLNK(metadata.st_mode)
-                        or not stat.S_ISREG(metadata.st_mode)
-                        or metadata.st_nlink != 1
-                    ):
-                        raise GitTrustError("Git metadata is redirected or nonregular")
         except GitTrustError:
             raise
         except OSError as error:

@@ -60,8 +60,8 @@ These are ledger-recorded validation assertions for implementation commit `80c5e
 - Research-memory events: 103
 - Research-memory head: `45c7bdef473969c03c916de5ebc74563bdc71b382b11a7d1a883dd8ee3c2a679`
 - Renderer contract: `inbar.generated-handoff.v2`
-- Renderer source SHA-256: `a1b6b0ba0be34c2601a4d58778ee017f349f4f04b7ab1bc06f9e8eb75fb13b28`
-- Generated-input digest: `eeb75d264b19c7fad6717331de830d6e5813584d45829f37e60657892260044c`
+- Renderer source SHA-256: `ec5bef668be20955a0da5307ed20dc285c626ea29bce04bf3c5aed273d9ab5df`
+- Generated-input digest: `4a1b6da5aa804323ab27baa23a31a7a4277126599e7f243a2b780d2bbbff62ae`
 
 ## Remaining activation gates
 
@@ -122,7 +122,7 @@ transition still requires its own prospective signed authority.
 ## Resume verification
 
 ```bash
-uv sync --group dev --frozen
+uv sync --link-mode copy --reinstall --group dev --frozen
 uv run inbar memory verify
 uv run inbar schemas check
 uv run inbar mission validate --expect-failure iter001-acquisition-contract

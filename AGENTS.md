@@ -6,7 +6,7 @@ Canonical workspace:
 Run first:
 
 ```bash
-uv sync --group dev --frozen
+uv sync --link-mode copy --reinstall --group dev --frozen
 uv run inbar mission validate --expect-failure iter001-acquisition-contract
 uv run inbar handoff check
 uv run pytest --cov

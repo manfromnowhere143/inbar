@@ -36,6 +36,7 @@ _BUILD_CLOSURE = {
 def test_build_backend_and_complete_closure_are_exactly_pinned() -> None:
     project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["build-system"]["requires"] == ["hatchling==1.31.0"]
+    assert project["tool"]["uv"]["link-mode"] == "copy"
     assert (
         "/requirements/build-constraints.txt"
         in (project["tool"]["hatch"]["build"]["targets"]["sdist"]["include"])
@@ -60,5 +61,35 @@ def test_package_workflow_cannot_fall_back_to_a_floating_build_backend() -> None
     workflow = (_REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "uv python install 3.11 3.12.13 3.14" in workflow
     assert "uv sync --group release --frozen --python 3.12.13 --managed-python" in workflow
+    sync_steps = tuple(
+        line.strip() for line in workflow.splitlines() if line.strip().startswith("- run: uv sync ")
+    )
+    assert len(sync_steps) == 6
+    assert all("--link-mode" not in step for step in sync_steps)
     assert workflow.count(_BUILD_COMMAND) == 2
     assert "uv run python -c 'import pyarrow; print(pyarrow.__version__)'" in workflow
+
+
+def test_uv_workflows_cannot_override_project_copy_mode() -> None:
+    workflow_paths = sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml"))
+    uv_workflows = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in workflow_paths
+        if "astral-sh/setup-uv@" in path.read_text(encoding="utf-8")
+    }
+    assert set(uv_workflows) == {"ci.yml", "memory-integrity.yml"}
+    for workflow in uv_workflows.values():
+        assert re.search(r"^\s*UV_LINK_MODE:", workflow, flags=re.MULTILINE) is None
+        sync_steps = tuple(
+            line.strip()
+            for line in workflow.splitlines()
+            if line.strip().startswith("- run: uv sync ")
+        )
+        assert sync_steps
+        assert all("--link-mode" not in step for step in sync_steps)
+
+
+def test_documented_environment_recovery_reinstalls_under_copy_mode() -> None:
+    for relative in ("AGENTS.md", "README.md", "CONTRIBUTING.md"):
+        document = (_REPO_ROOT / relative).read_text(encoding="utf-8")
+        assert "uv sync --link-mode copy --reinstall" in document

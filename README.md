@@ -93,7 +93,7 @@ reports the exact registered blocker set and no additional failure.
 ## Verification
 
 ```bash
-uv sync --group dev --frozen
+uv sync --link-mode copy --reinstall --group dev --frozen
 uv run ruff check .
 uv run mypy src
 uv run pytest

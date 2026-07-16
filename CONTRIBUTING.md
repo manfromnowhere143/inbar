@@ -15,7 +15,7 @@ software correctness and their effect on the scientific contract.
 ## Local verification
 
 ```bash
-uv sync
+uv sync --link-mode copy --reinstall
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src

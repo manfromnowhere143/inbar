@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import subprocess
 from pathlib import Path
 
@@ -195,6 +196,15 @@ def test_git_trust_rejects_unsafe_metadata_permissions(tmp_path: Path) -> None:
 
     with pytest.raises(GitTrustError, match="unsafe ownership or mode"):
         verify_repository_trust(repo, trusted_git_executable())
+
+
+def test_git_trust_classifies_linux_style_symlink_before_permission_bits() -> None:
+    metadata = os.stat_result(
+        (stat.S_IFLNK | 0o777, 1, 1, 1, os.geteuid(), os.getegid(), 0, 0, 0, 0)
+    )
+
+    with pytest.raises(GitTrustError, match="metadata is redirected"):
+        git_trust_module._git_metadata_entry_is_directory(metadata)
 
 
 def test_git_trust_rejects_execution_capable_local_config(

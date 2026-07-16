@@ -1283,7 +1283,7 @@ def _render(repo_root: Path) -> bytes:
             "## Resume verification",
             "",
             "```bash",
-            "uv sync --group dev --frozen",
+            "uv sync --link-mode copy --reinstall --group dev --frozen",
             "uv run inbar memory verify",
             "uv run inbar schemas check",
             f"uv run inbar mission validate {failure_arguments}",
