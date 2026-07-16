@@ -28,6 +28,7 @@ from fieldtrue.domain import (
     EngineeringValidationStep,
     engineering_validation_plan_sha256,
 )
+from fieldtrue.handoff import RECOVERY_CHECKPOINT_ACTION
 from fieldtrue.memory_cycle import MemoryCycleError, produce_handoff_cycle
 
 RECEIPT_ID = "inbar-core-validation-cycle-test"
@@ -202,8 +203,7 @@ def _cycle(root: Path) -> dict[str, str]:
         root,
         receipt_id=RECEIPT_ID,
         producer_actor_id="claude",
-        action="Recorded the census implementation checkpoint.",
-        outcome="The census slice is reproducibly bound to committed evidence.",
+        summary="Recorded the census implementation checkpoint.",
         checkpoint_event_id="cycle-test-checkpoint-v1",
         handoff_event_id="cycle-test-handoff-v1",
         resource_event_id="cycle-test-resource-v1",
@@ -248,6 +248,10 @@ def test_cycle_appends_a_verifiable_hash_chain(
     assert resource["event_type"] == "resource"
     assert checkpoint["payload"]["implementation_commit"] == result["implementation_commit"]
     assert checkpoint["payload"]["validation_receipt"]["receipt_id"] == RECEIPT_ID
+    # The recovery pair is a frozen contract: the payload text must be the renderer's own.
+    assert checkpoint["payload"]["action"] == RECOVERY_CHECKPOINT_ACTION
+    assert handoff["links"]["engine_boundary"] == "future-research-engine-shortcut-v2-lessons-v1"
+    assert handoff["evidence"][0]["git_commit"] == result["implementation_commit"]
     assert checkpoint["links"]["resource_observation"] == "cycle-test-resource-v1"
     assert handoff["links"]["checkpoint"] == "cycle-test-checkpoint-v1"
     # The mission state did not change, so the handoff payload carries forward verbatim.

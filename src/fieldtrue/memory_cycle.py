@@ -26,6 +26,11 @@ from typing import Any, Final
 
 from fieldtrue.canonical import sha256_value
 from fieldtrue.domain import EngineeringValidationReceipt
+from fieldtrue.handoff import (
+    RECOVERY_CHECKPOINT_ACTION,
+    RECOVERY_CHECKPOINT_AUTHORITY_EFFECT,
+    RECOVERY_CHECKPOINT_OUTCOME,
+)
 from fieldtrue.memory import ResearchMemoryRecord
 from fieldtrue.validation_producer import write_validation_receipt
 
@@ -33,6 +38,7 @@ _MEMORY_PATH: Final = "memory/research_engine_extraction.jsonl"
 _HANDOFF_PATH: Final = "HANDOFF.md"
 _RENDERER_PATH: Final = "src/fieldtrue/handoff.py"
 _SOURCE_VERDICT_EVENT: Final = "iter001-current-public-source-route-verdict-v2"
+_ENGINE_BOUNDARY_EVENT: Final = "future-research-engine-shortcut-v2-lessons-v1"
 
 
 class MemoryCycleError(RuntimeError):
@@ -143,8 +149,7 @@ def produce_handoff_cycle(
     *,
     receipt_id: str,
     producer_actor_id: str,
-    action: str,
-    outcome: str,
+    summary: str,
     checkpoint_event_id: str,
     handoff_event_id: str,
     resource_event_id: str,
@@ -237,15 +242,15 @@ def produce_handoff_cycle(
         stage="mission-handoff",
         status="pass",
         actor_id=producer_actor_id,
-        summary=action,
+        summary=summary,
+        # The recovery pair is a frozen contract, not a narrative: the renderer requires these
+        # exact strings, so they are imported from the renderer rather than restated.
         payload={
-            "action": action,
-            "authority_effect": (
-                "No authority was granted; iter001-acquisition-contract remains blocked."
-            ),
+            "action": RECOVERY_CHECKPOINT_ACTION,
+            "authority_effect": RECOVERY_CHECKPOINT_AUTHORITY_EFFECT,
             "handoff_contract": "inbar.handoff-checkpoint.v2",
             "implementation_commit": implementation_commit,
-            "outcome": outcome,
+            "outcome": RECOVERY_CHECKPOINT_OUTCOME,
             "validation_receipt": receipt_binding,
         },
         evidence=[
@@ -288,13 +293,14 @@ def produce_handoff_cycle(
             _evidence_ref(
                 root,
                 uri="CONTINUITY.md",
-                git_commit=evidence_commit,
+                git_commit=implementation_commit,
                 media_type="text/markdown",
                 role="source",
             )
         ],
         links={
             "checkpoint": checkpoint_event_id,
+            "engine_boundary": _ENGINE_BOUNDARY_EVENT,
             "source_verdict": _SOURCE_VERDICT_EVENT,
         },
         source_commit=evidence_commit,
