@@ -13,6 +13,11 @@ census artifact contributes a scientific unit or counts toward the thirty-incide
 
 from __future__ import annotations
 
+import resource
+import sys
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Final, Literal, Self
@@ -41,6 +46,16 @@ PREVIOUS_APPROVAL_RECEIPT_HASH: Final = (
     "482575c10bb58da6b867ee60587cefa290512fa6f09529a324cea3002fd616c3"
 )
 CENSUS_DECISION: Final = "approve_source_census_implementation_only"
+
+
+# Frozen by Amendment 002 `resource_ceiling`. These are the amendment's values expressed in
+# base units; they are not independently chosen here and cannot be widened without a new
+# prospective amendment.
+CEILING_CPU_SECONDS: Final = 4 * 3600.0
+CEILING_WALL_SECONDS: Final = 2 * 3600.0
+CEILING_PEAK_MEMORY_BYTES: Final = 16 * 1024**3
+CEILING_RETRIEVED_BYTES: Final = 1 * 1024**3
+CEILING_PEAK_STAGED_BYTES: Final = 2 * 1024**3
 
 
 class CensusError(ValueError):
@@ -393,6 +408,87 @@ class CandidateScreening(FrozenModel):
         )
 
 
+class CensusResourceUsage(FrozenModel):
+    """Measured resources for one census audit.
+
+    Amendment 002 freezes `missing_measurement_invalidates_audit`. This contract is therefore
+    a required member of a census report: an unmeasured audit is invalid rather than
+    unconstrained. Values are measured, never asserted; `measurement_method` names the
+    primitive that produced them so a reader can tell a measurement from a guess.
+
+    The amendment grants zero GPU, cloud, paid-provider, and cost authority. Those fields are
+    typed to their only permitted value rather than left free, so an audit cannot record spend
+    it was never authorized to make.
+    """
+
+    schema_version: Literal["inbar.iter001.census-resource-usage.v1"] = (
+        "inbar.iter001.census-resource-usage.v1"
+    )
+    cpu_seconds: float = Field(ge=0)
+    wall_seconds: float = Field(ge=0)
+    peak_memory_bytes: int = Field(ge=0)
+    retrieved_bytes: int = Field(ge=0)
+    peak_staged_bytes: int = Field(ge=0)
+    gpu_seconds: Literal[0] = 0
+    cloud_jobs: Literal[0] = 0
+    paid_calls: Literal[0] = 0
+    cost_usd: Literal["0"] = "0"
+    measurement_method: str = Field(min_length=1)
+    measured_at: datetime
+
+    @model_validator(mode="after")
+    def measured_time_is_aware(self) -> Self:
+        if self.measured_at.tzinfo is None or self.measured_at.utcoffset() is None:
+            raise ValueError("census resource measurement time must be timezone-aware")
+        return self
+
+    @property
+    def ceiling_breaches(self) -> tuple[str, ...]:
+        breaches: list[str] = []
+        if self.cpu_seconds > CEILING_CPU_SECONDS:
+            breaches.append("cpu_seconds")
+        if self.wall_seconds > CEILING_WALL_SECONDS:
+            breaches.append("wall_seconds")
+        if self.peak_memory_bytes > CEILING_PEAK_MEMORY_BYTES:
+            breaches.append("peak_memory_bytes")
+        if self.retrieved_bytes > CEILING_RETRIEVED_BYTES:
+            breaches.append("retrieved_bytes")
+        if self.peak_staged_bytes > CEILING_PEAK_STAGED_BYTES:
+            breaches.append("peak_staged_bytes")
+        return tuple(breaches)
+
+
+@contextmanager
+def measure_census_resources() -> Iterator[dict[str, float | int]]:
+    """Measure real CPU, wall, and peak memory for a census audit.
+
+    Uses only the standard library: `resource.getrusage` for CPU and peak resident memory
+    across this process and its children, and `time.perf_counter` for wall time. The caller
+    supplies retrieved and staged byte counts, which this primitive cannot observe.
+
+    `ru_maxrss` is bytes on macOS and kibibytes on Linux; the platform difference is resolved
+    explicitly rather than assumed, because a silent factor-of-1024 error would make the
+    memory ceiling meaningless in exactly one direction.
+    """
+    started = time.perf_counter()
+    before = resource.getrusage(resource.RUSAGE_SELF)
+    before_children = resource.getrusage(resource.RUSAGE_CHILDREN)
+    observed: dict[str, float | int] = {}
+    try:
+        yield observed
+    finally:
+        after = resource.getrusage(resource.RUSAGE_SELF)
+        after_children = resource.getrusage(resource.RUSAGE_CHILDREN)
+        cpu = (after.ru_utime - before.ru_utime) + (after.ru_stime - before.ru_stime)
+        cpu += (after_children.ru_utime - before_children.ru_utime) + (
+            after_children.ru_stime - before_children.ru_stime
+        )
+        scale = 1 if sys.platform == "darwin" else 1024
+        observed["cpu_seconds"] = max(cpu, 0.0)
+        observed["wall_seconds"] = max(time.perf_counter() - started, 0.0)
+        observed["peak_memory_bytes"] = max(after.ru_maxrss, after_children.ru_maxrss) * scale
+
+
 class CensusReport(FrozenModel):
     schema_version: Literal["inbar.iter001.census-report.v1"] = "inbar.iter001.census-report.v1"
     iteration_id: Literal["iter001_physical_causal_evidence_acquisition"]
@@ -403,6 +499,7 @@ class CensusReport(FrozenModel):
     frame_declared_incomplete: Literal[True]
     screenings: tuple[CandidateScreening, ...]
     verdict: CensusVerdict
+    resource_usage: CensusResourceUsage
     produced_at: datetime
 
     @model_validator(mode="after")
@@ -483,6 +580,11 @@ def assert_no_field_borrowing(
 def verify_census_report(report: CensusReport) -> CensusReport:
     """Recompute the fail-closed invariants a census report must satisfy."""
     reject_unreachable_verdict(report.verdict.value)
+    breaches = report.resource_usage.ceiling_breaches
+    if breaches:
+        raise CensusError(
+            "census audit exceeded its frozen resource ceiling: " + ", ".join(breaches)
+        )
     for screening in report.screenings:
         locator_sources = frozenset(
             locator.source_id

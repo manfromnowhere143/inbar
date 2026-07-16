@@ -13,6 +13,11 @@ from pydantic import ValidationError
 
 from fieldtrue.census import (
     AMENDMENT_DOCUMENT_SHA256,
+    CEILING_CPU_SECONDS,
+    CEILING_PEAK_MEMORY_BYTES,
+    CEILING_PEAK_STAGED_BYTES,
+    CEILING_RETRIEVED_BYTES,
+    CEILING_WALL_SECONDS,
     GATE_ORDER,
     MACHINE_PROPOSAL_SHA256,
     OWNER_APPROVAL_RECEIPT_HASH,
@@ -21,6 +26,7 @@ from fieldtrue.census import (
     CensusError,
     CensusGate,
     CensusReport,
+    CensusResourceUsage,
     CensusVerdict,
     ChronologyAssessment,
     FrozenIdentifierKind,
@@ -34,6 +40,7 @@ from fieldtrue.census import (
     SourceLocator,
     Stratum,
     census_subject_hash,
+    measure_census_resources,
     reject_unreachable_verdict,
     verify_census_report,
 )
@@ -80,6 +87,20 @@ def _passing_gates(source_id: str = "ntsb-docket-example") -> tuple[GateResult, 
     )
 
 
+def _usage(**overrides: object) -> CensusResourceUsage:
+    values: dict[str, object] = {
+        "cpu_seconds": 12.5,
+        "wall_seconds": 30.0,
+        "peak_memory_bytes": 256 * 1024**2,
+        "retrieved_bytes": 4 * 1024**2,
+        "peak_staged_bytes": 8 * 1024**2,
+        "measurement_method": "resource.getrusage+time.perf_counter",
+        "measured_at": NOW,
+    }
+    values.update(overrides)
+    return CensusResourceUsage(**values)  # type: ignore[arg-type]
+
+
 def _report(screenings: tuple[CandidateScreening, ...], verdict: CensusVerdict) -> CensusReport:
     return CensusReport(
         iteration_id="iter001_physical_causal_evidence_acquisition",
@@ -90,6 +111,7 @@ def _report(screenings: tuple[CandidateScreening, ...], verdict: CensusVerdict) 
         frame_declared_incomplete=True,
         screenings=screenings,
         verdict=verdict,
+        resource_usage=_usage(),
         produced_at=NOW,
     )
 
@@ -592,6 +614,7 @@ def test_report_must_bind_the_approved_amendment_document() -> None:
         CensusReport(
             iteration_id="iter001_physical_causal_evidence_acquisition",
             amendment_document_artifact_sha256="0" * 64,
+            resource_usage=_usage(),
             machine_proposal_artifact_sha256=MACHINE_PROPOSAL_SHA256,
             owner_approval_receipt_hash=OWNER_APPROVAL_RECEIPT_HASH,
             frame_scope="scope",
@@ -608,6 +631,7 @@ def test_report_must_bind_the_approved_machine_proposal() -> None:
             iteration_id="iter001_physical_causal_evidence_acquisition",
             amendment_document_artifact_sha256=AMENDMENT_DOCUMENT_SHA256,
             machine_proposal_artifact_sha256="0" * 64,
+            resource_usage=_usage(),
             owner_approval_receipt_hash=OWNER_APPROVAL_RECEIPT_HASH,
             frame_scope="scope",
             frame_declared_incomplete=True,
@@ -624,6 +648,7 @@ def test_report_must_bind_the_owner_approval_receipt() -> None:
             amendment_document_artifact_sha256=AMENDMENT_DOCUMENT_SHA256,
             machine_proposal_artifact_sha256=MACHINE_PROPOSAL_SHA256,
             owner_approval_receipt_hash="0" * 64,
+            resource_usage=_usage(),
             frame_scope="scope",
             frame_declared_incomplete=True,
             screenings=(),
@@ -641,6 +666,7 @@ def test_frame_must_be_declared_incomplete() -> None:
             owner_approval_receipt_hash=OWNER_APPROVAL_RECEIPT_HASH,
             frame_scope="scope",
             frame_declared_incomplete=False,  # type: ignore[arg-type]
+            resource_usage=_usage(),
             screenings=(),
             verdict=CensusVerdict.NULL_WITHIN_FRAME,
             produced_at=NOW,
@@ -658,6 +684,7 @@ def test_naive_report_time_is_rejected() -> None:
             frame_declared_incomplete=True,
             screenings=(),
             verdict=CensusVerdict.NULL_WITHIN_FRAME,
+            resource_usage=_usage(),
             produced_at=datetime(2026, 7, 16, 12, 0, 0),  # noqa: DTZ001
         )
 
@@ -680,6 +707,100 @@ def test_future_dated_report_is_rejected() -> None:
     )
     with pytest.raises(CensusError, match="dated in the future"):
         verify_census_report(report)
+
+
+# --- Resource ceiling controls (Amendment 002 freezes the ceiling) -----------------
+
+
+def test_a_report_cannot_be_built_without_a_resource_measurement() -> None:
+    # missing_measurement_invalidates_audit: an unmeasured audit is invalid, not unconstrained.
+    with pytest.raises(ValidationError):
+        CensusReport(
+            iteration_id="iter001_physical_causal_evidence_acquisition",
+            amendment_document_artifact_sha256=AMENDMENT_DOCUMENT_SHA256,
+            machine_proposal_artifact_sha256=MACHINE_PROPOSAL_SHA256,
+            owner_approval_receipt_hash=OWNER_APPROVAL_RECEIPT_HASH,
+            frame_scope="scope",
+            frame_declared_incomplete=True,
+            screenings=(),
+            verdict=CensusVerdict.NULL_WITHIN_FRAME,
+            produced_at=NOW,
+        )  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "dimension"),
+    [
+        ("cpu_seconds", CEILING_CPU_SECONDS + 1, "cpu_seconds"),
+        ("wall_seconds", CEILING_WALL_SECONDS + 1, "wall_seconds"),
+        ("peak_memory_bytes", CEILING_PEAK_MEMORY_BYTES + 1, "peak_memory_bytes"),
+        ("retrieved_bytes", CEILING_RETRIEVED_BYTES + 1, "retrieved_bytes"),
+        ("peak_staged_bytes", CEILING_PEAK_STAGED_BYTES + 1, "peak_staged_bytes"),
+    ],
+)
+def test_each_ceiling_dimension_fails_closed(field: str, value: float, dimension: str) -> None:
+    usage = _usage(**{field: value})
+    assert usage.ceiling_breaches == (dimension,)
+    report = _report((), CensusVerdict.NULL_WITHIN_FRAME).model_copy(
+        update={"resource_usage": usage}
+    )
+    with pytest.raises(CensusError, match="exceeded its frozen resource ceiling"):
+        verify_census_report(report)
+
+
+def test_usage_exactly_at_the_ceiling_is_permitted() -> None:
+    usage = _usage(
+        cpu_seconds=CEILING_CPU_SECONDS,
+        wall_seconds=CEILING_WALL_SECONDS,
+        peak_memory_bytes=CEILING_PEAK_MEMORY_BYTES,
+        retrieved_bytes=CEILING_RETRIEVED_BYTES,
+        peak_staged_bytes=CEILING_PEAK_STAGED_BYTES,
+    )
+    assert usage.ceiling_breaches == ()
+
+
+def test_multiple_simultaneous_breaches_are_all_reported() -> None:
+    usage = _usage(
+        cpu_seconds=CEILING_CPU_SECONDS + 1,
+        retrieved_bytes=CEILING_RETRIEVED_BYTES + 1,
+    )
+    assert usage.ceiling_breaches == ("cpu_seconds", "retrieved_bytes")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("gpu_seconds", 1), ("cloud_jobs", 1), ("paid_calls", 1), ("cost_usd", "0.01")],
+)
+def test_zero_authority_dimensions_cannot_record_spend(field: str, value: object) -> None:
+    # The amendment grants zero GPU, cloud, paid-provider, and cost authority. An audit must
+    # be unable to record spend it was never authorized to make.
+    with pytest.raises(ValidationError):
+        _usage(**{field: value})
+
+
+def test_naive_measurement_time_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        _usage(measured_at=datetime(2026, 7, 16, 12, 0, 0))  # noqa: DTZ001
+
+
+def test_measurement_primitive_measures_real_cpu_and_wall_time() -> None:
+    with measure_census_resources() as observed:
+        total = sum(i * i for i in range(200_000))
+    assert total > 0
+    assert observed["wall_seconds"] > 0
+    assert observed["cpu_seconds"] >= 0
+    assert observed["peak_memory_bytes"] > 0
+    # The measured values must be usable as a real audit measurement, not a placeholder.
+    usage = CensusResourceUsage(
+        cpu_seconds=observed["cpu_seconds"],
+        wall_seconds=observed["wall_seconds"],
+        peak_memory_bytes=int(observed["peak_memory_bytes"]),
+        retrieved_bytes=0,
+        peak_staged_bytes=0,
+        measurement_method="resource.getrusage+time.perf_counter",
+        measured_at=datetime.now(UTC),
+    )
+    assert usage.ceiling_breaches == ()
 
 
 def test_census_subject_hash_is_domain_separated_and_stable() -> None:

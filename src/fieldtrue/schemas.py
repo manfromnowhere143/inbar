@@ -65,6 +65,7 @@ from fieldtrue.canonical import atomic_write, canonical_json_pretty
 from fieldtrue.census import (
     CandidateScreening,
     CensusReport,
+    CensusResourceUsage,
     ChronologyAssessment,
     RoleInheritanceAssessment,
     SourceFactLocator,
@@ -223,6 +224,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "census_chronology_assessment.schema.json": ChronologyAssessment,
     "census_gate_result.schema.json": CensusGateResult,
     "census_report.schema.json": CensusReport,
+    "census_resource_usage.schema.json": CensusResourceUsage,
     "census_role_inheritance.schema.json": RoleInheritanceAssessment,
     "census_source_fact_locator.schema.json": SourceFactLocator,
     "shortcut_owner_approval_receipt.schema.json": OwnerAmendmentApprovalReceipt,

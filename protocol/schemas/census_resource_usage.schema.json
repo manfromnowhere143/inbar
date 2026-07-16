@@ -1,0 +1,82 @@
+{
+  "additionalProperties": false,
+  "description": "Measured resources for one census audit.\n\nAmendment 002 freezes `missing_measurement_invalidates_audit`. This contract is therefore\na required member of a census report: an unmeasured audit is invalid rather than\nunconstrained. Values are measured, never asserted; `measurement_method` names the\nprimitive that produced them so a reader can tell a measurement from a guess.\n\nThe amendment grants zero GPU, cloud, paid-provider, and cost authority. Those fields are\ntyped to their only permitted value rather than left free, so an audit cannot record spend\nit was never authorized to make.",
+  "properties": {
+    "cloud_jobs": {
+      "const": 0,
+      "default": 0,
+      "title": "Cloud Jobs",
+      "type": "integer"
+    },
+    "cost_usd": {
+      "const": "0",
+      "default": "0",
+      "title": "Cost Usd",
+      "type": "string"
+    },
+    "cpu_seconds": {
+      "minimum": 0,
+      "title": "Cpu Seconds",
+      "type": "number"
+    },
+    "gpu_seconds": {
+      "const": 0,
+      "default": 0,
+      "title": "Gpu Seconds",
+      "type": "integer"
+    },
+    "measured_at": {
+      "format": "date-time",
+      "title": "Measured At",
+      "type": "string"
+    },
+    "measurement_method": {
+      "minLength": 1,
+      "title": "Measurement Method",
+      "type": "string"
+    },
+    "paid_calls": {
+      "const": 0,
+      "default": 0,
+      "title": "Paid Calls",
+      "type": "integer"
+    },
+    "peak_memory_bytes": {
+      "minimum": 0,
+      "title": "Peak Memory Bytes",
+      "type": "integer"
+    },
+    "peak_staged_bytes": {
+      "minimum": 0,
+      "title": "Peak Staged Bytes",
+      "type": "integer"
+    },
+    "retrieved_bytes": {
+      "minimum": 0,
+      "title": "Retrieved Bytes",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.census-resource-usage.v1",
+      "default": "inbar.iter001.census-resource-usage.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "wall_seconds": {
+      "minimum": 0,
+      "title": "Wall Seconds",
+      "type": "number"
+    }
+  },
+  "required": [
+    "cpu_seconds",
+    "wall_seconds",
+    "peak_memory_bytes",
+    "retrieved_bytes",
+    "peak_staged_bytes",
+    "measurement_method",
+    "measured_at"
+  ],
+  "title": "CensusResourceUsage",
+  "type": "object"
+}

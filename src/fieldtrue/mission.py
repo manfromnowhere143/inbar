@@ -244,7 +244,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "3be1982f0e93cf621366c017df7c723cc469e1ad6ea7e670fe7bcca0dcc85af5"
     ),
     "src/fieldtrue/schemas.py": (
-        "903b7c754e85da98bd5d70a24086fc8da3096008ebe0d289e8891e7b382c4728"
+        "e810a51bbe4f150eceb75cdef1c0207289552aae5b29e8584bcfc6df4fea837d"
     ),
     "src/fieldtrue/shortcut_v2_crossfit.py": (
         "4beb28f55c8903c10c1744ead56757dc3d3994cb56b4c3b1ba58faf742ea17e5"
