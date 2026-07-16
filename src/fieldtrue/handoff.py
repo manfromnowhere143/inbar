@@ -36,7 +36,7 @@ _LAZY_AUTHORITY_MODULES = (_verification_module,)
 _HANDOFF_PATH = "HANDOFF.md"
 _MEMORY_PATH = "memory/research_engine_extraction.jsonl"
 _RENDERER_PATH = "src/fieldtrue/handoff.py"
-_RENDERER_CONTRACT = "inbar.generated-handoff.v2"
+_RENDERER_CONTRACT = "inbar.generated-handoff.v3"
 _MAX_INPUT_BYTES = 16 * 1024 * 1024
 _MAX_RECOVERY_INPUT_BYTES = 64 * 1024 * 1024
 _MAX_RECOVERY_INPUT_DIRECTORIES = 4096
@@ -1123,17 +1123,10 @@ def _render(repo_root: Path) -> bytes:
     ]
     input_digest = sha256_value(
         {
-            "domain": "inbar.generated-handoff-inputs.v3",
+            "domain": "inbar.generated-handoff-inputs.v4",
             "renderer_contract": _RENDERER_CONTRACT,
             "renderer_sha256": renderer_hash,
             "bound_module_artifacts": bound_module_hashes,
-            "recovery_directories": [
-                {
-                    "entries": list(item.entries),
-                    "path": item.path,
-                }
-                for item in recovery_manifest.directories
-            ],
             "recovery_artifacts": [
                 {
                     "path": item.path,

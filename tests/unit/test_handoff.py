@@ -374,18 +374,48 @@ def test_recovery_digest_binds_claims_outside_the_rendered_fields(
     )
 
 
-def test_recovery_digest_binds_empty_directory_inventory(
+def test_recovery_digest_ignores_empty_directories_but_binds_files_within_them(
     handoff_repo: Path,
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _install_verified_dependencies(monkeypatch, memory_records)
+    before_manifest = handoff_module._recovery_manifest(handoff_repo)
     before = render_handoff(handoff_repo)
-    (handoff_repo / "proofs" / "empty-proof-surface").mkdir()
+    cache_path = (
+        handoff_repo
+        / "nonexistent"
+        / "Library"
+        / "Caches"
+        / "com.apple.python"
+        / "Library"
+        / "Developer"
+        / "CommandLineTools"
+        / "Library"
+        / "Frameworks"
+        / "Python3.framework"
+        / "Versions"
+        / "3.9"
+        / "lib"
+        / "python3.9"
+        / "encodings"
+    )
+    cache_path.mkdir(parents=True)
 
-    after = render_handoff(handoff_repo)
+    empty_manifest = handoff_module._recovery_manifest(handoff_repo)
+    with_empty_directories = render_handoff(handoff_repo)
 
-    assert _input_digest(before) != _input_digest(after)
+    assert before_manifest.files == empty_manifest.files
+    assert before_manifest.directories != empty_manifest.directories
+    assert before == with_empty_directories
+
+    (cache_path / "artifact.pyc").write_bytes(b"content-bearing input\n")
+    with_file = render_handoff(handoff_repo)
+
+    assert _input_digest(with_file) != _input_digest(before)
+    assert with_file.replace(_input_digest(with_file).encode(), b"DIGEST") == before.replace(
+        _input_digest(before).encode(), b"DIGEST"
+    )
 
 
 def test_render_binds_the_imported_renderer_source_to_repository_source(
