@@ -262,7 +262,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
     ),
     "tests/unit/test_handoff.py": (
-        "c64634d0713cbbec11a34eea51121bde2f5fe95842b2ae8ae426712231a91ed8"
+        "7dd880ac8dd902fc4080f5a3d48312a96a22729d7e8adc7ba6f1cd224b295eb8"
     ),
     "tests/unit/test_mission.py": (
         "09b6915f052f333f21889dc2c0e42cf3b0ad85b072d8cf15bc4394644b71b3da"

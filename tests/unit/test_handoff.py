@@ -1757,6 +1757,7 @@ def test_preloaded_wrapper_allowlist_matches_the_fixed_reviewed_contract() -> No
                 "fieldtrue.diagnosis",
                 "fieldtrue.experiment",
                 "fieldtrue.ports",
+                "fieldtrue.validation_producer",
             }
         )
         == handoff_module._HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES
