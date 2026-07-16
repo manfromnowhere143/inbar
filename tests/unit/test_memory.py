@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+import fieldtrue.memory as memory_module
 from fieldtrue.canonical import CanonicalizationError, canonical_json, sha256_value
 from fieldtrue.memory import (
     AccessClass,
@@ -19,6 +21,8 @@ from fieldtrue.memory import (
     MemoryVerificationError,
     ResearchMemoryRecord,
     append_memory,
+    load_memory_records,
+    load_memory_records_bytes,
     verify_memory,
     verify_memory_prefix,
 )
@@ -176,6 +180,102 @@ def test_empty_memory_is_valid(tmp_path: Path) -> None:
     assert verify_memory(tmp_path / "absent.jsonl") == (0, "0" * 64)
 
 
+def test_memory_records_can_be_verified_from_one_byte_snapshot(tmp_path: Path) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(path, "decision-1")
+    records = load_memory_records_bytes(path.read_bytes())
+    assert [record.event_id for record in records] == ["decision-1"]
+    with pytest.raises(MemoryVerificationError, match="UTF-8"):
+        load_memory_records_bytes(b"\xff")
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda line: line.replace(b'{"access":', b'{"summary":"forged","access":', 1),
+        lambda line: line.replace(
+            b'"actor":{"actor_id":', b'"actor":{"kind":"human","actor_id":', 1
+        ),
+    ],
+)
+def test_memory_snapshot_rejects_duplicate_keys_at_every_depth(
+    mutation: object,
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(path, "decision-1")
+    duplicate = mutation(path.read_bytes())  # type: ignore[operator]
+
+    with pytest.raises(MemoryVerificationError, match="duplicate memory object key"):
+        load_memory_records_bytes(duplicate)
+
+
+def test_memory_snapshot_rejects_duplicate_keys_inside_nested_lists(tmp_path: Path) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(
+        path,
+        "decision-1",
+        payload={"decision": "proceed", "items": [{"role": "source"}]},
+    )
+    duplicate = path.read_bytes().replace(
+        b'"items":[{"role":"source"}]',
+        b'"items":[{"role":"source","role":"source"}]',
+        1,
+    )
+
+    with pytest.raises(MemoryVerificationError, match="duplicate memory object key"):
+        load_memory_records_bytes(duplicate)
+
+
+def test_memory_snapshot_requires_canonical_jsonl(tmp_path: Path) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(path, "decision-1")
+
+    with pytest.raises(MemoryVerificationError, match="noncanonical memory line at 1"):
+        load_memory_records_bytes(path.read_bytes().replace(b'"access":', b' "access":', 1))
+
+    non_finite = path.read_bytes().replace(b'"manual_minutes":0.0', b'"manual_minutes":NaN', 1)
+    with pytest.raises(MemoryVerificationError, match="non-finite memory number"):
+        load_memory_records_bytes(non_finite)
+
+
+def test_nonempty_memory_requires_a_terminal_lf_before_verify_or_append(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(path, "decision-1")
+    path.write_bytes(path.read_bytes().removesuffix(b"\n"))
+
+    with pytest.raises(MemoryVerificationError, match="must end with one LF"):
+        verify_memory(path)
+    with pytest.raises(MemoryVerificationError, match="must end with one LF"):
+        _append(path, "decision-2")
+
+    path.write_bytes(path.read_bytes() + b"\n")
+    _append(path, "decision-2")
+    assert verify_memory(path)[0] == 2
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda data: data.replace(b"\n", b"\r\n"),
+        lambda data: data.removesuffix(b"\n") + b"\r\n",
+    ],
+)
+def test_memory_rejects_crlf_framing(mutation: object, tmp_path: Path) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(path, "decision-1")
+    path.write_bytes(mutation(path.read_bytes()))  # type: ignore[operator]
+
+    with pytest.raises(MemoryVerificationError, match="exact LF framing"):
+        load_memory_records_bytes(path.read_bytes())
+    with pytest.raises(MemoryVerificationError, match="exact LF framing"):
+        verify_memory(path)
+    with pytest.raises(MemoryVerificationError, match="exact LF framing"):
+        _append(path, "decision-2")
+
+
 def test_memory_prefix_is_immutable_and_current_chain_is_reverified(tmp_path: Path) -> None:
     current = tmp_path / "current.jsonl"
     _append(current, "decision-1")
@@ -226,6 +326,25 @@ def test_memory_evidence_and_links_require_reconstructible_anchors(tmp_path: Pat
             access=AccessClass.PUBLIC,
             label_access=LabelAccess.NONE,
         )
+    external = MemoryEvidenceRef(
+        role="source",
+        uri="https://example.invalid/paper",
+        sha256="a" * 64,
+        media_type="text/html",
+        access=AccessClass.PUBLIC,
+        label_access=LabelAccess.NONE,
+    )
+    assert external.git_commit is None
+    with pytest.raises(ValidationError, match="must not include a Git commit"):
+        MemoryEvidenceRef(
+            role="source",
+            uri="https://example.invalid/paper",
+            sha256="a" * 64,
+            git_commit=COMMIT,
+            media_type="text/html",
+            access=AccessClass.PUBLIC,
+            label_access=LabelAccess.NONE,
+        )
     with pytest.raises(ValidationError, match="Git commit"):
         MemoryEvidenceRef(
             role="input",
@@ -244,11 +363,45 @@ def test_memory_evidence_and_links_require_reconstructible_anchors(tmp_path: Pat
             access=AccessClass.PUBLIC,
             label_access=LabelAccess.SEALED_HELDOUT,
         )
+    for uri in (
+        "https://example.invalid/paper?revision=1",
+        "https://example.invalid/paper?",
+        "https://example.invalid/paper#results",
+        "https://example.invalid/paper#",
+    ):
+        with pytest.raises(ValidationError, match="query or fragment"):
+            MemoryEvidenceRef(
+                role="source",
+                uri=uri,
+                sha256="a" * 64,
+                media_type="text/html",
+                access=AccessClass.PUBLIC,
+                label_access=LabelAccess.NONE,
+            )
 
     path = tmp_path / "memory.jsonl"
     _append(path, "decision-1")
     with pytest.raises(MemoryVerificationError, match="links"):
         _append(path, "decision-2", links={"supports": "missing-event"})
+
+
+def test_memory_evidence_schema_separates_external_and_repository_anchors() -> None:
+    schema = MemoryEvidenceRef.model_json_schema()
+    external, repository = schema["allOf"][0]["oneOf"]
+
+    assert set(external["required"]) == {"uri", "sha256"}
+    assert external["properties"]["uri"] == {
+        "type": "string",
+        "pattern": r"^https://[^/?#]+(?:/|$)",
+    }
+    assert external["properties"]["sha256"] == {"type": "string"}
+    assert external["properties"]["git_commit"] == {"type": "null"}
+    assert set(repository["required"]) == {"uri", "git_commit"}
+    assert repository["properties"]["uri"] == {
+        "type": "string",
+        "not": {"pattern": r"^[A-Za-z][A-Za-z0-9+.-]*:"},
+    }
+    assert repository["properties"]["git_commit"] == {"type": "string"}
 
 
 def test_memory_event_payload_contract_is_typed(tmp_path: Path) -> None:
@@ -259,3 +412,46 @@ def test_memory_event_payload_contract_is_typed(tmp_path: Path) -> None:
             event_type=MemoryEventType.FINDING,
             payload={"observation": "untyped"},
         )
+
+
+@pytest.mark.parametrize("alias_kind", ["symlink", "hardlink"])
+def test_memory_file_apis_reject_final_path_aliases(
+    alias_kind: str,
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.jsonl"
+    _append(source, "decision-1")
+    alias = tmp_path / "alias.jsonl"
+    if alias_kind == "symlink":
+        alias.symlink_to(source)
+    else:
+        os.link(source, alias)
+
+    with pytest.raises(MemoryVerificationError, match=r"symbolic link|hard linked"):
+        verify_memory(alias)
+    with pytest.raises(MemoryVerificationError, match=r"symbolic link|hard linked"):
+        load_memory_records(alias)
+    with pytest.raises(MemoryVerificationError, match=r"symbolic link|hard linked"):
+        verify_memory_prefix(alias, source)
+    with pytest.raises(MemoryVerificationError, match=r"symbolic link|hard linked"):
+        verify_memory_prefix(source, alias)
+    with pytest.raises(MemoryVerificationError, match=r"symbolic link|hard linked"):
+        _append(alias, "decision-2")
+
+
+def test_memory_file_reads_and_append_are_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "memory.jsonl"
+    _append(path, "decision-1")
+    monkeypatch.setattr(memory_module, "_MAX_MEMORY_BYTES", path.stat().st_size - 1)
+
+    with pytest.raises(MemoryVerificationError, match="byte limit"):
+        verify_memory(path)
+    with pytest.raises(MemoryVerificationError, match="byte limit"):
+        load_memory_records(path)
+    with pytest.raises(MemoryVerificationError, match="byte limit"):
+        verify_memory_prefix(path, path)
+    with pytest.raises(MemoryVerificationError, match="byte limit"):
+        _append(path, "decision-2")

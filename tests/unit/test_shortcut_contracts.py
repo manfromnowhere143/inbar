@@ -125,7 +125,7 @@ def test_authority_loader_rejects_uncommitted_receipt_bytes(
     original = contracts._git_blob
 
     def substitute(root: Path, commit: str, relative: str, label: str) -> bytes:
-        if commit == "HEAD":
+        if relative == OWNER_APPROVAL_PATH:
             return b"substituted"
         return original(root, commit, relative, label)
 
@@ -414,20 +414,16 @@ def test_git_history_requires_exact_worktree_root_and_approved_ancestry(
     contracts._verify_git_history(_repo())
     original = contracts.subprocess.run
 
-    def substitute_root(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        command = args[0]
-        if isinstance(command, list) and "rev-parse" in command:
-            return subprocess.CompletedProcess(
-                command,
-                0,
-                stdout=f"{_repo().parent}\n",
-                stderr="",
-            )
-        return original(*args, **kwargs)  # type: ignore[return-value]
-
-    monkeypatch.setattr(contracts.subprocess, "run", substitute_root)
-    with pytest.raises(ShortcutContractError, match="worktree top level"):
-        contracts._verify_git_history(_repo())
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            contracts,
+            "verify_repository_trust",
+            lambda *_args: (_ for _ in ()).throw(
+                contracts.GitTrustError("repository or object directory is redirected")
+            ),
+        )
+        with pytest.raises(ShortcutContractError, match="authority Git trust failed"):
+            contracts._verify_git_history(_repo())
 
     def reject_ancestry(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
         command = args[0]
@@ -435,9 +431,10 @@ def test_git_history_requires_exact_worktree_root_and_approved_ancestry(
             return subprocess.CompletedProcess(command, 1, stdout="", stderr="")
         return original(*args, **kwargs)  # type: ignore[return-value]
 
-    monkeypatch.setattr(contracts.subprocess, "run", reject_ancestry)
-    with pytest.raises(ShortcutContractError, match="not an ancestor"):
-        contracts._verify_git_history(_repo())
+    with monkeypatch.context() as scoped:
+        scoped.setattr(contracts.subprocess, "run", reject_ancestry)
+        with pytest.raises(ShortcutContractError, match="not an ancestor"):
+            contracts._verify_git_history(_repo())
 
 
 def test_git_authority_ignores_inherited_repository_redirection(
@@ -476,25 +473,48 @@ def test_git_authority_rejects_unsafe_system_git_mode(
         contracts._trusted_git_executable()
 
 
-def test_git_authority_rejects_legacy_grafts(
-    tmp_path: Path,
+def test_git_authority_maps_shared_history_trust_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    grafts = tmp_path / "grafts"
-    grafts.write_text(f"{'f' * 40} {'e' * 40}\n")
-    original = contracts.subprocess.run
-
-    def substitute_grafts(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
-        command = args[0]
-        if isinstance(command, list) and "--git-path" in command:
-            return subprocess.CompletedProcess(
-                command,
-                0,
-                stdout=f"{grafts}\n",
-                stderr="",
-            )
-        return original(*args, **kwargs)  # type: ignore[return-value]
-
-    monkeypatch.setattr(contracts.subprocess, "run", substitute_grafts)
-    with pytest.raises(ShortcutContractError, match="grafts are forbidden"):
+    monkeypatch.setattr(
+        contracts,
+        "verify_repository_trust",
+        lambda *_args: (_ for _ in ()).throw(contracts.GitTrustError("graft state is forbidden")),
+    )
+    with pytest.raises(ShortcutContractError, match="graft state is forbidden"):
         contracts._verify_git_history(_repo())
+
+
+def test_git_authority_rejects_head_change_during_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    head = subprocess.run(
+        ["/usr/bin/git", "rev-parse", "HEAD"],
+        cwd=_repo(),
+        check=True,
+        capture_output=True,
+        env=contracts._git_environment(),
+        text=True,
+        timeout=10,
+    ).stdout.strip()
+    observed = iter((head, "f" * len(head)))
+    monkeypatch.setattr(contracts, "_verify_git_history", lambda _repo_root: next(observed))
+
+    with pytest.raises(ShortcutContractError, match="HEAD changed"):
+        load_shortcut_implementation_authority(_repo(), verified_at=NOW)
+
+
+def test_git_authority_rejects_a_real_alternate_object_database(tmp_path: Path) -> None:
+    clone = tmp_path / "authority-clone"
+    subprocess.run(  # noqa: S603 - fixed Git path and test-controlled repository paths
+        ["/usr/bin/git", "clone", "--quiet", "--no-local", str(_repo()), str(clone)],
+        check=True,
+        env={**contracts._git_environment(), "GIT_ALLOW_PROTOCOL": "file"},
+        timeout=30,
+    )
+    alternates = clone / ".git" / "objects" / "info" / "alternates"
+    alternates.parent.mkdir(parents=True, exist_ok=True)
+    alternates.write_text(f"{_repo() / '.git' / 'objects'}\n", encoding="utf-8")
+
+    with pytest.raises(ShortcutContractError, match="alternate-object state is forbidden"):
+        load_shortcut_implementation_authority(clone, verified_at=NOW)

@@ -33,11 +33,22 @@ prospective, approved testbed work.
 The canonical acquisition contract remains `bootstrap`. No production control receipt, pilot
 verdict, training authority, or scientific claim exists.
 
+The control generator executes each registered control in a fresh private CPython, dependency, and
+committed-source snapshot whose downloaded artifacts are checked against frozen sizes and hashes.
+The child starts with `-I`, `-B`, and `-S`; the acquisition verifier separately binds an exact bounded
+`src/fieldtrue` census to the control execution commit. These controls authenticate the child control
+runner, but not the ambient parent that has already imported the orchestration code, assembles the
+production manifest, loads the governance key, and signs the result. Ordinary ambient invocation
+cannot authorize acquisition. That complete authority path must move inside the authenticated
+pre-import child, and the ambient process must never receive the signing key. This execution boundary
+remains part of the sole registered `iter001-acquisition-contract` blocker and must be closed
+prospectively before canonical authority can be sealed.
+
 ## Implemented authority
 
 The bootstrap implements typed evidence, rights, clocks, custody, hypotheses, approvals, execution,
 recovery, settled outcome, resources, split, comparator, review, and candidate-registry contracts.
-Twenty-two outcome-bound controls exercise the production admission path.
+Outcome-bound controls exercise the production admission path.
 
 Terminal authority Phase 1 is implemented at base commit
 `b1e6b369d39de98004b3eacb2770779d86410504`. It adds a root-certified verifier contract, complete
@@ -47,12 +58,15 @@ It does not issue a production certificate, load a production key, wire the CLI,
 Future publication authority uses a separate Inbar-bound signer anchor. Legacy Fieldtrue signer
 anchors cannot authorize an Inbar publication transition.
 
-The complete matrix passes 376 tests with one platform-capability skip and 90.20 percent branch
-coverage. Ruff, strict mypy across 23 source modules, 85 generated schemas, the dependency lock,
-and Git whitespace checks pass. Exact commit
-`8735dbea2675b51f8e38a5abec9d625e3f47e16b` passed GitHub Actions run `29405551773`
-across the quality, package, dependency, data, Ubuntu, and macOS jobs. The earlier Linux-only
-`/private/tmp` failure and its correction remain separate append-only memory records.
+Shortcut Authority V2 has an implementation-only checkpoint covering exact depth-two Gini trees,
+leave-one-group-out cross-fitting, recipient-scoped encrypted target envelopes, and adversarial
+authority checks. It remains dormant and grants no data, target, training, truth-release, execution,
+verdict, seal, or publication authority.
+
+The current mission inventory, Git anchors, memory head, and activation gates are rendered into
+`HANDOFF.md` from verified machine state. Checkpoint metrics in that document are explicitly labeled
+as historical results from their linked implementation commit. This continuity document does not
+duplicate those volatile values.
 
 ## Conditional research interest
 
@@ -79,14 +93,9 @@ open. The separate Inbar surface belongs to another mission and must not be chan
 
 ## Remaining blockers
 
-1. Commit a prospective shortcut amendment with exact-census, no-fit kill authority and
-   recipient-scoped truth release.
-2. Implement shared prediction keys and signed truth-to-hypothesis mechanism targets.
-3. Complete terminal generation, atomic output publication, end-to-end invalidity records, and
-   deterministic read-only replay through the production validator.
-4. Add format-specific opaque-media leakage parsers.
-5. Generate and independently verify a production control receipt only after every preceding gate
-   is closed on a clean committed tree.
+The exact ordered activation gates are generated in `HANDOFF.md` from the latest verified Inbar
+handoff event and its linked passing implementation checkpoint. They must be closed prospectively,
+with signed authority and negative controls, before any affected evidence or target access.
 
 Do not reinterpret V1 shortcut booleans, lower thresholds, treat synthetic fixtures as evidence, or
 claim diagnosis, recovery, safety, transfer, product readiness, or economic value.
@@ -98,6 +107,18 @@ engineering checkpoints, not publication. Inbar is intended for a disciplined op
 but visibility changes only after the exact release commit has green clean-clone CI, an explicit
 license, completed rights and secret scans, consistent identity and claim documents, and Daniel's
 approval.
+
+The current private personal-repository plan exposes neither branch protection nor repository
+rulesets. GitHub Actions therefore provide auditable evidence but cannot enforce integration policy
+against a direct push or merge. Direct integration remains an operator-controlled action. Before a
+public release, enable a protected integration path and bind its required checks to the exact tested
+head; the base-controlled target workflow alone is not a latest-head required check.
+
+Candidate branches must start from the current integration head because history verification requires
+the immutable event base to be an ancestor of the exact candidate head. Rebase a behind-base branch
+before review. After the initial bootstrap, normal candidate edges intentionally reject changes to
+workflows or `scripts/ci/verify_history.py`; any future policy change requires a separately audited
+policy-bootstrap and operator-controlled direct-integration ceremony.
 
 Scientific authority may remain transparently blocked in an open-source code release. A public code
 checkpoint must not imply a scientific result.
@@ -111,7 +132,8 @@ approved compute plan before use.
 
 ## Resume state
 
-The append-only research memory contains 56 verified events with head
-`be128add60d11e0fa942592aecb50d0d4598009c668608525e87269ac63385ad`. Resume from `HANDOFF.md`,
-verify Git and memory anchors, and keep the standalone general research engine out of this
-repository.
+Resume from the generated `HANDOFF.md`, run its exact verification commands, verify Git and memory
+anchors, and keep the standalone general research engine out of this repository. `inbar handoff
+check` must fail whenever that document no longer matches the verified contracts, schemas, blocker
+set, or append-only memory chain. This is deterministic candidate-tree consistency, not independent
+or base-controlled attestation; renderer and transitive verifier changes still require source review.

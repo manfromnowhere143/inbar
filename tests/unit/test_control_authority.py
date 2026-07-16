@@ -3,7 +3,10 @@ from __future__ import annotations
 import errno
 import os
 import shutil
+import signal
 import subprocess
+import sys
+from contextlib import suppress
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -58,6 +61,19 @@ ZERO_HASH = "0" * 64
 ZERO_BLOB = "0" * 40
 
 
+def _bind_test_uv(
+    monkeypatch: pytest.MonkeyPatch,
+    executable: Path,
+    *,
+    target: str = "test-target",
+) -> None:
+    trust = authority.runner_trust
+    key = (trust.platform.system().casefold(), trust.platform.machine().casefold())
+    monkeypatch.setattr(trust, "PINNED_UV_SHA256", {key: sha256_file(executable)})
+    monkeypatch.setattr(trust, "PINNED_UV_TARGET", {key: target})
+    monkeypatch.setattr(trust.shutil, "which", lambda *_args, **_kwargs: str(executable))
+
+
 def _execution_manifest_value() -> dict[str, Any]:
     return {
         "suite_id": "iter001-admission-controls-v1",
@@ -67,10 +83,14 @@ def _execution_manifest_value() -> dict[str, Any]:
         "finished_at": "2026-01-01T00:01:00Z",
         "repository_clean_before": True,
         "repository_clean_after": True,
-        "dependency_mode": "uv-offline-frozen",
+        "dependency_mode": "lock-hash-authenticated-wheels",
         "uv_executable": "/absolute/uv",
         "uv_executable_sha256": ZERO_HASH,
         "uv_version": "uv 1.0.0",
+        "python_executable_sha256": ZERO_HASH,
+        "python_version": "3.12.13",
+        "runner_environment_sha256": ZERO_HASH,
+        "artifact_set_sha256": ZERO_HASH,
         "environment_policy": (),
         "sources": [
             {
@@ -359,11 +379,35 @@ def test_sanitized_control_environment_is_an_explicit_allowlist(
     )
 
     assert environment["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] == "1"
-    assert environment["UV_FROZEN"] == "1"
-    assert environment["UV_OFFLINE"] == "1"
-    assert environment["TMPDIR"] == str(tmp_path / "tmp")
-    assert environment["UV_CACHE_DIR"] == str(tmp_path / "uv-cache")
+    assert environment["PYTHONDONTWRITEBYTECODE"] == "1"
+    assert environment["HOME"] == "/nonexistent"
+    assert environment["PATH"] == os.defpath
+    assert "TMPDIR" not in environment
+    assert "UV_CACHE_DIR" not in environment
     assert "CLOUD_API_TOKEN" not in environment
+
+
+def test_parent_process_preflight_rejects_startup_injection_and_origin_substitution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = Path(__file__).parents[2]
+    authority._assert_parent_process_trusted(repo)
+
+    with monkeypatch.context() as scoped:
+        scoped.setenv("PYTHONPATH", str(tmp_path))
+        with pytest.raises(ControlAuthorityError, match="startup injection"):
+            authority._assert_parent_process_trusted(repo)
+
+    with monkeypatch.context() as scoped:
+        scoped.setitem(sys.modules, "sitecustomize", SimpleNamespace())
+        with pytest.raises(ControlAuthorityError, match="startup customization"):
+            authority._assert_parent_process_trusted(repo)
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(authority.runner_trust, "__file__", str(tmp_path / "runner_trust.py"))
+        with pytest.raises(ControlAuthorityError, match="origin"):
+            authority._assert_parent_process_trusted(repo)
 
 
 def test_generator_bound_observation_records_actual_report(
@@ -665,20 +709,29 @@ def test_execution_tool_identity_fails_closed(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(authority.shutil, "which", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(authority.runner_trust.shutil, "which", lambda *_args, **_kwargs: None)
     with pytest.raises(ControlAuthorityError, match="uv is not available"):
         authority._resolve_uv_executable()
 
-    monkeypatch.setattr(authority.shutil, "which", lambda *_args, **_kwargs: str(tmp_path))
-    with pytest.raises(ControlAuthorityError, match="not a regular file"):
+    monkeypatch.setattr(
+        authority.runner_trust.shutil,
+        "which",
+        lambda *_args, **_kwargs: str(tmp_path),
+    )
+    with pytest.raises(ControlAuthorityError, match="not a stable regular file"):
         authority._resolve_uv_executable()
+
+    executable = tmp_path / "uv"
+    executable.write_bytes(b"pinned-test-executable")
+    executable.chmod(0o500)
+    _bind_test_uv(monkeypatch, executable)
 
     def malformed_version(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
         return SimpleNamespace(stdout="substituted tool\n")
 
-    monkeypatch.setattr(authority.subprocess, "run", malformed_version)
+    monkeypatch.setattr(authority.runner_trust.subprocess, "run", malformed_version)
     with pytest.raises(ControlAuthorityError, match="invalid version identity"):
-        authority._uv_version("/absolute/uv")
+        authority._uv_version(str(executable))
     with pytest.raises(ControlAuthorityError, match="signing key does not exist"):
         authority._load_existing_key(tmp_path / "missing-key")
 
@@ -700,14 +753,109 @@ def test_git_and_tool_identifiers_reject_malformed_substitutions(
 
     executable = tmp_path / "uv"
     executable.write_bytes(b"executable")
-    monkeypatch.setattr(authority.shutil, "which", lambda *_args, **_kwargs: str(executable))
-    assert authority._resolve_uv_executable() == str(executable)
+    executable.chmod(0o500)
+    _bind_test_uv(monkeypatch, executable)
     monkeypatch.setattr(
-        authority.subprocess,
+        authority.runner_trust.subprocess,
         "run",
-        lambda *_args, **_kwargs: SimpleNamespace(stdout="uv 1.2.3\n"),
+        lambda *_args, **_kwargs: SimpleNamespace(
+            stdout="uv 0.11.28 (abcdef 2026-07-07 test-target)\n"
+        ),
     )
-    assert authority._uv_version(str(executable)) == "uv 1.2.3"
+    assert authority._resolve_uv_executable() == str(executable)
+    assert authority._uv_version(str(executable)) == "uv 0.11.28 (abcdef 2026-07-07 test-target)"
+
+
+def test_commit_snapshot_rejects_aggregate_bytes_before_exceeding_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records = (
+        b"100644 blob object-1\tpyproject.toml\0"
+        b"100644 blob object-2\tuv.lock\0"
+        b"100644 blob object-3\tsrc/fieldtrue/module.py\0"
+    )
+    payloads = {
+        "object-1": b"123456",
+        "object-2": b"abcdef",
+        "object-3": b"source",
+    }
+
+    def fake_git(_repo: Path, *arguments: str, text: bool = True) -> str | bytes:
+        if arguments[0] == "ls-tree":
+            assert not text
+            return records
+        assert arguments[:2] == ("cat-file", "blob")
+        assert not text
+        return payloads[arguments[2]]
+
+    monkeypatch.setattr(authority, "_run_git", fake_git)
+    monkeypatch.setattr(authority, "MAX_RUNNER_TREE_BYTES", 10)
+    destination = tmp_path / "snapshot"
+
+    assert not authority._materialize_commit_snapshot(tmp_path, ZERO_BLOB, destination)
+    assert destination.joinpath("pyproject.toml").read_bytes() == b"123456"
+    assert not destination.joinpath("uv.lock").exists()
+
+
+def test_fake_ambient_uv_cannot_emit_control_evidence_or_reach_signing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
+    contract_path.parent.mkdir(parents=True)
+    atomic_write(
+        contract_path,
+        canonical_json_pretty(
+            read_json(
+                Path(__file__).parents[2] / "protocol" / "acquisition" / "iter001_contract.json"
+            )
+        ),
+    )
+    forged_control = tmp_path / "forged-control.json"
+    forged_signature = tmp_path / "forged-signature.txt"
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        f"printf '{{\"forged\":true}}\\n' > '{forged_control}'\n"
+        f"printf 'forged-signature\\n' > '{forged_signature}'\n"
+        "printf 'uv 0.11.28 (ebf0f43d7 2026-07-07 aarch64-apple-darwin)\\n'\n"
+    )
+    fake_uv.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setattr(authority, "_assert_clean_repo", lambda _repo: None)
+    monkeypatch.setattr(authority, "_assert_parent_process_trusted", lambda _repo: None)
+    monkeypatch.setattr(authority, "_git_identity", lambda _repo: (ZERO_BLOB, "1" * 40))
+    monkeypatch.setattr(
+        authority,
+        "_git_bound_source",
+        lambda _repo, _commit, name, path: authority.GitBoundSource(
+            name=name,
+            path=path,
+            git_blob=ZERO_BLOB,
+            sha256=ZERO_HASH,
+            bytes=0,
+        ),
+    )
+
+    signing_reached = False
+
+    def reject_signing(_path: Path) -> Any:
+        nonlocal signing_reached
+        signing_reached = True
+        raise AssertionError("hostile runner reached signing")
+
+    monkeypatch.setattr(authority, "_load_existing_key", reject_signing)
+    output = tmp_path / "bundle"
+    with pytest.raises(ControlAuthorityError, match="pinned official release"):
+        generate_admission_control_bundle(repo, output, tmp_path / "key")
+
+    assert not forged_control.exists()
+    assert not forged_signature.exists()
+    assert not output.exists()
+    assert signing_reached is False
 
 
 def _positive_observation(node: str) -> ControlObservation:
@@ -739,6 +887,294 @@ def _positive_observation(node: str) -> ControlObservation:
     )
 
 
+def _test_runner(tmp_path: Path) -> authority.AuthenticatedRunner:
+    root = tmp_path / "runner"
+    snapshot = root / "snapshot"
+    site_packages = root / "authenticated-site-packages"
+    interpreter_root = root / "python-install" / "test-python"
+    scratch_root = root / "runner-scratch"
+    python_path = interpreter_root / "bin" / "python3.12"
+    snapshot.mkdir(parents=True)
+    site_packages.mkdir()
+    python_path.parent.mkdir(parents=True)
+    scratch_root.mkdir()
+    binding = authority.runner_trust.ExecutableBinding(
+        lexical_path=python_path,
+        resolved_path=python_path,
+        sha256=ZERO_HASH,
+        size=1,
+        mode=0o500,
+        owner_uid=os.getuid(),
+        owner_gid=os.getgid(),
+    )
+    return authority.AuthenticatedRunner(
+        root=root,
+        snapshot_root=snapshot,
+        python_path=python_path,
+        site_packages=site_packages,
+        interpreter_root=interpreter_root,
+        scratch_root=scratch_root,
+        uv=authority.runner_trust.PinnedUvBinding(
+            executable=binding,
+            version="uv test",
+            target="test-target",
+        ),
+        python=binding,
+        python_artifact_sha256=ZERO_HASH,
+        host_tool=authority.runner_trust.HostToolBinding(
+            trust_root="test-host",
+            system="test-system",
+            machine="test-machine",
+            release="test-release",
+            version="test-version",
+            tool=None,
+        ),
+        python_version="3.12.13",
+        lock_sha256=ZERO_HASH,
+        artifact_set_sha256=ZERO_HASH,
+        environment_sha256=ZERO_HASH,
+        excluded_tree_paths=("runner-scratch",),
+        distribution_versions=(("pytest", "test"),),
+    )
+
+
+def _record_spawned_processes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[subprocess.Popen[bytes]]:
+    real_popen = authority.subprocess.Popen
+    processes: list[subprocess.Popen[bytes]] = []
+
+    def recording_popen(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        process = real_popen(*args, **kwargs)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(authority.subprocess, "Popen", recording_popen)
+    return processes
+
+
+def test_bounded_control_process_preserves_exact_output(tmp_path: Path) -> None:
+    expected_stdout = b"control-output\x00\n"
+    expected_stderr = b"diagnostic-output\xff\n"
+    command = (
+        sys.executable,
+        "-I",
+        "-c",
+        (f"import os; os.write(1, {expected_stdout!r}); os.write(2, {expected_stderr!r})"),
+    )
+
+    completed = authority._run_bounded_control_process(
+        command,
+        cwd=tmp_path,
+        env=os.environ.copy(),
+        timeout_seconds=5,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == expected_stdout
+    assert completed.stderr == expected_stderr
+
+
+@pytest.mark.parametrize("file_descriptor", [1, 2])
+def test_bounded_control_process_reaps_on_stream_overflow(
+    file_descriptor: int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(authority, "_MAX_CAPTURE_BYTES", 32)
+    monkeypatch.setattr(authority, "_MAX_AGGREGATE_CAPTURE_BYTES", 64)
+    processes = _record_spawned_processes(monkeypatch)
+    command = (
+        sys.executable,
+        "-I",
+        "-c",
+        f"import os,time;os.write({file_descriptor}, b'x' * 33);time.sleep(30)",
+    )
+
+    with pytest.raises(ControlAuthorityError, match="capture bound"):
+        authority._run_bounded_control_process(
+            command,
+            cwd=tmp_path,
+            env=os.environ.copy(),
+            timeout_seconds=5,
+        )
+
+    assert len(processes) == 1
+    assert processes[0].poll() is not None
+
+
+def test_bounded_control_process_reaps_on_aggregate_overflow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(authority, "_MAX_CAPTURE_BYTES", 32)
+    monkeypatch.setattr(authority, "_MAX_AGGREGATE_CAPTURE_BYTES", 40)
+    processes = _record_spawned_processes(monkeypatch)
+    command = (
+        sys.executable,
+        "-I",
+        "-c",
+        "import os,time;os.write(1,b'x'*24);os.write(2,b'y'*24);time.sleep(30)",
+    )
+
+    with pytest.raises(ControlAuthorityError, match="capture bound"):
+        authority._run_bounded_control_process(
+            command,
+            cwd=tmp_path,
+            env=os.environ.copy(),
+            timeout_seconds=5,
+        )
+
+    assert len(processes) == 1
+    assert processes[0].poll() is not None
+
+
+def test_bounded_control_process_reaps_on_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    processes = _record_spawned_processes(monkeypatch)
+    command = (sys.executable, "-I", "-c", "import time;time.sleep(30)")
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        authority._run_bounded_control_process(
+            command,
+            cwd=tmp_path,
+            env=os.environ.copy(),
+            timeout_seconds=0.1,
+        )
+
+    assert len(processes) == 1
+    assert processes[0].poll() is not None
+
+
+def test_bounded_control_process_rejects_and_terminates_descendant_after_success(
+    tmp_path: Path,
+) -> None:
+    descendant_pid_path = tmp_path / "descendant.pid"
+    descendant_script = "import os,time;os.close(1);os.close(2);time.sleep(30)"
+    leader_script = (
+        "import pathlib,subprocess,sys;"
+        f"process=subprocess.Popen([sys.executable,'-I','-c',{descendant_script!r}]);"
+        "pathlib.Path(sys.argv[1]).write_text(str(process.pid),encoding='ascii')"
+    )
+    command = (
+        sys.executable,
+        "-I",
+        "-c",
+        leader_script,
+        str(descendant_pid_path),
+    )
+    descendant_pid: int | None = None
+    descendant_alive = False
+    try:
+        with pytest.raises(
+            ControlAuthorityError,
+            match=r"left descendant processes|process-group state cannot be verified",
+        ):
+            authority._run_bounded_control_process(
+                command,
+                cwd=tmp_path,
+                env=os.environ.copy(),
+                timeout_seconds=5,
+            )
+        descendant_pid = int(descendant_pid_path.read_text(encoding="ascii"))
+        try:
+            os.kill(descendant_pid, 0)
+        except ProcessLookupError:
+            pass
+        else:
+            descendant_alive = True
+    finally:
+        if descendant_pid is not None and descendant_alive:
+            with suppress(ProcessLookupError):
+                os.kill(descendant_pid, signal.SIGKILL)
+
+    assert not descendant_alive
+
+
+def _sidecar_fixture(model_name: str) -> tuple[type[Any], bytes]:
+    node = _CONTROL_REQUIREMENTS["valid-conjunctive-pilot"][0]
+    if model_name == "lifecycle":
+        value = PytestLifecycle(
+            requested_node_id=node,
+            collected_node_ids=(node,),
+            phases=(PytestPhase(when="call", outcome="passed", was_xfail=False),),
+            exit_status=0,
+        )
+        return PytestLifecycle, canonical_json_pretty(value)
+    return ControlObservation, canonical_json_pretty(_positive_observation(node))
+
+
+@pytest.mark.parametrize("model_name", ["lifecycle", "observation"])
+@pytest.mark.parametrize("fault", ["oversized", "symlink", "special"])
+def test_control_sidecar_rejects_unbounded_or_unsafe_files(
+    model_name: str,
+    fault: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model, valid_bytes = _sidecar_fixture(model_name)
+    path = tmp_path / f"{model_name}.json"
+    if fault == "oversized":
+        monkeypatch.setattr(authority, "_MAX_CONTROL_SIDECAR_BYTES", len(valid_bytes) - 1)
+        path.write_bytes(valid_bytes)
+    elif fault == "symlink":
+        target = tmp_path / f"{model_name}-target.json"
+        target.write_bytes(valid_bytes)
+        path.symlink_to(target)
+    else:
+        if not hasattr(os, "mkfifo"):
+            pytest.skip("FIFO creation requires POSIX")
+        os.mkfifo(path)
+
+    with pytest.raises(ControlAuthorityError, match="bounded stable regular file"):
+        authority._load_control_sidecar(
+            path,
+            model,
+            label=model_name,
+            missing_message="sidecar missing",
+        )
+
+
+@pytest.mark.parametrize("model_name", ["lifecycle", "observation"])
+def test_control_sidecar_rejects_replacement_between_lstat_and_open(
+    model_name: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model, valid_bytes = _sidecar_fixture(model_name)
+    path = tmp_path / f"{model_name}.json"
+    path.write_bytes(valid_bytes)
+    replacement = tmp_path / f"{model_name}-replacement.json"
+    replacement.write_bytes(valid_bytes)
+    original_open = authority.runner_trust.os.open
+    replaced = False
+
+    def racing_open(
+        target: str | os.PathLike[str],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        if Path(target) == path and not replaced:
+            replaced = True
+            replacement.replace(path)
+        return original_open(target, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(authority.runner_trust.os, "open", racing_open)
+
+    with pytest.raises(ControlAuthorityError, match="bounded stable regular file"):
+        authority._load_control_sidecar(
+            path,
+            model,
+            label=model_name,
+            missing_message="sidecar missing",
+        )
+
+
 def test_run_control_requires_both_pytest_and_audit_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -763,14 +1199,13 @@ def test_run_control_requires_both_pytest_and_audit_evidence(
         atomic_write(outcome_path, canonical_json_pretty(lifecycle))
         return subprocess.CompletedProcess(command, 0, b"passed\n", b"")
 
-    monkeypatch.setattr(authority.subprocess, "run", successful_run)
+    monkeypatch.setattr(authority, "_run_bounded_control_process", successful_run)
     result, entry = _run_control(
-        tmp_path,
         staging,
         commit=ZERO_BLOB,
         tree="1" * 40,
         control_id="valid-conjunctive-pilot",
-        uv_executable="/absolute/uv",
+        runner=_test_runner(tmp_path),
         timeout_seconds=10,
     )
     assert result.passed is True
@@ -792,15 +1227,14 @@ def test_run_control_requires_both_pytest_and_audit_evidence(
         )
         return subprocess.CompletedProcess(command, 0, b"passed\n", b"")
 
-    monkeypatch.setattr(authority.subprocess, "run", lifecycle_only)
+    monkeypatch.setattr(authority, "_run_bounded_control_process", lifecycle_only)
     with pytest.raises(ControlAuthorityError, match="no audit observation"):
         _run_control(
-            tmp_path,
             staging,
             commit=ZERO_BLOB,
             tree="1" * 40,
             control_id="valid-conjunctive-pilot",
-            uv_executable="/absolute/uv",
+            runner=_test_runner(tmp_path / "second"),
             timeout_seconds=10,
         )
 
@@ -864,15 +1298,14 @@ def test_run_control_fails_closed_on_process_and_evidence_faults(
             b"",
         )
 
-    monkeypatch.setattr(authority.subprocess, "run", controlled_run)
+    monkeypatch.setattr(authority, "_run_bounded_control_process", controlled_run)
     with pytest.raises(ControlAuthorityError, match=message):
         _run_control(
-            tmp_path,
             staging,
             commit=ZERO_BLOB,
             tree="1" * 40,
             control_id="valid-conjunctive-pilot",
-            uv_executable="/absolute/uv",
+            runner=_test_runner(tmp_path),
             timeout_seconds=10,
         )
 
@@ -883,7 +1316,6 @@ def _write_fake_control_result(
     *,
     commit: str,
     tree: str,
-    uv_executable: str,
 ) -> tuple[AdmissionControlResult, authority.ControlManifestEntry]:
     node, verdict, gate, failure = _CONTROL_REQUIREMENTS[control_id]
     report = {"control_id": control_id, "verdict": verdict}
@@ -917,20 +1349,7 @@ def _write_fake_control_result(
         execution_tree=tree,
         control_id=control_id,
         pytest_node_id=node,
-        command=(
-            uv_executable,
-            "run",
-            "--offline",
-            "--frozen",
-            "python",
-            "-m",
-            "pytest",
-            "-p",
-            "fieldtrue.control_authority",
-            "--no-header",
-            "--tb=short",
-            node,
-        ),
+        command=authority._normalized_control_command(node),
         observation=observation,
         lifecycle=lifecycle,
         stdout_sha256=authority.sha256_bytes(b""),
@@ -1006,30 +1425,31 @@ def generated_bundle(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespac
     _git(repo, "commit", "-qm", "freeze authority")
 
     def fake_control(
-        repo: Path,
         staging: Path,
         *,
         commit: str,
         tree: str,
         control_id: str,
-        uv_executable: str,
+        runner: authority.AuthenticatedRunner,
         timeout_seconds: int,
     ) -> tuple[AdmissionControlResult, authority.ControlManifestEntry]:
-        del repo, timeout_seconds
+        del runner, timeout_seconds
         return _write_fake_control_result(
             staging,
             control_id,
             commit=commit,
             tree=tree,
-            uv_executable=uv_executable,
         )
 
-    true_executable = shutil.which("true")
-    assert true_executable is not None
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(authority, "_run_control", fake_control)
-    monkeypatch.setattr(authority, "_resolve_uv_executable", lambda: true_executable)
-    monkeypatch.setattr(authority, "_uv_version", lambda _executable: "uv test")
+    monkeypatch.setattr(authority, "_assert_parent_process_trusted", lambda _repo: None)
+    monkeypatch.setattr(
+        authority,
+        "_prepare_authenticated_runner",
+        lambda _repo, _commit, root: _test_runner(root),
+    )
+    monkeypatch.setattr(authority, "_authenticated_runner_is_unchanged", lambda _runner: True)
     output = repo / ".local" / "admission-controls"
     try:
         receipt_path = generate_admission_control_bundle(repo, output, key_path)

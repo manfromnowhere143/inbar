@@ -1,5 +1,77 @@
 {
   "additionalProperties": false,
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "dependency_closure_sha256": {
+              "type": "null"
+            },
+            "environment_provenance_sha256": {
+              "type": "null"
+            },
+            "fieldtrue_source_sha256": {
+              "type": "null"
+            },
+            "loaded_module_closure_sha256": {
+              "type": "null"
+            },
+            "provenance_state": {
+              "const": "legacy-unbound"
+            },
+            "python_interpreter_provenance_sha256": {
+              "type": "null"
+            },
+            "startup_provenance_sha256": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "dependency_closure_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "environment_provenance_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "fieldtrue_source_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "loaded_module_closure_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "provenance_state": {
+              "const": "observed-v1"
+            },
+            "python_interpreter_provenance_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "startup_provenance_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "provenance_state",
+            "python_interpreter_provenance_sha256",
+            "startup_provenance_sha256",
+            "environment_provenance_sha256",
+            "fieldtrue_source_sha256",
+            "loaded_module_closure_sha256",
+            "dependency_closure_sha256"
+          ]
+        }
+      ]
+    }
+  ],
+  "description": "A receipt description, not proof against a compromised interpreter or OS TCB.\n\nHistorical receipts parse as ``legacy-unbound``. New confirmatory authority must call\n:meth:`require_observed_provenance` and refuse that legacy state. ``observed-v1`` binds\nwhat this already-running process could inspect; it does not elevate self-observation\ninto independent attestation.",
   "properties": {
     "command": {
       "items": {
@@ -8,10 +80,49 @@
       "title": "Command",
       "type": "array"
     },
+    "dependency_closure_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dependency Closure Sha256"
+    },
     "dirty_state_hash": {
       "pattern": "^[0-9a-f]{64}$",
       "title": "Dirty State Hash",
       "type": "string"
+    },
+    "environment_provenance_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Environment Provenance Sha256"
+    },
+    "fieldtrue_source_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fieldtrue Source Sha256"
     },
     "git_commit": {
       "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
@@ -23,6 +134,19 @@
       "title": "Git Tree",
       "type": "string"
     },
+    "loaded_module_closure_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Loaded Module Closure Sha256"
+    },
     "lockfile_hash": {
       "pattern": "^[0-9a-f]{64}$",
       "title": "Lockfile Hash",
@@ -32,6 +156,28 @@
       "title": "Platform",
       "type": "string"
     },
+    "provenance_state": {
+      "default": "legacy-unbound",
+      "enum": [
+        "legacy-unbound",
+        "observed-v1"
+      ],
+      "title": "Provenance State",
+      "type": "string"
+    },
+    "python_interpreter_provenance_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Python Interpreter Provenance Sha256"
+    },
     "python_version": {
       "title": "Python Version",
       "type": "string"
@@ -39,6 +185,19 @@
     "repository_dirty": {
       "title": "Repository Dirty",
       "type": "boolean"
+    },
+    "startup_provenance_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Startup Provenance Sha256"
     }
   },
   "required": [

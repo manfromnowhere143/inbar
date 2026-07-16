@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling==1.31.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -26,6 +26,7 @@ dependencies = [
   "certifi>=2026.6.17,<2027",
   "networkx>=3.4,<4",
   "numpy>=2.0,<3",
+  "packaging>=26.2,<27",
   "pydantic>=2.10,<3",
   "pynacl>=1.5,<2",
   "scikit-learn>=1.6,<2",
@@ -64,6 +65,7 @@ include = [
   "/IP_NOTICE.md",
   "/README.md",
   "/pyproject.toml",
+  "/requirements/build-constraints.txt",
 ]
 exclude = ["/.gitignore"]
 

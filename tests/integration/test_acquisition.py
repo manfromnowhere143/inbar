@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -90,7 +91,10 @@ def test_production_cli_fails_closed_for_synthetic_test_root(
 
     # Repository binding has its own integration test; isolate the evidence-authority boundary.
     monkeypatch.setattr("fieldtrue.cli.verify_preregistration_binding", lambda *_: None)
-    monkeypatch.setattr("fieldtrue.cli.verify_admission_control_bundle", lambda *_: None)
+    monkeypatch.setattr(
+        "fieldtrue.cli.verify_admission_control_bundle",
+        lambda *_: SimpleNamespace(execution_commit="1" * 40),
+    )
     with pytest.raises(SystemExit) as error:
         main(
             [
@@ -164,7 +168,10 @@ def test_output_root_is_single_use_and_cannot_be_nested_in_input(
         write_admission_output(output_root, report)
 
     monkeypatch.setattr("fieldtrue.cli.verify_preregistration_binding", lambda *_: None)
-    monkeypatch.setattr("fieldtrue.cli.verify_admission_control_bundle", lambda *_: None)
+    monkeypatch.setattr(
+        "fieldtrue.cli.verify_admission_control_bundle",
+        lambda *_: SimpleNamespace(execution_commit="1" * 40),
+    )
     with pytest.raises(SystemExit, match="3") as error:
         main(
             [
@@ -181,6 +188,50 @@ def test_output_root_is_single_use_and_cannot_be_nested_in_input(
             ]
         )
     assert error.value.code == 3
+
+
+def test_production_cli_rejects_source_change_during_audit(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_root = tmp_path / "input"
+    fixture_contract = build_acquisition_tree(input_root)
+    fixture_report = audit_acquisition(fixture_contract, input_root)
+    output_root = tmp_path / "proof"
+    source_bindings = iter(("preflight", "audit-start", "audit-finish"))
+
+    monkeypatch.setattr(
+        "fieldtrue.cli.verify_preregistration_binding",
+        lambda *_: next(source_bindings),
+    )
+    monkeypatch.setattr(
+        "fieldtrue.cli.verify_admission_control_bundle",
+        lambda *_: SimpleNamespace(execution_commit="1" * 40),
+    )
+    monkeypatch.setattr("fieldtrue.cli.audit_acquisition", lambda *_: fixture_report)
+
+    with pytest.raises(SystemExit) as error:
+        main(
+            [
+                "--repo",
+                str(REPO_ROOT),
+                "acquisition",
+                "audit",
+                "--contract",
+                str(CONTRACT_PATH),
+                "--input-root",
+                str(input_root),
+                "--output-root",
+                str(output_root),
+            ]
+        )
+
+    captured = capsys.readouterr()
+    assert error.value.code == 3
+    assert captured.out == ""
+    assert captured.err.strip() == "acquisition source closure changed during audit"
+    assert not output_root.exists()
 
 
 def test_noncanonical_selection_and_contract_failures_are_explicit(tmp_path: Path) -> None:

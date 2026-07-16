@@ -42,7 +42,7 @@ from fieldtrue.receipts import (
     load_signer_anchor,
     verify_ledger,
 )
-from fieldtrue.runtime import RuntimeIdentity, collect_runtime_identity
+from fieldtrue.runtime import RuntimeIdentity, RuntimeProvenanceError, collect_runtime_identity
 from fieldtrue.verification import (
     ProofBundleVerificationError,
     verify_iter000_proof_bundle,
@@ -271,6 +271,12 @@ def _write_attempt_001_authority_consumption(
     authority_specification_path: Path,
     authority_specification: dict[str, Any],
 ) -> tuple[Path, str]:
+    try:
+        runtime.require_observed_provenance()
+    except RuntimeProvenanceError as error:
+        raise ExperimentPreflightError(
+            "attempt authority consumption requires observed-v1 runtime provenance"
+        ) from error
     receipt_path = repo_root / _ATTEMPT_001_RECEIPT_PATH
     if receipt_path.is_symlink() or receipt_path.exists():
         raise ExperimentAlreadyExecutedError(

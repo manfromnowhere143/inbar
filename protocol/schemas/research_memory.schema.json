@@ -67,6 +67,47 @@
     },
     "MemoryEvidenceRef": {
       "additionalProperties": false,
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "git_commit": {
+                  "type": "null"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "uri": {
+                  "pattern": "^https://[^/?#]+(?:/|$)",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "uri",
+                "sha256"
+              ]
+            },
+            {
+              "properties": {
+                "git_commit": {
+                  "type": "string"
+                },
+                "uri": {
+                  "not": {
+                    "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:"
+                  },
+                  "type": "string"
+                }
+              },
+              "required": [
+                "uri",
+                "git_commit"
+              ]
+            }
+          ]
+        }
+      ],
       "properties": {
         "access": {
           "$ref": "#/$defs/AccessClass"

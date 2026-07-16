@@ -154,7 +154,29 @@ def runtime_identity(*, dirty: bool = False) -> RuntimeIdentity:
         python_version="3.12.2",
         platform="test-platform",
         command=("fieldtrue", "test"),
+        provenance_state="observed-v1",
+        python_interpreter_provenance_sha256="3" * 64,
+        startup_provenance_sha256="4" * 64,
+        environment_provenance_sha256="5" * 64,
+        fieldtrue_source_sha256="6" * 64,
+        loaded_module_closure_sha256="7" * 64,
+        dependency_closure_sha256="8" * 64,
     )
+
+
+def legacy_runtime_identity(*, dirty: bool = False) -> RuntimeIdentity:
+    payload = runtime_identity(dirty=dirty).model_dump(mode="json")
+    for field in (
+        "provenance_state",
+        "python_interpreter_provenance_sha256",
+        "startup_provenance_sha256",
+        "environment_provenance_sha256",
+        "fieldtrue_source_sha256",
+        "loaded_module_closure_sha256",
+        "dependency_closure_sha256",
+    ):
+        payload.pop(field)
+    return RuntimeIdentity.model_validate(payload)
 
 
 def adapt_text(experiment_id: str = "001", *, unknown_row: bool = False) -> str:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import stat
 import subprocess
 from collections.abc import Mapping
@@ -39,6 +38,7 @@ from fieldtrue.domain import (
     ReadinessReport,
     Sha256,
 )
+from fieldtrue.git_trust import GitTrustError, git_environment, trusted_repository_git
 from fieldtrue.readiness import audit_adapt_proof_readiness, render_readiness_result
 from fieldtrue.receipts import (
     LedgerEvent,
@@ -50,7 +50,7 @@ from fieldtrue.receipts import (
     verify_ledger,
     write_signer_anchor,
 )
-from fieldtrue.runtime import RuntimeIdentity, collect_runtime_identity
+from fieldtrue.runtime import RuntimeIdentity, RuntimeProvenanceError, collect_runtime_identity
 
 _ITERATION_ID = "iter000_nasa_adapt_corpus_readiness"
 _ANCHOR_ID = "iter000-execution-ledger"
@@ -71,6 +71,9 @@ _CORRECTED_VERIFICATION_COMMAND = (
     "verify-iter000-amendment-001-correction-001",
 )
 _CLEAN_STATE_HASH = sha256_bytes(b"")
+_LEGACY_RUNTIME_LOCK_HASH = "19fe8aaea2f7af991cc614d8b439aa7101e02ced0147b7e534decb858efbb196"
+_LEGACY_RUNTIME_PLATFORM = "macOS-14.4-arm64-arm-64bit"
+_LEGACY_RUNTIME_PYTHON = "3.12.2"
 _ATTEMPT_000_LEDGER_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_000/execution_ledger.jsonl"
 _ATTEMPT_000_HEAD_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_000/execution_ledger.head.json"
 _ATTEMPT_000_LEDGER_HASH = "c84327a7c15e48e7169711b7b84aa7167fa170ab3b735993b3ff5b224d7e5982"
@@ -85,6 +88,16 @@ _ATTEMPT_001_CERTIFI_VERSION = "2026.6.17"
 _ATTEMPT_001_CA_BUNDLE_SHA256 = "bbc7e9c01d7551bb8a159b5dedd989b8ee3ce105aff522b68eb1b01bf854cab0"
 _ATTEMPT_001_EXECUTION_COMMIT = "ab20d41be48003c443a807c733c4c8ce43445e01"
 _ATTEMPT_001_EXECUTION_TREE = "e3d8a8609e483b37c755b252e4f43b57b4731480"
+_ATTEMPT_001_LEGACY_RUNTIME = {
+    "git_commit": _ATTEMPT_001_EXECUTION_COMMIT,
+    "git_tree": _ATTEMPT_001_EXECUTION_TREE,
+    "command": _AUTHORIZED_COMMAND,
+}
+_CORRECTION_001_LEGACY_RUNTIME = {
+    "git_commit": "3b59c234a5c032d4b4f4e1884df92931b101afec",
+    "git_tree": "5a26551e0ab55c283fb78cf99fd209962f371910",
+    "command": _CORRECTED_VERIFICATION_COMMAND,
+}
 _ATTEMPT_001_PROOF_COMMIT = "15cd75dd761a1c3f1d75994445a9ce702c58810a"
 _ATTEMPT_001_PROOF_COMMIT_TREE = "388a78ef4afe4187dc0d2389feb28899571589fb"
 _ATTEMPT_001_PROOF_PATH = f"experiments/{_ITERATION_ID}/proof/attempt_001"
@@ -252,6 +265,32 @@ def _fail(message: str) -> NoReturn:
     raise ProofBundleVerificationError(message)
 
 
+def _require_observed_runtime(runtime: RuntimeIdentity, label: str) -> None:
+    try:
+        runtime.require_observed_provenance()
+    except RuntimeProvenanceError as error:
+        raise ProofBundleVerificationError(
+            f"{label} requires observed-v1 runtime provenance"
+        ) from error
+
+
+def _matches_exact_legacy_runtime(
+    runtime: RuntimeIdentity,
+    binding: Mapping[str, object],
+) -> bool:
+    return (
+        runtime.provenance_state == "legacy-unbound"
+        and runtime.git_commit == binding["git_commit"]
+        and runtime.git_tree == binding["git_tree"]
+        and runtime.command == binding["command"]
+        and runtime.repository_dirty is False
+        and runtime.dirty_state_hash == _CLEAN_STATE_HASH
+        and runtime.lockfile_hash == _LEGACY_RUNTIME_LOCK_HASH
+        and runtime.python_version == _LEGACY_RUNTIME_PYTHON
+        and runtime.platform == _LEGACY_RUNTIME_PLATFORM
+    )
+
+
 def _read_regular_file(path: Path, label: str) -> bytes:
     if path.is_symlink() or not path.is_file():
         _fail(f"{label} must be a regular, non-symlink file")
@@ -336,19 +375,18 @@ def _model(model: type[_ModelT], value: Any, label: str) -> _ModelT:
 
 
 def _git_text(repo_root: Path, *arguments: str) -> str:
-    git = shutil.which("git")
-    if git is None:
-        _fail("Git is required to verify the correction authority")
     try:
+        git = trusted_repository_git(repo_root)
         completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed internally
             [git, *arguments],
             cwd=repo_root,
             check=True,
             capture_output=True,
-            env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
+            env=git_environment(),
+            timeout=10,
             text=True,
         )
-    except subprocess.CalledProcessError as error:
+    except (GitTrustError, OSError, subprocess.SubprocessError) as error:
         raise ProofBundleVerificationError(
             f"Git correction-authority check failed: {' '.join(arguments)}"
         ) from error
@@ -356,18 +394,17 @@ def _git_text(repo_root: Path, *arguments: str) -> str:
 
 
 def _git_blob(repo_root: Path, commit: str, relative: str) -> bytes:
-    git = shutil.which("git")
-    if git is None:
-        _fail("Git is required to verify the correction authority")
     try:
+        git = trusted_repository_git(repo_root)
         completed = subprocess.run(  # noqa: S603 - fixed Git object read
             [git, "show", f"{commit}:{relative}"],
             cwd=repo_root,
             check=True,
             capture_output=True,
-            env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
+            env=git_environment(),
+            timeout=10,
         )
-    except subprocess.CalledProcessError as error:
+    except (GitTrustError, OSError, subprocess.SubprocessError) as error:
         raise ProofBundleVerificationError(
             f"committed correction input is unavailable: {relative}"
         ) from error
@@ -1177,6 +1214,8 @@ def _verify_authorized_runtime(
     authority: Mapping[str, Any],
     protocol_hashes: Mapping[str, str],
 ) -> None:
+    if not _matches_exact_legacy_runtime(runtime, _ATTEMPT_001_LEGACY_RUNTIME):
+        _require_observed_runtime(runtime, "authorized execution")
     expected_run_id = f"iter000-attempt_001-{runtime.git_commit[:12]}"
     if run_id != expected_run_id:
         _fail("amended proof run_id is not the authorized attempt_001 identity")
@@ -1914,6 +1953,7 @@ def _consumption_record(
     signer_public_key: str,
     signing_key: SigningKey,
 ) -> dict[str, Any]:
+    _require_observed_runtime(runtime, "verification authority consumption")
     body = {
         "schema_version": "fieldtrue.iter000-verification-authority-consumption.v1",
         "authority_id": authority["authority_id"],
@@ -1971,6 +2011,8 @@ def _verify_consumption_record(
         "verification consumption receipt",
     )
     runtime = _model(RuntimeIdentity, value["runtime"], "verification consumption runtime")
+    if not _matches_exact_legacy_runtime(runtime, _CORRECTION_001_LEGACY_RUNTIME):
+        _require_observed_runtime(runtime, "verification consumption receipt")
     consumed_at = value["consumed_at"]
     if not isinstance(consumed_at, str):
         _fail("verification consumption timestamp must be an RFC 3339 string")

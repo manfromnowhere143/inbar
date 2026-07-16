@@ -10,6 +10,7 @@ import fieldtrue.cli as cli_module
 from fieldtrue.canonical import canonical_json_pretty
 from fieldtrue.cli import _repo_root, main
 from fieldtrue.domain import GateResult, GateStatus, ReadinessReport
+from fieldtrue.handoff import HandoffError
 from fieldtrue.mission import MissionValidation, ValidationCheck
 from fieldtrue.receipts import SignedLedger
 from tests.helpers import create_adapt_source, runtime_identity
@@ -293,3 +294,36 @@ def test_repo_discovery_fails_outside_a_mission(
     monkeypatch.chdir(tmp_path)
     with pytest.raises(FileNotFoundError, match="inside"):
         _repo_root(None)
+
+
+def test_handoff_render_and_check_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = _repo(tmp_path)
+    handoff = repo / "HANDOFF.md"
+
+    def write(_repo: Path) -> Path:
+        assert _repo == repo
+        handoff.write_text("generated\n", encoding="utf-8")
+        return handoff
+
+    checked: list[Path] = []
+    monkeypatch.setattr(cli_module, "write_handoff", write)
+    monkeypatch.setattr(cli_module, "check_handoff", checked.append)
+
+    assert main(["--repo", str(repo), "handoff", "render"]) == 0
+    assert capsys.readouterr().out == "HANDOFF.md\n"
+    assert handoff.read_text(encoding="utf-8") == "generated\n"
+    assert main(["--repo", str(repo), "handoff", "check"]) == 0
+    assert capsys.readouterr().out == "HANDOFF_VERIFIED\n"
+    assert checked == [repo]
+
+    def fail(_repo: Path) -> None:
+        raise HandoffError("stale handoff")
+
+    monkeypatch.setattr(cli_module, "check_handoff", fail)
+    with pytest.raises(SystemExit, match="1"):
+        main(["--repo", str(repo), "handoff", "check"])
+    assert "stale handoff" in capsys.readouterr().err

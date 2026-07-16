@@ -76,24 +76,39 @@ primitives, but it grants no data access, target release, execution, result, sea
 authority. Its current boundaries are recorded in
 [the implementation checkpoint](docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md).
 
+The control generator now executes every registered control in a fresh private CPython, dependency,
+and committed-source snapshot whose downloaded artifacts are checked against frozen sizes and
+hashes. The child starts with `-I`, `-B`, and `-S`, and the acquisition verifier also compares an
+exact bounded census of the on-disk `src/fieldtrue` package with its control execution commit. These
+controls authenticate the child control runner, but not the ambient parent that has already imported
+the orchestration code, assembles the production manifest, loads the governance key, and signs the
+result. That complete authority path must move inside the authenticated pre-import child, and the
+ambient process must never receive the signing key. An ordinary ambient `inbar` invocation therefore
+cannot authorize acquisition. This unresolved execution boundary remains inside the sole registered
+`iter001-acquisition-contract` blocker.
+
 These blockers are preserved as blockers. CI accepts the checkpoint only when the mission validator
 reports the exact registered blocker set and no additional failure.
 
 ## Verification
 
 ```bash
-uv sync
+uv sync --group dev --frozen
 uv run ruff check .
 uv run mypy src
 uv run pytest
 uv run inbar schemas check
 uv run inbar memory verify
-uv run inbar mission validate
+uv run inbar mission validate --expect-failure iter001-acquisition-contract
+uv run inbar handoff check
 ```
 
-The final command is expected to return a blocked status until canonical authority is sealed. The
-GitHub workflow checks that this is the only registered mission validation failure; an unexpected
-pass or any additional failure makes CI fail.
+The mission validator must report exactly the registered acquisition-contract blocker until
+canonical authority is sealed. The handoff check deterministically reconstructs the recovery
+document from the checked-out tree and detects drift. Its renderer and transitive verification
+sources belong to that candidate tree, so the result is an internal consistency check rather than
+an independent or base-controlled attestation. An unexpected mission pass, any additional failure,
+or stale recovery state makes CI fail.
 
 ## Repository map
 

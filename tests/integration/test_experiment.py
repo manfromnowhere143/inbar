@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 import fieldtrue.experiment as experiment_module
+import fieldtrue.runtime as runtime_module
 from fieldtrue.canonical import canonical_json_pretty, sha256_file, sha256_value
 from fieldtrue.experiment import (
     ExperimentAlreadyExecutedError,
@@ -31,11 +32,29 @@ from fieldtrue.receipts import (
     write_signer_anchor,
 )
 from fieldtrue.verification import ProofBundleVerificationError, verify_iter000_proof_bundle
-from tests.helpers import create_adapt_source, runtime_identity
+from tests.helpers import create_adapt_source, legacy_runtime_identity, runtime_identity
 
 _GIT = shutil.which("git")
 if _GIT is None:
     raise RuntimeError("git executable is required for integration tests")
+
+_OBSERVED_PROVENANCE = runtime_module._ObservedExecutionProvenance(
+    python_interpreter_provenance_sha256="1" * 64,
+    startup_provenance_sha256="2" * 64,
+    environment_provenance_sha256="3" * 64,
+    fieldtrue_source_sha256="4" * 64,
+    loaded_module_closure_sha256="5" * 64,
+    dependency_closure_sha256="6" * 64,
+)
+
+
+@pytest.fixture(autouse=True)
+def _stub_execution_provenance(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        runtime_module,
+        "_observe_execution_provenance",
+        lambda *_args, **_kwargs: _OBSERVED_PROVENANCE,
+    )
 
 
 def _git(repo: Path, *arguments: str) -> None:
@@ -428,6 +447,19 @@ def test_attempt_authority_loader_rejects_malformed_or_unbound_surfaces(tmp_path
     authority_path.symlink_to(repo / "missing-authority.json")
     with pytest.raises(ExperimentPreflightError, match="committed regular file"):
         _load_attempt_001_authority_specification(repo)
+
+
+def test_attempt_authority_consumption_refuses_legacy_runtime(tmp_path: Path) -> None:
+    with pytest.raises(ExperimentPreflightError, match="requires observed-v1"):
+        _write_attempt_001_authority_consumption(
+            tmp_path,
+            run_id="iter000-attempt_001-legacy",
+            runtime=legacy_runtime_identity(),
+            signing_key=load_or_create_signing_key(tmp_path / "key"),
+            signer_public_key="0" * 64,
+            authority_specification_path=tmp_path / "authority.json",
+            authority_specification={},
+        )
 
 
 def test_attempt_authority_receipt_verifier_rejects_counterfeits(tmp_path: Path) -> None:

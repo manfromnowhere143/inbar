@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
+import re
 import stat
 import subprocess
 from datetime import UTC, datetime
@@ -27,6 +27,12 @@ from fieldtrue.domain import (
     HexSignature,
     Identifier,
     Sha256,
+)
+from fieldtrue.git_trust import (
+    GitTrustError,
+    git_environment,
+    trusted_git_executable,
+    verify_repository_trust,
 )
 
 ITERATION_ID: Final = "iter001_physical_causal_evidence_acquisition"
@@ -58,6 +64,7 @@ APPROVAL_GENESIS: Final = "0" * 64
 _TRUSTED_GIT_PATH: Final = Path("/usr/bin/git")
 
 _MAX_AUTHORITY_FILE_BYTES = 2 * 1024 * 1024
+_GIT_OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 _DENIED_AUTHORITIES = (
     "production_data_access",
     "target_creation",
@@ -239,7 +246,7 @@ def load_shortcut_implementation_authority(
     verified_at: datetime | None = None,
 ) -> ShortcutImplementationAuthorityVerification:
     root = repo_root.resolve(strict=True)
-    _verify_git_history(root)
+    head = _verify_git_history(root)
     receipt_path = root / OWNER_APPROVAL_PATH
     raw_receipt = _read_regular_file(receipt_path, "owner approval receipt")
     _canonical_json_object(raw_receipt, "owner approval receipt")
@@ -247,11 +254,13 @@ def load_shortcut_implementation_authority(
         receipt = OwnerAmendmentApprovalReceipt.model_validate_json(raw_receipt, strict=True)
     except ValueError as error:
         raise ShortcutContractError("owner approval receipt violates its typed contract") from error
-    head_receipt = _git_blob(root, "HEAD", OWNER_APPROVAL_PATH, "owner approval receipt")
+    head_receipt = _git_blob(root, head, OWNER_APPROVAL_PATH, "owner approval receipt")
     if head_receipt != raw_receipt:
         raise ShortcutContractError("owner approval receipt is not committed at HEAD")
     _verify_proposal_and_owner_anchor(root, receipt)
     _verify_owner_receipt_scope_and_signature(receipt)
+    if _verify_git_history(root) != head:
+        raise ShortcutContractError("authority Git HEAD changed during verification")
 
     checked_at = verified_at or datetime.now(UTC)
     if checked_at.tzinfo is None or checked_at.utcoffset() is None:
@@ -389,56 +398,33 @@ def _git_blob(repo_root: Path, commit: str, relative: str, label: str) -> bytes:
     return completed.stdout
 
 
-def _verify_git_history(repo_root: Path) -> None:
+def _verify_git_history(repo_root: Path) -> str:
     git = _trusted_git_executable()
     environment = _git_environment()
     try:
-        top_level = subprocess.run(  # noqa: S603 - fixed Git repository query
-            [git, "rev-parse", "--show-toplevel"],
+        verify_repository_trust(repo_root, git)
+    except GitTrustError as error:
+        raise ShortcutContractError(f"authority Git trust failed: {error}") from error
+    try:
+        head_result = subprocess.run(  # noqa: S603 - fixed Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
             cwd=repo_root,
             check=True,
             capture_output=True,
             env=environment,
-            timeout=10,
             text=True,
-        ).stdout.strip()
-    except (OSError, subprocess.SubprocessError) as error:
-        raise ShortcutContractError("authority root is not a readable Git worktree") from error
-    try:
-        observed_root = Path(top_level).resolve(strict=True)
-    except OSError as error:
-        raise ShortcutContractError("Git reported an unavailable worktree root") from error
-    if observed_root != repo_root:
-        raise ShortcutContractError("authority root is not the Git worktree top level")
-
-    try:
-        grafts_path = subprocess.run(  # noqa: S603 - fixed Git repository query
-            [git, "rev-parse", "--git-path", "info/grafts"],
-            cwd=repo_root,
-            check=True,
-            capture_output=True,
-            env=environment,
             timeout=10,
-            text=True,
-        ).stdout.strip()
-        grafts = Path(grafts_path)
-        if not grafts.is_absolute():
-            grafts = repo_root / grafts
-        grafts_stat = grafts.lstat()
-    except FileNotFoundError:
-        pass
+        )
     except (OSError, subprocess.SubprocessError) as error:
-        raise ShortcutContractError("Git graft state cannot be verified") from error
-    else:
-        if grafts_stat.st_size > 0 or stat.S_ISLNK(grafts_stat.st_mode):
-            raise ShortcutContractError(
-                "legacy Git grafts are forbidden for authority verification"
-            )
+        raise ShortcutContractError("authority Git HEAD cannot be verified") from error
+    head = head_result.stdout.strip()
+    if _GIT_OBJECT_ID.fullmatch(head) is None:
+        raise ShortcutContractError("authority Git HEAD has an invalid object identity")
 
     for ancestor in (OWNER_ANCHOR_COMMIT, APPROVED_PROPOSAL_COMMIT):
         try:
             completed = subprocess.run(  # noqa: S603 - fixed Git ancestry query
-                [git, "merge-base", "--is-ancestor", ancestor, "HEAD"],
+                [git, "merge-base", "--is-ancestor", ancestor, head],
                 cwd=repo_root,
                 check=False,
                 capture_output=True,
@@ -449,30 +435,15 @@ def _verify_git_history(repo_root: Path) -> None:
             raise ShortcutContractError("approved Git ancestry cannot be verified") from error
         if completed.returncode != 0:
             raise ShortcutContractError("approved Git history is not an ancestor of HEAD")
+    return head
 
 
 def _trusted_git_executable() -> str:
     try:
-        git_stat = _TRUSTED_GIT_PATH.lstat()
-    except OSError as error:
-        raise ShortcutContractError("trusted system Git is unavailable") from error
-    if (
-        stat.S_ISLNK(git_stat.st_mode)
-        or not stat.S_ISREG(git_stat.st_mode)
-        or git_stat.st_uid != 0
-        or git_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
-    ):
-        raise ShortcutContractError("trusted system Git has unsafe ownership or mode")
-    return str(_TRUSTED_GIT_PATH)
+        return trusted_git_executable(_TRUSTED_GIT_PATH)
+    except GitTrustError as error:
+        raise ShortcutContractError(str(error)) from error
 
 
 def _git_environment() -> dict[str, str]:
-    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
-    environment.update(
-        {
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_NO_REPLACE_OBJECTS": "1",
-        }
-    )
-    return environment
+    return git_environment()

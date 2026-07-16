@@ -17,7 +17,7 @@ from fieldtrue.receipts import (
     verify_ledger,
     write_signer_anchor,
 )
-from tests.helpers import runtime_identity
+from tests.helpers import legacy_runtime_identity, runtime_identity
 
 
 def _ledger(tmp_path: Path) -> tuple[SignedLedger, Path, Path, SigningKey]:
@@ -64,6 +64,24 @@ def test_signed_ledger_round_trip_and_local_head(tmp_path: Path) -> None:
     assert verification.event_count == 5
     assert verification.head_hash == events[-1].event_hash
     assert verification.trust_level == "git_pinned_ed25519_no_external_timestamp"
+
+
+def test_signed_ledger_refuses_legacy_runtime_for_new_events(tmp_path: Path) -> None:
+    ledger, path, head, _ = _ledger(tmp_path)
+    legacy = legacy_runtime_identity()
+    promoted = legacy.model_copy(update={"provenance_state": "observed-v1"})
+
+    for candidate in (legacy, promoted):
+        with pytest.raises(LedgerVerificationError, match="require observed-v1"):
+            ledger.append(
+                run_id="run-legacy",
+                event_type="run-started",
+                payload={},
+                runtime=candidate,
+            )
+
+    assert not path.exists()
+    assert not head.exists()
 
 
 def test_payload_tampering_is_detected(tmp_path: Path) -> None:

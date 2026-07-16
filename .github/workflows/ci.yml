@@ -2,18 +2,90 @@ name: inbar-ci
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+    types:
+      - edited
+      - opened
+      - reopened
+      - synchronize
+  merge_group:
+    types:
+      - checks_requested
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
+  contracts-preflight:
+    if: github.event_name != 'push' || github.event.deleted == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify every commit in the immutable event range
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+          MERGE_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          MERGE_HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            base_commit="${PR_BASE_SHA}"
+            head_commit="${PR_HEAD_SHA}"
+          elif [[ "${EVENT_NAME}" == "merge_group" ]]; then
+            base_commit="${MERGE_BASE_SHA}"
+            head_commit="${MERGE_HEAD_SHA}"
+          elif [[ "${EVENT_NAME}" == "push" && ! "${BEFORE_SHA}" =~ ^0+$ ]]; then
+            base_commit="${BEFORE_SHA}"
+            head_commit="${GITHUB_SHA}"
+          else
+            exit 1
+          fi
+          verifier=$(mktemp)
+          trap 'rm -f -- "${verifier}"' EXIT
+          if [[ "$(git cat-file -t "${base_commit}:scripts/ci/verify_history.py" 2>/dev/null || true)" == "blob" ]]; then
+            git cat-file blob "${base_commit}:scripts/ci/verify_history.py" > "${verifier}"
+          elif [[ "${EVENT_NAME}" == "push" && "${base_commit}" == "b3cd7570a7b86e918e4831c3b57f7d4ca213d026" ]]; then
+            # One-time two-commit bootstrap only: this is candidate policy backed by
+            # manual audit, not a base-controlled verification claim.
+            git cat-file blob "${head_commit}:scripts/ci/verify_history.py" > "${verifier}"
+            echo "Using the manually audited one-time candidate verifier for the bootstrap range." >&2
+          else
+            echo "Base-controlled history verifier is unavailable; candidate policy is refused." >&2
+            exit 1
+          fi
+          python3 "${verifier}" \
+            --repo . \
+            --base "${base_commit}" \
+            --head "${head_commit}"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
+        with:
+          version: "0.11.28"
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv lock --check
+      - run: uv sync --group dev --frozen
+      - run: uv run inbar memory verify
+      - run: uv run inbar schemas export
+      - run: git diff --exit-code -- protocol/schemas
+      - run: uv run inbar schemas check
+      - run: uv run inbar mission validate --expect-failure iter001-acquisition-contract
+      - run: uv run inbar handoff check
+
   dependency-review:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.repository.private == false
+    needs: contracts-preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -25,6 +97,7 @@ jobs:
           fail-on-severity: moderate
 
   quality-contracts:
+    needs: contracts-preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -39,32 +112,13 @@ jobs:
       - run: uv python install 3.12
       - run: uv lock --check
       - run: uv sync --group dev --frozen
-      - run: git diff --check
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy src
       - run: uv run pytest --cov --cov-report=term-missing
-      - run: uv run inbar schemas export
-      - run: git diff --exit-code -- protocol/schemas
-      - run: uv run inbar schemas check
-      - run: uv run inbar mission validate --expect-failure iter001-acquisition-contract
-      - name: Verify append-only research memory
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          git show "origin/${BASE_REF}:memory/research_engine_extraction.jsonl" > /tmp/base-memory.jsonl
-          uv run inbar memory verify-prefix /tmp/base-memory.jsonl
-      - name: Reject tracked data, local keys, and credential material
-        run: |
-          if git ls-files | grep -E '^(data/(raw|derived)/|\.local/)|\.ed25519$'; then
-            exit 1
-          fi
-          if git grep -nE -- 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}'; then
-            exit 1
-          fi
 
   compatibility:
+    needs: contracts-preflight
     name: compatibility-${{ matrix.os }}-py${{ matrix.python }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -92,11 +146,12 @@ jobs:
           version: "0.11.28"
           enable-cache: true
           cache-dependency-glob: uv.lock
-      - run: uv python install ${{ matrix.python }}
+      - run: uv python install 3.12 ${{ matrix.python }}
       - run: uv sync --group dev --frozen --python ${{ matrix.python }}
       - run: uv run --python ${{ matrix.python }} pytest
 
   package:
+    needs: contracts-preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -109,18 +164,31 @@ jobs:
         with:
           version: "0.11.28"
           enable-cache: true
-      - run: uv python install 3.11 3.12 3.14
-      - run: uv sync --group release --frozen --python 3.12
+      - run: uv python install 3.11 3.12.13 3.14
+      - run: uv sync --group release --frozen --python 3.12.13 --managed-python
       - name: Build reproducibly
         run: |
-          uv build
+          uv build --build-constraints requirements/build-constraints.txt --require-hashes --python 3.12.13 --managed-python
           sha256sum dist/* | sed 's#dist/##' > /tmp/build-one.sha256
           mv dist /tmp/build-one
-          uv build
+          uv build --build-constraints requirements/build-constraints.txt --require-hashes --python 3.12.13 --managed-python
           sha256sum dist/* | sed 's#dist/##' > /tmp/build-two.sha256
           diff -u /tmp/build-one.sha256 /tmp/build-two.sha256
+          source_root=$(mktemp -d)
+          wheel_root=$(mktemp -d)
+          archive=$(find dist -name '*.tar.gz' -print -quit)
+          tar -xzf "${archive}" -C "${source_root}"
+          source_dir=$(find "${source_root}" -mindepth 1 -maxdepth 1 -type d -print -quit)
+          uv build --wheel "${source_dir}" --out-dir "${wheel_root}" --build-constraints requirements/build-constraints.txt --require-hashes --python 3.12.13 --managed-python
+          wheel=$(find dist -name '*.whl' -print -quit)
+          rebuilt_wheel=$(find "${wheel_root}" -name '*.whl' -print -quit)
+          test "$(sha256sum "${wheel}" | cut -d' ' -f1)" = "$(sha256sum "${rebuilt_wheel}" | cut -d' ' -f1)"
       - run: uv run --group release twine check --strict dist/*
-      - run: uv run --group release check-wheel-contents dist/*.whl
+      - name: Verify package contents
+        run: |
+          uv run --group release check-wheel-contents dist/*.whl
+          archive=$(find dist -name '*.tar.gz' -print -quit)
+          test "$(tar -tzf "${archive}" | grep -Ec '^[^/]+/requirements/build-constraints\.txt$')" = "1"
       - name: Verify isolated wheel on oldest and newest Python
         run: |
           wheel=$(find dist -name '*.whl' -print -quit)
@@ -128,6 +196,7 @@ jobs:
           uv run --isolated --no-project --python 3.14 --with "$wheel" inbar --help
 
   data-extra:
+    needs: contracts-preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -140,9 +209,11 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv sync --extra data --group dev --frozen
+      - run: uv run python -c 'import pyarrow; print(pyarrow.__version__)'
       - run: uv run pytest tests/unit/test_adapt.py tests/unit/test_readiness.py
 
   dependency-audit:
+    needs: contracts-preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -157,3 +228,35 @@ jobs:
       - run: uv sync --group security --frozen
       - run: uv export --frozen --no-dev --no-emit-project --output-file /tmp/runtime-requirements.txt
       - run: uv run --group security pip-audit --strict --requirement /tmp/runtime-requirements.txt
+
+  ci-gate:
+    if: always()
+    needs:
+      - contracts-preflight
+      - dependency-review
+      - quality-contracts
+      - compatibility
+      - package
+      - data-extra
+      - dependency-audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every mandatory job
+        env:
+          COMPATIBILITY: ${{ needs.compatibility.result }}
+          CONTRACTS: ${{ needs.contracts-preflight.result }}
+          DATA_EXTRA: ${{ needs.data-extra.result }}
+          DEPENDENCY_AUDIT: ${{ needs.dependency-audit.result }}
+          DEPENDENCY_REVIEW: ${{ needs.dependency-review.result }}
+          PACKAGE: ${{ needs.package.result }}
+          QUALITY: ${{ needs.quality-contracts.result }}
+        run: |
+          test "${CONTRACTS}" = "success"
+          test "${QUALITY}" = "success"
+          test "${COMPATIBILITY}" = "success"
+          test "${PACKAGE}" = "success"
+          test "${DATA_EXTRA}" = "success"
+          test "${DEPENDENCY_AUDIT}" = "success"
+          test "${DEPENDENCY_REVIEW}" = "success" \
+            || test "${DEPENDENCY_REVIEW}" = "skipped"

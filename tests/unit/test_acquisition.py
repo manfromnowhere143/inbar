@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import py_compile
+import subprocess
+import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -9,6 +13,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+import fieldtrue.acquisition as acquisition_module
 from fieldtrue.acquisition import (
     AcquisitionAdmissionReport,
     AcquisitionAuditError,
@@ -50,10 +55,12 @@ from fieldtrue.acquisition import (
     build_model_visible_leakage_scan,
     issue_actor_trust_registry,
     render_admission_result,
+    verify_preregistration_binding,
     write_admission_output,
 )
 from fieldtrue.canonical import read_json, sha256_file, sha256_value, write_json
 from fieldtrue.control_authority import record_control_observation
+from fieldtrue.git_trust import git_environment, trusted_repository_git
 from fieldtrue.splits import SplitUnit, freeze_group_split
 from tests.acquisition_helpers import (
     ACTOR_KEYS,
@@ -85,6 +92,766 @@ def _rewrite_bound_json(
 
 def _aware(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _git(repo: Path, *arguments: str) -> str:
+    return subprocess.run(  # noqa: S603 - test helper uses fixed Git and internal arguments
+        ("/usr/bin/git", *arguments),
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _initialize_source_repository(repo: Path, files: dict[str, str]) -> str:
+    for relative, content in files.items():
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    _git(repo, "init", "--quiet")
+    _git(repo, "config", "user.name", "Acquisition Closure Test")
+    _git(repo, "config", "user.email", "acquisition-closure@example.invalid")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "--quiet", "-m", "seal source census")
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _source_census(
+    repo: Path,
+    authority_commit: str,
+    repository_head: str,
+) -> acquisition_module.AcquisitionSourceClosure:
+    git = trusted_repository_git(repo)
+    validator_path = repo / "src" / "fieldtrue" / "acquisition.py"
+    return acquisition_module._acquisition_source_closure(
+        git,
+        repo,
+        git_environment(),
+        authority_commit=authority_commit,
+        repository_head=repository_head,
+        expected_validator_blob=_git(
+            repo,
+            "rev-parse",
+            f"{authority_commit}:src/fieldtrue/acquisition.py",
+        ),
+        expected_validator_sha256=acquisition_module.sha256_bytes(validator_path.read_bytes()),
+    )
+
+
+def test_source_census_binds_from_package_child_module(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    authority = _initialize_source_repository(
+        repo,
+        {
+            "src/fieldtrue/__init__.py": "",
+            "src/fieldtrue/acquisition.py": "from fieldtrue.pkg import child\n",
+            "src/fieldtrue/pkg/__init__.py": "",
+            "src/fieldtrue/pkg/child.py": 'VALUE = "authority"\n',
+        },
+    )
+    (repo / "src/fieldtrue/pkg/child.py").write_text('VALUE = "head"\n')
+    _git(repo, "add", ".")
+    _git(repo, "commit", "--quiet", "-m", "replace imported child")
+
+    with pytest.raises(AcquisitionAuditError, match="source tree differs"):
+        _source_census(repo, authority, _git(repo, "rev-parse", "HEAD"))
+
+
+def test_source_census_rejects_module_package_resolution_collision(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    authority = _initialize_source_repository(
+        repo,
+        {
+            "src/fieldtrue/__init__.py": "",
+            "src/fieldtrue/acquisition.py": "import fieldtrue.dual\n",
+            "src/fieldtrue/dual.py": 'VALUE = "module"\n',
+            "src/fieldtrue/dual/__init__.py": 'VALUE = "authority-package"\n',
+        },
+    )
+    (repo / "src/fieldtrue/dual/__init__.py").write_text('VALUE = "head-package"\n')
+    _git(repo, "add", ".")
+    _git(repo, "commit", "--quiet", "-m", "replace runtime-selected package")
+
+    with pytest.raises(AcquisitionAuditError, match="source tree differs"):
+        _source_census(repo, authority, _git(repo, "rev-parse", "HEAD"))
+
+
+def test_source_census_binds_indirect_dynamic_import_target(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    authority = _initialize_source_repository(
+        repo,
+        {
+            "src/fieldtrue/__init__.py": "",
+            "src/fieldtrue/acquisition.py": (
+                'import importlib\nloader = getattr(importlib, "import_module")\n'
+                'loader("fieldtrue.hidden")\n'
+            ),
+            "src/fieldtrue/hidden.py": 'VALUE = "authority"\n',
+        },
+    )
+    (repo / "src/fieldtrue/hidden.py").write_text('VALUE = "head"\n')
+    _git(repo, "add", ".")
+    _git(repo, "commit", "--quiet", "-m", "replace dynamic target")
+
+    with pytest.raises(AcquisitionAuditError, match="source tree differs"):
+        _source_census(repo, authority, _git(repo, "rev-parse", "HEAD"))
+
+
+def test_source_census_rejects_ignored_sourceless_bytecode(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    authority = _initialize_source_repository(
+        repo,
+        {
+            ".gitignore": "*.py[cod]\n__pycache__/\n",
+            "src/fieldtrue/__init__.py": "",
+            "src/fieldtrue/acquisition.py": (
+                "try:\n import fieldtrue.hidden\nexcept ModuleNotFoundError:\n pass\n"
+            ),
+        },
+    )
+    bytecode_source = tmp_path / "hidden.py"
+    bytecode_source.write_text('VALUE = "ignored"\n')
+    py_compile.compile(
+        str(bytecode_source),
+        cfile=str(repo / "src/fieldtrue/hidden.pyc"),
+        doraise=True,
+    )
+    assert (
+        acquisition_module._clean_repository_status(
+            trusted_repository_git(repo), repo, git_environment()
+        )
+        == b""
+    )
+
+    with pytest.raises(AcquisitionAuditError, match="working acquisition source census differs"):
+        _source_census(repo, authority, authority)
+
+
+def test_source_census_rejects_ignored_symlink_descendant(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    authority = _initialize_source_repository(
+        repo,
+        {
+            ".gitignore": "src/fieldtrue/escape.py\n",
+            "src/fieldtrue/__init__.py": "",
+            "src/fieldtrue/acquisition.py": "VALUE = 1\n",
+        },
+    )
+    (repo / "src/fieldtrue/escape.py").symlink_to("acquisition.py")
+    assert (
+        acquisition_module._clean_repository_status(
+            trusted_repository_git(repo), repo, git_environment()
+        )
+        == b""
+    )
+
+    with pytest.raises(AcquisitionAuditError, match="not a regular file"):
+        _source_census(repo, authority, authority)
+
+
+def test_source_census_detects_file_replacement_during_descriptor_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "repo"
+    _initialize_source_repository(
+        repo,
+        {
+            "src/fieldtrue/__init__.py": "",
+            "src/fieldtrue/acquisition.py": "VALUE = 1\n",
+            "src/fieldtrue/planning.py": "VALUE = 1\n",
+        },
+    )
+    planning = repo / "src/fieldtrue/planning.py"
+    original_open = acquisition_module.os.open
+    replaced = False
+
+    def racing_open(
+        path: str | Path,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        if path == "planning.py" and dir_fd is not None and not replaced:
+            replaced = True
+            planning.write_text("VALUE = 200\n")
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(acquisition_module.os, "open", racing_open)
+    with pytest.raises(AcquisitionAuditError, match="changed during census"):
+        acquisition_module._working_source_census(repo)
+
+
+def test_source_census_rejects_hard_linked_source(tmp_path: Path) -> None:
+    package = tmp_path / "src" / "fieldtrue"
+    package.mkdir(parents=True)
+    source = package / "acquisition.py"
+    source.write_text("VALUE = 1\n")
+    try:
+        (tmp_path / "external-alias.py").hardlink_to(source)
+    except OSError as error:
+        pytest.skip(f"hard links are unavailable on this filesystem: {error}")
+
+    with pytest.raises(AcquisitionAuditError, match="not a regular file"):
+        acquisition_module._working_source_census(tmp_path)
+
+
+def test_binding_file_rejects_replacement_between_lstat_and_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "binding.json"
+    path.write_bytes(b"same-authorized-bytes")
+    replacement = tmp_path / "replacement.json"
+    replacement.write_bytes(path.read_bytes())
+    original_open = acquisition_module.os.open
+    replaced = False
+
+    def racing_open(
+        target: str | Path,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        if Path(target) == path and not replaced:
+            replaced = True
+            replacement.replace(path)
+        return original_open(target, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(acquisition_module.os, "open", racing_open)
+
+    with pytest.raises(AcquisitionAuditError, match="changed while being read"):
+        acquisition_module._read_binding_file(path, "test binding")
+
+
+def test_bound_artifact_rejects_replacement_between_stat_and_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "artifact.bin"
+    target.write_bytes(b"same-authorized-bytes")
+    replacement = tmp_path / "replacement.bin"
+    replacement.write_bytes(target.read_bytes())
+    binding = ArtifactBinding(
+        path=target.name,
+        sha256=sha256_file(target),
+        bytes=target.stat().st_size,
+        media_type="application/octet-stream",
+    )
+    original_open = acquisition_module.os.open
+    replaced = False
+
+    def racing_open(
+        path: str | Path,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        if path == target.name and dir_fd is not None and not replaced:
+            replaced = True
+            replacement.replace(target)
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(acquisition_module.os, "open", racing_open)
+
+    with pytest.raises(AcquisitionAuditError, match="changed before open"):
+        acquisition_module._verify_artifact(tmp_path, binding)
+
+
+@pytest.mark.parametrize(
+    "consumer",
+    ["model", "json-leakage", "opaque-leakage", "ordered-chunks", "fingerprint"],
+)
+def test_artifact_consumers_reject_post_open_path_substitution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    consumer: str,
+) -> None:
+    artifact_root = tmp_path / consumer
+    artifact_root.mkdir()
+    target = artifact_root / "artifact.bin"
+    if consumer == "model":
+        original_payload = (
+            b'{"bytes":1,"media_type":"application/octet-stream",'
+            b'"path":"original.bin","sha256":"' + b"a" * 64 + b'"}\n'
+        )
+        replacement_payload = original_payload.replace(b"original.bin", b"replaced.bin")
+        media_type = "application/json"
+    elif consumer == "json-leakage":
+        original_payload = b'{"signal":"nominal"}\n'
+        replacement_payload = b'{"fault_label":"incident-secret"}\n'
+        media_type = "application/json"
+    elif consumer == "opaque-leakage":
+        original_payload = b"nominal-opaque-stream"
+        replacement_payload = b"incident-secret-stream"
+        media_type = "application/octet-stream"
+    elif consumer == "fingerprint":
+        original_payload = b"a" * (acquisition_module._FINGERPRINT_SAMPLE_BYTES + 4096)
+        replacement_payload = b"b" * len(original_payload)
+        media_type = "application/octet-stream"
+    else:
+        original_payload = b"ordered-source-stream" * 64
+        replacement_payload = b"substitute-byte-stream" * 64
+        media_type = "application/octet-stream"
+    target.write_bytes(original_payload)
+    replacement = artifact_root / "replacement.bin"
+    replacement.write_bytes(replacement_payload)
+    binding = ArtifactBinding(
+        path=f"{consumer}/artifact.bin",
+        sha256=sha256_file(target),
+        bytes=len(original_payload),
+        media_type=media_type,
+    )
+    original_fdopen = acquisition_module.os.fdopen
+    replaced = False
+
+    def racing_fdopen(
+        descriptor: int,
+        mode: str,
+        *,
+        closefd: bool = True,
+    ) -> Any:
+        nonlocal replaced
+        handle = original_fdopen(descriptor, mode, closefd=closefd)
+        if not replaced:
+            replaced = True
+            target.replace(artifact_root / "verified-original.bin")
+            replacement.replace(target)
+        return handle
+
+    monkeypatch.setattr(acquisition_module.os, "fdopen", racing_fdopen)
+
+    def consume() -> object:
+        if consumer == "model":
+            return acquisition_module._load_bound_model(tmp_path, binding, ArtifactBinding)
+        if consumer in {"json-leakage", "opaque-leakage"}:
+            return build_model_visible_leakage_scan(
+                tmp_path,
+                incident_id="incident-race",
+                artifacts=(binding,),
+                identity_values=("incident-secret",),
+            )
+        if consumer == "ordered-chunks":
+            return acquisition_module._ordered_chunk_hashes(tmp_path, binding, 64)
+        return acquisition_module._bounded_artifact_sample(tmp_path, binding)
+
+    with pytest.raises(AcquisitionAuditError, match="changed while consumed"):
+        consume()
+
+
+def test_bound_artifact_rejects_ancestor_replacement_after_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_directory = tmp_path / "artifacts"
+    artifact_directory.mkdir()
+    target = artifact_directory / "model.json"
+    target.write_bytes(b'{"path":"a","sha256":"' + b"a" * 64 + b'","bytes":1,"media_type":"x"}')
+    replacement_directory = tmp_path / "replacement-artifacts"
+    replacement_directory.mkdir()
+    (replacement_directory / target.name).write_bytes(
+        b'{"path":"b","sha256":"' + b"b" * 64 + b'","bytes":2,"media_type":"y"}'
+    )
+    binding = ArtifactBinding(
+        path="artifacts/model.json",
+        sha256=sha256_file(target),
+        bytes=target.stat().st_size,
+        media_type="application/json",
+    )
+    original_open = acquisition_module.os.open
+    replaced = False
+
+    def racing_open(
+        path: str | Path,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal replaced
+        descriptor = original_open(path, flags, mode, dir_fd=dir_fd)
+        if path == target.name and dir_fd is not None and not replaced:
+            replaced = True
+            artifact_directory.replace(tmp_path / "verified-artifacts")
+            replacement_directory.replace(artifact_directory)
+        return descriptor
+
+    monkeypatch.setattr(acquisition_module.os, "open", racing_open)
+
+    with pytest.raises(AcquisitionAuditError, match="artifact path changed while consumed"):
+        acquisition_module._load_bound_model(tmp_path, binding, ArtifactBinding)
+
+
+def test_bound_model_rejects_artifact_above_parse_byte_ceiling(tmp_path: Path) -> None:
+    target = tmp_path / "oversized-model.json"
+    with target.open("wb") as handle:
+        handle.truncate(acquisition_module._MAX_BOUND_MODEL_BYTES + 1)
+    binding = ArtifactBinding(
+        path=target.name,
+        sha256="0" * 64,
+        bytes=target.stat().st_size,
+        media_type="application/json",
+    )
+
+    with pytest.raises(AcquisitionAuditError, match="exceeds its consumption bound"):
+        acquisition_module._load_bound_model(tmp_path, binding, ArtifactBinding)
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO creation requires POSIX")
+def test_source_census_rejects_special_file(tmp_path: Path) -> None:
+    package = tmp_path / "src" / "fieldtrue"
+    package.mkdir(parents=True)
+    (package / "acquisition.py").write_text("VALUE = 1\n")
+    try:
+        os.mkfifo(package / "stream.py")
+    except OSError as error:
+        pytest.skip(f"FIFO creation is unavailable on this filesystem: {error}")
+
+    with pytest.raises(AcquisitionAuditError, match="not a regular file"):
+        acquisition_module._working_source_census(tmp_path)
+
+
+def test_source_census_detects_directory_insertion_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = tmp_path / "src" / "fieldtrue"
+    package.mkdir(parents=True)
+    (package / "acquisition.py").write_text("VALUE = 1\n")
+    package_metadata = package.stat()
+    package_identity = (package_metadata.st_dev, package_metadata.st_ino)
+    original_fstat = acquisition_module.os.fstat
+    package_observations = 0
+
+    def racing_fstat(descriptor: int) -> os.stat_result:
+        nonlocal package_observations
+        metadata = original_fstat(descriptor)
+        if (metadata.st_dev, metadata.st_ino) == package_identity:
+            package_observations += 1
+            if package_observations == 2:
+                (package / "late.py").write_text("VALUE = 2\n")
+                metadata = original_fstat(descriptor)
+        return metadata
+
+    monkeypatch.setattr(acquisition_module.os, "fstat", racing_fstat)
+    with pytest.raises(AcquisitionAuditError, match="directory changed during census"):
+        acquisition_module._working_source_census(tmp_path)
+
+
+def test_source_census_detects_directory_replacement_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = tmp_path / "src" / "fieldtrue"
+    child = package / "pkg"
+    child.mkdir(parents=True)
+    (package / "acquisition.py").write_text("VALUE = 1\n")
+    (child / "module.py").write_text("VALUE = 2\n")
+    child_metadata = child.stat()
+    child_identity = (child_metadata.st_dev, child_metadata.st_ino)
+    original_fstat = acquisition_module.os.fstat
+    child_observations = 0
+
+    def racing_fstat(descriptor: int) -> os.stat_result:
+        nonlocal child_observations
+        metadata = original_fstat(descriptor)
+        if (metadata.st_dev, metadata.st_ino) == child_identity:
+            child_observations += 1
+            if child_observations == 2:
+                child.rename(package / "pkg-original")
+                child.mkdir()
+                (child / "module.py").write_text("VALUE = 2\n")
+        return metadata
+
+    monkeypatch.setattr(acquisition_module.os, "fstat", racing_fstat)
+    with pytest.raises(AcquisitionAuditError, match="directory changed during census"):
+        acquisition_module._working_source_census(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("limit_name", "expected_error"),
+    [
+        ("_MAX_ACQUISITION_SOURCE_DESCENDANTS", "descendant ceiling"),
+        ("_MAX_ACQUISITION_SOURCE_FILES", "file ceiling"),
+        ("_MAX_ACQUISITION_SOURCE_TOTAL_BYTES", "total byte ceiling"),
+    ],
+)
+def test_working_source_census_enforces_resource_ceilings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    limit_name: str,
+    expected_error: str,
+) -> None:
+    package = tmp_path / "src" / "fieldtrue"
+    package.mkdir(parents=True)
+    (package / "acquisition.py").write_text("VALUE = 1\n")
+    (package / "planning.py").write_text("VALUE = 2\n")
+    monkeypatch.setattr(acquisition_module, limit_name, 1)
+
+    with pytest.raises(AcquisitionAuditError, match=expected_error):
+        acquisition_module._working_source_census(tmp_path)
+
+
+def test_git_source_contents_rejects_malformed_batch_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    blob = "a" * 40
+    responses = iter(
+        (
+            subprocess.CompletedProcess(
+                args=("git", "cat-file", "--batch-check"),
+                returncode=0,
+                stdout=f"{blob} blob 1\n".encode("ascii"),
+                stderr=b"",
+            ),
+            subprocess.CompletedProcess(
+                args=("git", "cat-file", "--batch"),
+                returncode=0,
+                stdout=f"{blob} blob 1\nx".encode("ascii"),
+                stderr=b"",
+            ),
+        )
+    )
+
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        return next(responses)
+
+    monkeypatch.setattr(acquisition_module.subprocess, "run", fake_run)
+    census = (("src/fieldtrue/acquisition.py", "100644", blob),)
+    with pytest.raises(AcquisitionAuditError, match="content census is incoherent"):
+        acquisition_module._git_source_contents("/usr/bin/git", tmp_path, {}, census)
+
+
+def test_acquisition_source_closure_rejects_dirty_and_later_committed_planner(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    package = repo / "src" / "fieldtrue"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("\n")
+    acquisition_path = package / "acquisition.py"
+    acquisition_path.write_text("from fieldtrue.planning import select\n")
+    planning_path = package / "planning.py"
+    original_planning = "from fieldtrue.domain import VALUE\nselect = VALUE\n"
+    planning_path.write_text(original_planning)
+    (package / "domain.py").write_text("VALUE = 1\n")
+    _git(repo, "init", "--quiet")
+    _git(repo, "config", "user.name", "Acquisition Closure Test")
+    _git(repo, "config", "user.email", "acquisition-closure@example.invalid")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "--quiet", "-m", "seal source closure")
+
+    git = trusted_repository_git(repo)
+    environment = git_environment()
+    authority_commit = _git(repo, "rev-parse", "HEAD")
+    validator_blob = _git(repo, "rev-parse", "HEAD:src/fieldtrue/acquisition.py")
+    validator_sha256 = acquisition_module.sha256_bytes(acquisition_path.read_bytes())
+    closure = acquisition_module._acquisition_source_closure(
+        git,
+        repo,
+        environment,
+        authority_commit=authority_commit,
+        repository_head=authority_commit,
+        expected_validator_blob=validator_blob,
+        expected_validator_sha256=validator_sha256,
+    )
+    assert tuple(item[0] for item in closure.sources) == (
+        "src/fieldtrue/__init__.py",
+        "src/fieldtrue/acquisition.py",
+        "src/fieldtrue/domain.py",
+        "src/fieldtrue/planning.py",
+    )
+    assert acquisition_module._clean_repository_status(git, repo, environment) == b""
+
+    planning_path.write_text(original_planning + "select = 0\n")
+    assert acquisition_module._clean_repository_status(git, repo, environment)
+    with pytest.raises(
+        AcquisitionAuditError,
+        match="working acquisition source census differs",
+    ):
+        acquisition_module._acquisition_source_closure(
+            git,
+            repo,
+            environment,
+            authority_commit=authority_commit,
+            repository_head=authority_commit,
+            expected_validator_blob=validator_blob,
+            expected_validator_sha256=validator_sha256,
+        )
+
+    _git(repo, "add", "src/fieldtrue/planning.py")
+    assert acquisition_module._clean_repository_status(git, repo, environment)
+    _git(repo, "commit", "--quiet", "-m", "replace planner after seal")
+    changed_head = _git(repo, "rev-parse", "HEAD")
+    with pytest.raises(
+        AcquisitionAuditError,
+        match="source tree differs",
+    ):
+        acquisition_module._acquisition_source_closure(
+            git,
+            repo,
+            environment,
+            authority_commit=authority_commit,
+            repository_head=changed_head,
+            expected_validator_blob=validator_blob,
+            expected_validator_sha256=validator_sha256,
+        )
+
+
+def test_sealed_binding_rejects_dirty_staged_and_post_seal_planning_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(acquisition_module, "_isolated_launcher_flags_present", lambda: True)
+    monkeypatch.setattr(
+        acquisition_module,
+        "_executing_validator_matches_source",
+        lambda *_: True,
+    )
+    source_repo = Path(__file__).resolve().parents[2]
+    repo = tmp_path / "repo"
+    _git(tmp_path, "clone", "--quiet", "--no-hardlinks", str(source_repo), str(repo))
+    _git(repo, "config", "user.name", "Acquisition Binding Test")
+    _git(repo, "config", "user.email", "acquisition-binding@example.invalid")
+
+    contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
+    contract_value = read_json(contract_path)
+    validator_path = repo / "src" / "fieldtrue" / "acquisition.py"
+    contract_value.update(
+        {
+            "control_authority_status": "sealed",
+            "validator_git_blob": _git(
+                repo,
+                "rev-parse",
+                "HEAD:src/fieldtrue/acquisition.py",
+            ),
+            "validator_source_sha256": sha256_file(validator_path),
+            "dependency_lock_sha256": sha256_file(repo / "uv.lock"),
+            "control_suite_sha256": "1" * 64,
+        }
+    )
+    contract = AcquisitionContract.model_validate(contract_value)
+    write_json(contract_path, contract)
+    _git(repo, "add", "protocol/acquisition/iter001_contract.json")
+    _git(repo, "commit", "--quiet", "-m", "seal acquisition authority")
+    execution_commit = _git(repo, "rev-parse", "HEAD")
+
+    closure = verify_preregistration_binding(repo, contract, execution_commit)
+    assert any(path == "src/fieldtrue/planning.py" for path, *_ in closure.sources)
+
+    planning_path = repo / "src" / "fieldtrue" / "planning.py"
+    planning_path.write_bytes(planning_path.read_bytes() + b"\n# injected planner\n")
+    with pytest.raises(AcquisitionAuditError, match="requires a clean repository"):
+        verify_preregistration_binding(repo, contract, execution_commit)
+
+    _git(repo, "add", "src/fieldtrue/planning.py")
+    with pytest.raises(AcquisitionAuditError, match="Git preregistration trust failed"):
+        verify_preregistration_binding(repo, contract, execution_commit)
+
+    _git(repo, "commit", "--quiet", "-m", "replace planner after authority seal")
+    with pytest.raises(
+        AcquisitionAuditError,
+        match="source tree differs",
+    ):
+        verify_preregistration_binding(repo, contract, execution_commit)
+
+
+def test_sealed_binding_rejects_ordinary_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = Path(__file__).resolve().parents[2]
+    contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
+    contract_value = read_json(contract_path)
+    contract_value.update(
+        {
+            "control_authority_status": "sealed",
+            "validator_git_blob": "1" * 40,
+            "control_suite_sha256": "1" * 64,
+        }
+    )
+    contract = AcquisitionContract.model_validate(contract_value)
+    original_read_binding_file = acquisition_module._read_binding_file
+
+    def sealed_contract(path: Path, label: str) -> bytes:
+        if path == contract_path:
+            return contract.model_dump_json().encode("utf-8")
+        return original_read_binding_file(path, label)
+
+    monkeypatch.setattr(acquisition_module, "_read_binding_file", sealed_contract)
+    assert not acquisition_module._isolated_launcher_flags_present()
+    with pytest.raises(AcquisitionAuditError, match="isolated launcher process flags"):
+        verify_preregistration_binding(repo, contract)
+
+
+def test_isolated_python_flags_can_satisfy_launcher_contract() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-B",
+            "-S",
+            "-c",
+            (
+                "import sys; f=sys.flags; "
+                "assert f.isolated == f.no_site == f.ignore_environment == 1; "
+                "assert f.safe_path is True and f.dont_write_bytecode == 1"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_executing_validator_honestly_matches_current_source() -> None:
+    repo = Path(__file__).resolve().parents[2]
+    source = (repo / "src/fieldtrue/acquisition.py").read_bytes()
+    assert acquisition_module._executing_validator_matches_source(repo, source)
+    altered = source.replace(b'"--untracked-files=all"', b'"--untracked-files=no"')
+    assert altered != source
+    assert not acquisition_module._executing_validator_matches_source(repo, altered)
+
+
+def test_preregistration_binding_maps_git_timeout_to_audit_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = Path(__file__).resolve().parents[2]
+    contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
+    contract_value = read_json(contract_path)
+    contract_value["control_authority_status"] = "sealed"
+    contract_value["validator_git_blob"] = "1" * 40
+    contract_value["control_suite_sha256"] = "1" * 64
+    contract = AcquisitionContract.model_validate(contract_value)
+    original_read_binding_file = acquisition_module._read_binding_file
+
+    def sealed_contract(path: Path, label: str) -> bytes:
+        if path == contract_path:
+            return contract.model_dump_json().encode("utf-8")
+        return original_read_binding_file(path, label)
+
+    monkeypatch.setattr(acquisition_module, "_read_binding_file", sealed_contract)
+    monkeypatch.setattr(acquisition_module, "_isolated_launcher_flags_present", lambda: True)
+    monkeypatch.setattr(
+        acquisition_module,
+        "trusted_repository_git",
+        lambda _repo: "/usr/bin/git",
+    )
+
+    def timeout(*_args: object, **_kwargs: object) -> None:
+        raise acquisition_module.subprocess.TimeoutExpired(cmd="git", timeout=10)
+
+    monkeypatch.setattr(acquisition_module.subprocess, "run", timeout)
+    with pytest.raises(AcquisitionAuditError, match="failed to run"):
+        verify_preregistration_binding(repo, contract)
 
 
 def _rewrite_signed_bound_json(

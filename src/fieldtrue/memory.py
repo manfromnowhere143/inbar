@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import os
+import stat
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
@@ -16,6 +18,7 @@ from fieldtrue.canonical import canonical_json, sha256_value
 from fieldtrue.domain import GitObjectId, Identifier, Sha256
 
 MEMORY_GENESIS_HASH = "0" * 64
+_MAX_MEMORY_BYTES = 16 * 1024 * 1024
 _SENSITIVE_KEY_TERMS = ("credential", "hidden_label", "password", "private_key", "secret", "token")
 
 
@@ -76,7 +79,39 @@ class MemoryActor(BaseModel):
 
 
 class MemoryEvidenceRef(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        json_schema_extra={
+            "allOf": [
+                {
+                    "oneOf": [
+                        {
+                            "properties": {
+                                "uri": {
+                                    "type": "string",
+                                    "pattern": r"^https://[^/?#]+(?:/|$)",
+                                },
+                                "sha256": {"type": "string"},
+                                "git_commit": {"type": "null"},
+                            },
+                            "required": ["uri", "sha256"],
+                        },
+                        {
+                            "properties": {
+                                "uri": {
+                                    "type": "string",
+                                    "not": {"pattern": r"^[A-Za-z][A-Za-z0-9+.-]*:"},
+                                },
+                                "git_commit": {"type": "string"},
+                            },
+                            "required": ["uri", "git_commit"],
+                        },
+                    ]
+                }
+            ]
+        },
+    )
 
     role: str = Field(pattern=r"^(input|raw|derived|verifier|source|approval)$")
     uri: str = Field(min_length=1)
@@ -94,8 +129,14 @@ class MemoryEvidenceRef(BaseModel):
                 raise ValueError("external memory evidence must use HTTPS")
             if parsed.username is not None or parsed.password is not None:
                 raise ValueError("memory evidence URI must not contain credentials")
+            if "?" in self.uri or "#" in self.uri:
+                raise ValueError(
+                    "external memory evidence URI must not contain a query or fragment"
+                )
             if self.sha256 is None:
                 raise ValueError("external memory evidence requires a content hash")
+            if self.git_commit is not None:
+                raise ValueError("external memory evidence must not include a Git commit")
         else:
             pure = PurePosixPath(self.uri)
             if pure.is_absolute() or ".." in pure.parts:
@@ -227,15 +268,42 @@ def _record_body(record: ResearchMemoryRecord | dict[str, Any]) -> dict[str, Any
     return body
 
 
+def _memory_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise MemoryVerificationError(f"duplicate memory object key: {key}")
+        value[key] = item
+    return value
+
+
+def _reject_memory_constant(value: str) -> Any:
+    raise MemoryVerificationError(f"non-finite memory number: {value}")
+
+
 def _parse_memory(text: str) -> list[ResearchMemoryRecord]:
+    if "\r" in text:
+        raise MemoryVerificationError("research memory must use exact LF framing")
+    if text and not text.endswith("\n"):
+        raise MemoryVerificationError("nonempty research memory must end with one LF")
     records: list[ResearchMemoryRecord] = []
     for line_number, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
             raise MemoryVerificationError(f"blank memory line at {line_number}")
         try:
-            records.append(ResearchMemoryRecord.model_validate_json(line))
+            value = json.loads(
+                line,
+                object_pairs_hook=_memory_object,
+                parse_constant=_reject_memory_constant,
+            )
+            record = ResearchMemoryRecord.model_validate(value)
+        except MemoryVerificationError:
+            raise
         except ValueError as error:
             raise MemoryVerificationError(f"invalid memory line {line_number}") from error
+        if canonical_json(record.model_dump(mode="json")) != line.encode("utf-8"):
+            raise MemoryVerificationError(f"noncanonical memory line at {line_number}")
+        records.append(record)
     return records
 
 
@@ -268,30 +336,121 @@ def _verify_records(records: list[ResearchMemoryRecord]) -> tuple[int, str]:
     return len(records), previous
 
 
+def _stable_stat_fields(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def _memory_file_flags(*, append: bool = False) -> int:
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise MemoryVerificationError("research memory requires file no-follow support")
+    flags = os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0)
+    if append:
+        return flags | os.O_RDWR | os.O_APPEND | os.O_CREAT
+    return flags | os.O_RDONLY
+
+
+def _validate_memory_file(metadata: os.stat_result, *, label: str) -> None:
+    if not stat.S_ISREG(metadata.st_mode):
+        raise MemoryVerificationError(f"{label} must be a regular file")
+    if metadata.st_nlink != 1:
+        raise MemoryVerificationError(f"{label} must not be hard linked")
+    if metadata.st_size > _MAX_MEMORY_BYTES:
+        raise MemoryVerificationError(f"{label} exceeds the memory byte limit")
+
+
+def _current_memory_file_stat(path: Path, *, label: str) -> os.stat_result:
+    try:
+        return os.stat(path, follow_symlinks=False)
+    except OSError as error:
+        raise MemoryVerificationError(f"{label} changed while being read") from error
+
+
+def _read_memory_file(
+    path: Path,
+    *,
+    missing_ok: bool,
+    label: str,
+) -> bytes | None:
+    try:
+        descriptor = os.open(path, _memory_file_flags())
+    except FileNotFoundError:
+        if missing_ok:
+            return None
+        raise MemoryVerificationError(f"{label} is missing") from None
+    except OSError as error:
+        raise MemoryVerificationError(f"{label} is unavailable or is a symbolic link") from error
+    try:
+        before = os.fstat(descriptor)
+        _validate_memory_file(before, label=label)
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            data = handle.read(_MAX_MEMORY_BYTES + 1)
+        after = os.fstat(descriptor)
+        current = _current_memory_file_stat(path, label=label)
+    finally:
+        os.close(descriptor)
+    if (
+        _stable_stat_fields(before) != _stable_stat_fields(after)
+        or _stable_stat_fields(after) != _stable_stat_fields(current)
+        or not stat.S_ISREG(current.st_mode)
+        or current.st_nlink != 1
+        or len(data) != before.st_size
+        or len(data) > _MAX_MEMORY_BYTES
+    ):
+        raise MemoryVerificationError(f"{label} changed while being read")
+    return data
+
+
 def verify_memory(path: Path) -> tuple[int, str]:
-    if not path.exists():
+    data = _read_memory_file(path, missing_ok=True, label="research memory")
+    if data is None:
         return 0, MEMORY_GENESIS_HASH
-    return _verify_records(_parse_memory(path.read_text(encoding="utf-8")))
+    records = load_memory_records_bytes(data)
+    return len(records), records[-1].event_hash if records else MEMORY_GENESIS_HASH
 
 
 def load_memory_records(path: Path) -> tuple[ResearchMemoryRecord, ...]:
-    if not path.is_file():
+    data = _read_memory_file(path, missing_ok=True, label="research memory")
+    if data is None:
         return ()
-    records = _parse_memory(path.read_text(encoding="utf-8"))
+    return load_memory_records_bytes(data)
+
+
+def load_memory_records_bytes(data: bytes) -> tuple[ResearchMemoryRecord, ...]:
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise MemoryVerificationError("research memory is not valid UTF-8") from error
+    records = _parse_memory(text)
     _verify_records(records)
     return tuple(records)
 
 
 def verify_memory_prefix(base_path: Path, current_path: Path) -> tuple[int, int]:
-    if not base_path.is_file():
-        raise MemoryVerificationError("base memory ledger is missing")
-    base_lines = base_path.read_bytes().splitlines(keepends=True)
-    current_lines = current_path.read_bytes().splitlines(keepends=True)
+    base_data = _read_memory_file(base_path, missing_ok=False, label="base memory ledger")
+    current_data = _read_memory_file(
+        current_path,
+        missing_ok=False,
+        label="current memory ledger",
+    )
+    assert base_data is not None
+    assert current_data is not None
+    base_lines = base_data.splitlines(keepends=True)
+    current_lines = current_data.splitlines(keepends=True)
     if current_lines[: len(base_lines)] != base_lines:
         raise MemoryVerificationError("base memory ledger is not an immutable prefix")
-    base_count, _ = verify_memory(base_path)
-    current_count, _ = verify_memory(current_path)
-    return base_count, current_count
+    base_records = load_memory_records_bytes(base_data)
+    current_records = load_memory_records_bytes(current_data)
+    return len(base_records), len(current_records)
 
 
 def append_memory(
@@ -318,11 +477,30 @@ def append_memory(
     recorded_at: datetime | None = None,
 ) -> ResearchMemoryRecord:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+", encoding="utf-8") as handle:
+    try:
+        descriptor = os.open(path, _memory_file_flags(append=True), 0o644)
+    except OSError as error:
+        raise MemoryVerificationError(
+            "research memory is unavailable or is a symbolic link"
+        ) from error
+    with os.fdopen(descriptor, "a+b") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        before = os.fstat(handle.fileno())
+        _validate_memory_file(before, label="research memory")
         handle.seek(0)
-        records = _parse_memory(handle.read())
-        _verify_records(records)
+        existing = handle.read(_MAX_MEMORY_BYTES + 1)
+        after_read = os.fstat(handle.fileno())
+        current = _current_memory_file_stat(path, label="research memory")
+        if (
+            _stable_stat_fields(before) != _stable_stat_fields(after_read)
+            or _stable_stat_fields(after_read) != _stable_stat_fields(current)
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or len(existing) != before.st_size
+            or len(existing) > _MAX_MEMORY_BYTES
+        ):
+            raise MemoryVerificationError("research memory changed while being read")
+        records = list(load_memory_records_bytes(existing))
         if any(record.event_id == event_id for record in records):
             raise MemoryVerificationError(f"duplicate memory event ID: {event_id}")
         if corrects_event_id is not None and not any(
@@ -360,10 +538,40 @@ def append_memory(
             {**body, "event_hash": sha256_value(_record_body(body))}
         )
         _verify_records([*records, record])
+        record_line = canonical_json(record) + b"\n"
+        expected_size = before.st_size + len(record_line)
+        if expected_size > _MAX_MEMORY_BYTES:
+            raise MemoryVerificationError("research memory exceeds the memory byte limit")
         handle.seek(0, os.SEEK_END)
-        handle.write(canonical_json(record).decode())
-        handle.write("\n")
+        if handle.write(record_line) != len(record_line):
+            raise MemoryVerificationError("research memory append was incomplete")
         handle.flush()
         os.fsync(handle.fileno())
+        final = os.fstat(handle.fileno())
+        final_current = _current_memory_file_stat(path, label="research memory")
+        final_identity = (
+            final.st_dev,
+            final.st_ino,
+            final.st_mode,
+            final.st_nlink,
+            final.st_uid,
+            final.st_gid,
+        )
+        current_identity = (
+            final_current.st_dev,
+            final_current.st_ino,
+            final_current.st_mode,
+            final_current.st_nlink,
+            final_current.st_uid,
+            final_current.st_gid,
+        )
+        if (
+            final_identity != current_identity
+            or not stat.S_ISREG(final_current.st_mode)
+            or final_current.st_nlink != 1
+            or final.st_size != expected_size
+            or final_current.st_size != expected_size
+        ):
+            raise MemoryVerificationError("research memory changed while being appended")
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         return record

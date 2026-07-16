@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
+import sys
 import tempfile
 from collections import Counter, defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from itertools import pairwise
 from pathlib import Path, PurePosixPath
-from typing import Annotated, Any, Literal, Self, TypeVar
+from types import CodeType
+from typing import Annotated, Any, BinaryIO, Literal, Self, TypeVar
 from urllib.parse import urlsplit
 
 from nacl.exceptions import BadSignatureError
@@ -55,6 +62,7 @@ from fieldtrue.domain import (
     TruthRecord,
     VerificationResult,
 )
+from fieldtrue.git_trust import GitTrustError, git_environment, trusted_repository_git
 from fieldtrue.planning import (
     NoEligibleTestError,
     NonDiscriminatingTestError,
@@ -67,6 +75,16 @@ Money = Annotated[str, StringConstraints(pattern=r"^(0|[1-9][0-9]*)(\.[0-9]{1,6}
 
 class AcquisitionAuditError(ValueError):
     """An acquisition artifact is malformed, unbound, or outside the audit root."""
+
+
+@dataclass(frozen=True)
+class AcquisitionSourceClosure:
+    """Complete on-disk package source census anchored to one control execution commit."""
+
+    authority_commit: str
+    repository_head: str
+    sources: tuple[tuple[str, str, str, str, int], ...]
+    closure_sha256: str
 
 
 class PermissionKind(StrEnum):
@@ -1616,6 +1634,7 @@ _FINGERPRINT_SAMPLE_BYTES = 512 * 1024
 _FINGERPRINT_CHUNK_BYTES = 64
 _NEAR_DUPLICATE_JACCARD = 0.90
 _LEAKAGE_SCAN_CHUNK_BYTES = 64 * 1024
+_MAX_BOUND_MODEL_BYTES = 16 * 1024 * 1024
 _MAX_LEAKAGE_ARTIFACT_BYTES = 256 * 1024 * 1024
 _MAX_LEAKAGE_INPUT_BYTES = 512 * 1024 * 1024
 _MIN_JSON_IDENTITY_TOKEN_CHARS = 4
@@ -1632,18 +1651,190 @@ _ACTION_OR_EVENT_MODALITIES = {
 }
 
 
-def _artifact_path(root: Path, binding: ArtifactBinding) -> Path:
-    root_resolved = root.resolve()
-    path = root.joinpath(*PurePosixPath(binding.path).parts)
-    try:
-        resolved = path.resolve(strict=True)
-    except (FileNotFoundError, OSError) as error:
-        raise AcquisitionAuditError(f"missing artifact: {binding.path}") from error
-    if path.is_symlink() or not resolved.is_file() or not resolved.is_relative_to(root_resolved):
+_STABLE_ARTIFACT_FIELDS = (
+    "st_dev",
+    "st_ino",
+    "st_mode",
+    "st_nlink",
+    "st_uid",
+    "st_gid",
+    "st_size",
+    "st_mtime_ns",
+    "st_ctime_ns",
+)
+
+
+def _artifact_metadata_matches(first: os.stat_result, *others: os.stat_result) -> bool:
+    return all(
+        getattr(first, field) == getattr(other, field)
+        for other in others
+        for field in _STABLE_ARTIFACT_FIELDS
+    )
+
+
+def _artifact_directory_flags() -> int:
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        raise AcquisitionAuditError("artifact consumption requires directory no-follow support")
+    return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+
+
+def _artifact_file_flags() -> int:
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise AcquisitionAuditError("artifact consumption requires file no-follow support")
+    return os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0)
+
+
+@contextmanager
+def _open_bound_artifact(root: Path, binding: ArtifactBinding) -> Iterator[BinaryIO]:
+    """Open one artifact through a stable no-follow descriptor chain."""
+
+    pure = PurePosixPath(binding.path)
+    if (
+        pure.is_absolute()
+        or not pure.parts
+        or any(part in {"", ".", ".."} for part in pure.parts)
+        or pure.as_posix() != binding.path
+    ):
         raise AcquisitionAuditError(f"unsafe artifact path: {binding.path}")
-    if resolved.stat().st_size != binding.bytes or sha256_file(resolved) != binding.sha256:
+
+    directory_descriptors: list[tuple[int, os.stat_result, int | None, str | None]] = []
+    file_descriptor: int | None = None
+    handle: BinaryIO | None = None
+    try:
+        root_path = root.resolve(strict=True)
+        root_lexical = root_path.lstat()
+        root_descriptor = os.open(root_path, _artifact_directory_flags())
+        root_opened = os.fstat(root_descriptor)
+        if (
+            not stat.S_ISDIR(root_lexical.st_mode)
+            or not stat.S_ISDIR(root_opened.st_mode)
+            or not _artifact_metadata_matches(root_lexical, root_opened)
+        ):
+            os.close(root_descriptor)
+            raise AcquisitionAuditError(f"unsafe artifact root: {binding.path}")
+        directory_descriptors.append((root_descriptor, root_opened, None, None))
+
+        for part in pure.parts[:-1]:
+            parent_descriptor = directory_descriptors[-1][0]
+            lexical = os.stat(part, dir_fd=parent_descriptor, follow_symlinks=False)
+            child_descriptor = os.open(
+                part,
+                _artifact_directory_flags(),
+                dir_fd=parent_descriptor,
+            )
+            opened = os.fstat(child_descriptor)
+            if (
+                not stat.S_ISDIR(lexical.st_mode)
+                or not stat.S_ISDIR(opened.st_mode)
+                or not _artifact_metadata_matches(lexical, opened)
+            ):
+                os.close(child_descriptor)
+                raise AcquisitionAuditError(f"unsafe artifact path: {binding.path}")
+            directory_descriptors.append((child_descriptor, opened, parent_descriptor, part))
+
+        parent_descriptor = directory_descriptors[-1][0]
+        filename = pure.parts[-1]
+        lexical = os.stat(filename, dir_fd=parent_descriptor, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(lexical.st_mode)
+            or lexical.st_nlink != 1
+            or lexical.st_size != binding.bytes
+        ):
+            raise AcquisitionAuditError(f"artifact binding mismatch: {binding.path}")
+        file_descriptor = os.open(
+            filename,
+            _artifact_file_flags(),
+            dir_fd=parent_descriptor,
+        )
+        opened = os.fstat(file_descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or not _artifact_metadata_matches(lexical, opened)
+        ):
+            raise AcquisitionAuditError(f"artifact changed before open: {binding.path}")
+        handle = os.fdopen(file_descriptor, "rb", closefd=False)
+        try:
+            yield handle
+        finally:
+            after = os.fstat(file_descriptor)
+            current = os.stat(filename, dir_fd=parent_descriptor, follow_symlinks=False)
+            if (
+                not stat.S_ISREG(current.st_mode)
+                or current.st_nlink != 1
+                or not _artifact_metadata_matches(opened, after, current)
+            ):
+                raise AcquisitionAuditError(f"artifact changed while consumed: {binding.path}")
+            for descriptor, initial, parent, name in reversed(directory_descriptors):
+                settled = os.fstat(descriptor)
+                if parent is None:
+                    current_directory = root_path.lstat()
+                else:
+                    assert name is not None
+                    current_directory = os.stat(name, dir_fd=parent, follow_symlinks=False)
+                if not stat.S_ISDIR(current_directory.st_mode) or not _artifact_metadata_matches(
+                    initial, settled, current_directory
+                ):
+                    raise AcquisitionAuditError(
+                        f"artifact path changed while consumed: {binding.path}"
+                    )
+    except AcquisitionAuditError:
+        raise
+    except OSError as error:
+        raise AcquisitionAuditError(f"artifact is unavailable or unsafe: {binding.path}") from error
+    finally:
+        if handle is not None:
+            handle.close()
+        if file_descriptor is not None:
+            with suppress(OSError):
+                os.close(file_descriptor)
+        for descriptor, *_ in reversed(directory_descriptors):
+            with suppress(OSError):
+                os.close(descriptor)
+
+
+def _assert_artifact_digest(binding: ArtifactBinding, digest: str, size: int) -> None:
+    if size != binding.bytes or digest != binding.sha256:
         raise AcquisitionAuditError(f"artifact binding mismatch: {binding.path}")
-    return resolved
+
+
+def _read_bound_artifact(
+    handle: BinaryIO,
+    binding: ArtifactBinding,
+    *,
+    maximum_bytes: int,
+) -> bytes:
+    if binding.bytes > maximum_bytes:
+        raise AcquisitionAuditError(f"artifact exceeds its consumption bound: {binding.path}")
+    handle.seek(0)
+    digest = hashlib.sha256()
+    chunks: list[bytes] = []
+    size = 0
+    while chunk := handle.read(1024 * 1024):
+        digest.update(chunk)
+        chunks.append(chunk)
+        size += len(chunk)
+        if size > binding.bytes:
+            raise AcquisitionAuditError(f"artifact binding mismatch: {binding.path}")
+    _assert_artifact_digest(binding, digest.hexdigest(), size)
+    return b"".join(chunks)
+
+
+def _verify_bound_artifact(handle: BinaryIO, binding: ArtifactBinding) -> None:
+    handle.seek(0)
+    digest = hashlib.sha256()
+    size = 0
+    while chunk := handle.read(1024 * 1024):
+        digest.update(chunk)
+        size += len(chunk)
+        if size > binding.bytes:
+            raise AcquisitionAuditError(f"artifact binding mismatch: {binding.path}")
+    _assert_artifact_digest(binding, digest.hexdigest(), size)
+
+
+def _verify_artifact(root: Path, binding: ArtifactBinding) -> None:
+    with _open_bound_artifact(root, binding) as handle:
+        _verify_bound_artifact(handle, binding)
 
 
 def _normalized_leakage_tokens(values: tuple[str, ...]) -> tuple[str, ...]:
@@ -1702,22 +1893,34 @@ def _scan_json_leakage(
     return tuple(sorted(forbidden)), tuple(sorted(matched))
 
 
-def _scan_opaque_identity_tokens(path: Path, identity_tokens: tuple[str, ...]) -> tuple[str, ...]:
+def _scan_opaque_identity_tokens(
+    handle: BinaryIO,
+    binding: ArtifactBinding,
+    identity_tokens: tuple[str, ...],
+) -> tuple[str, ...]:
     token_bytes = tuple(
         token.encode("utf-8")
         for token in identity_tokens
         if len(token.encode("utf-8")) >= _MIN_OPAQUE_IDENTITY_TOKEN_BYTES
     )
     if not token_bytes:
+        _verify_bound_artifact(handle, binding)
         return ()
     overlap_bytes = max(len(token) for token in token_bytes) - 1
     matched: set[bytes] = set()
     overlap = b""
-    with path.open("rb") as handle:
-        while chunk := handle.read(_LEAKAGE_SCAN_CHUNK_BYTES):
-            window = (overlap + chunk).lower()
-            matched.update(token for token in token_bytes if token in window)
-            overlap = window[-overlap_bytes:] if overlap_bytes else b""
+    digest = hashlib.sha256()
+    size = 0
+    handle.seek(0)
+    while chunk := handle.read(_LEAKAGE_SCAN_CHUNK_BYTES):
+        digest.update(chunk)
+        size += len(chunk)
+        if size > binding.bytes:
+            raise AcquisitionAuditError(f"artifact binding mismatch: {binding.path}")
+        window = (overlap + chunk).lower()
+        matched.update(token for token in token_bytes if token in window)
+        overlap = window[-overlap_bytes:] if overlap_bytes else b""
+    _assert_artifact_digest(binding, digest.hexdigest(), size)
     return tuple(sorted(token.decode("utf-8") for token in matched))
 
 
@@ -1738,17 +1941,24 @@ def build_model_visible_leakage_scan(
             raise AcquisitionAuditError(
                 f"model-visible leakage scan exceeds artifact byte ceiling: {binding.path}"
             )
-        path = _artifact_path(root, binding)
-        if binding.media_type == "application/json":
-            forbidden_paths, matched_tokens = _scan_json_leakage(
-                _json_without_duplicate_keys(path.read_bytes(), binding.path),
-                identity_tokens=identity_tokens,
-            )
-            scan_mode: Literal["utf8_json", "opaque_stream"] = "utf8_json"
-        else:
-            forbidden_paths = ()
-            matched_tokens = _scan_opaque_identity_tokens(path, identity_tokens)
-            scan_mode = "opaque_stream"
+        with _open_bound_artifact(root, binding) as handle:
+            if binding.media_type == "application/json":
+                forbidden_paths, matched_tokens = _scan_json_leakage(
+                    _json_without_duplicate_keys(
+                        _read_bound_artifact(
+                            handle,
+                            binding,
+                            maximum_bytes=_MAX_LEAKAGE_ARTIFACT_BYTES,
+                        ),
+                        binding.path,
+                    ),
+                    identity_tokens=identity_tokens,
+                )
+                scan_mode: Literal["utf8_json", "opaque_stream"] = "utf8_json"
+            else:
+                forbidden_paths = ()
+                matched_tokens = _scan_opaque_identity_tokens(handle, binding, identity_tokens)
+                scan_mode = "opaque_stream"
         scans.append(
             LeakageArtifactScan(
                 artifact_sha256=binding.sha256,
@@ -1775,26 +1985,47 @@ def build_model_visible_leakage_scan(
     )
 
 
-def _bounded_artifact_sample(path: Path) -> bytes:
-    size = path.stat().st_size
-    if size <= _FINGERPRINT_SAMPLE_BYTES:
-        return path.read_bytes()
-    chunk_size = _FINGERPRINT_SAMPLE_BYTES // 16
-    offsets = [round(index * (size - chunk_size) / 15) for index in range(16)]
-    samples: list[bytes] = []
-    with path.open("rb") as handle:
+def _bounded_artifact_sample(root: Path, binding: ArtifactBinding) -> bytes:
+    with _open_bound_artifact(root, binding) as handle:
+        if binding.bytes <= _FINGERPRINT_SAMPLE_BYTES:
+            return _read_bound_artifact(
+                handle,
+                binding,
+                maximum_bytes=_FINGERPRINT_SAMPLE_BYTES,
+            )
+        _verify_bound_artifact(handle, binding)
+        chunk_size = _FINGERPRINT_SAMPLE_BYTES // 16
+        offsets = [round(index * (binding.bytes - chunk_size) / 15) for index in range(16)]
+        samples: list[bytes] = []
         for offset in offsets:
             handle.seek(offset)
-            samples.append(handle.read(chunk_size))
-    return b"".join(samples)
+            sample = handle.read(chunk_size)
+            if len(sample) != chunk_size:
+                raise AcquisitionAuditError(f"artifact changed while sampled: {binding.path}")
+            samples.append(sample)
+        return b"".join(samples)
 
 
-def _ordered_chunk_hashes(path: Path, chunk_bytes: int) -> tuple[str, ...]:
-    hashes: list[str] = []
-    with path.open("rb") as handle:
+def _ordered_chunk_hashes(
+    root: Path,
+    binding: ArtifactBinding,
+    chunk_bytes: int,
+) -> tuple[str, ...]:
+    if chunk_bytes <= 0 or chunk_bytes > 1024 * 1024:
+        raise AcquisitionAuditError("evidence chunk size is outside the audit bound")
+    with _open_bound_artifact(root, binding) as handle:
+        hashes: list[str] = []
+        digest = hashlib.sha256()
+        size = 0
+        handle.seek(0)
         while chunk := handle.read(chunk_bytes):
+            digest.update(chunk)
+            size += len(chunk)
+            if size > binding.bytes:
+                raise AcquisitionAuditError(f"artifact binding mismatch: {binding.path}")
             hashes.append(sha256_bytes(chunk))
-    return tuple(hashes)
+        _assert_artifact_digest(binding, digest.hexdigest(), size)
+        return tuple(hashes)
 
 
 def _identity_stripped_shingles(data: bytes, identity_values: tuple[str, ...]) -> frozenset[str]:
@@ -1828,9 +2059,17 @@ def _near_duplicate_pairs(
 
 
 def _load_bound_model(root: Path, binding: ArtifactBinding, model: type[T]) -> T:
-    path = _artifact_path(root, binding)
     try:
-        return model.model_validate_json(path.read_bytes())
+        with _open_bound_artifact(root, binding) as handle:
+            return model.model_validate_json(
+                _read_bound_artifact(
+                    handle,
+                    binding,
+                    maximum_bytes=_MAX_BOUND_MODEL_BYTES,
+                )
+            )
+    except AcquisitionAuditError:
+        raise
     except (ValueError, json.JSONDecodeError) as error:
         raise AcquisitionAuditError(f"invalid {model.__name__}: {binding.path}") from error
 
@@ -1919,7 +2158,7 @@ def _verify_trust_registry(
         raise AcquisitionAuditError("trust registry signature is invalid") from error
     actors = {actor.actor_id: actor for actor in registry.actors}
     for actor in registry.actors:
-        _artifact_path(root, actor.mandate)
+        _verify_artifact(root, actor.mandate)
     return actors
 
 
@@ -1995,10 +2234,10 @@ def _verify_source(
     actors: dict[str, TrustedActor],
 ) -> list[str]:
     rights_failures: list[str] = []
-    _artifact_path(root, source.terms_artifact)
+    _verify_artifact(root, source.terms_artifact)
     decisions = {item.kind: item for item in source.permissions}
     for permission in source.permissions:
-        _artifact_path(root, permission.basis)
+        _verify_artifact(root, permission.basis)
     reviewer = actors.get(source.rights_reviewer_id)
     steward = actors.get(source.source_steward_id)
     if (
@@ -2031,12 +2270,11 @@ def _verify_source(
             raise AcquisitionAuditError(
                 f"source resource was staged before rights approval: {resource.resource_id}"
             )
-        staged = _artifact_path(root, resource.staged_artifact)
+        _verify_artifact(root, resource.staged_artifact)
         if (
             resource.staged_artifact.sha256 != resource.sha256
             or resource.staged_artifact.bytes != resource.bytes
             or resource.staged_artifact.media_type != resource.media_type
-            or sha256_file(staged) != resource.sha256
         ):
             raise AcquisitionAuditError(f"source resource is not bound: {resource.resource_id}")
     return rights_failures
@@ -2065,7 +2303,7 @@ def _verify_artifact_ref(root: Path, uri: str, expected_sha256: str, expected_by
         bytes=expected_bytes,
         media_type="application/octet-stream",
     )
-    _artifact_path(root, binding)
+    _verify_artifact(root, binding)
 
 
 def _verify_dossier(
@@ -2092,7 +2330,7 @@ def _verify_dossier(
         raise AcquisitionAuditError("counted dossier is not one claim-bearing physical root event")
 
     for assignment in dossier.roles:
-        _artifact_path(root, assignment.conflict_disclosure)
+        _verify_artifact(root, assignment.conflict_disclosure)
         actor = actors.get(assignment.actor_id)
         if (
             actor is None
@@ -2105,7 +2343,7 @@ def _verify_dossier(
             )
     for review in dossier.reviews:
         for review_evidence in review.evidence:
-            _artifact_path(root, review_evidence)
+            _verify_artifact(root, review_evidence)
 
     provenance = _load_bound_model(
         root,
@@ -2190,10 +2428,10 @@ def _verify_dossier(
         provenance.baseline_evidence,
         provenance.physical_capture,
     ):
-        _artifact_path(root, binding)
+        _verify_artifact(root, binding)
     if plane.source_id != source.source_id or plane.source_manifest_sha256 != sha256_value(source):
         raise AcquisitionAuditError("plane-separation receipt is not source-bound")
-    _artifact_path(root, plane.parser_coverage)
+    _verify_artifact(root, plane.parser_coverage)
     evidence_incidents = _load_bound_model(
         root,
         plane.evidence_manifest,
@@ -2264,7 +2502,7 @@ def _verify_dossier(
         or truth_custody.attestation.issued_at != truth_custody.unsealed_at
     ):
         raise AcquisitionAuditError("truth custody is incomplete or chronology differs")
-    _artifact_path(root, truth_custody.access_log)
+    _verify_artifact(root, truth_custody.access_log)
     _verify_attestation(
         truth_custody.attestation,
         expected_kind=AttestationSubjectKind.TRUTH_CUSTODY,
@@ -2333,7 +2571,7 @@ def _verify_dossier(
         projection.projection_implementation,
         projection.leakage_scan,
     ):
-        _artifact_path(root, binding)
+        _verify_artifact(root, binding)
     _verify_attestation(
         projection.attestation,
         expected_kind=AttestationSubjectKind.MODEL_VISIBLE_PROJECTION,
@@ -2362,20 +2600,22 @@ def _verify_dossier(
         )
     for evidence_id, stream in sequence_by_id.items():
         item = evidence_by_id[evidence_id]
-        path = _artifact_path(
+        artifact_binding = ArtifactBinding(
+            path=item.artifact.uri,
+            sha256=item.artifact.sha256,
+            bytes=item.artifact.bytes,
+            media_type=item.artifact.media_type,
+        )
+        observed_chunk_hashes = _ordered_chunk_hashes(
             root,
-            ArtifactBinding(
-                path=item.artifact.uri,
-                sha256=item.artifact.sha256,
-                bytes=item.artifact.bytes,
-                media_type=item.artifact.media_type,
-            ),
+            artifact_binding,
+            stream.chunk_bytes,
         )
         if (
             not stream.source_order_monotonic
             or stream.artifact_sha256 != item.artifact.sha256
             or stream.artifact_bytes != item.artifact.bytes
-            or stream.ordered_chunk_sha256 != _ordered_chunk_hashes(path, stream.chunk_bytes)
+            or stream.ordered_chunk_sha256 != observed_chunk_hashes
         ):
             raise AcquisitionAuditError(
                 "shuffled-modality: evidence order differs from its source sequence receipt"
@@ -2499,7 +2739,7 @@ def _verify_dossier(
         diagnostic_action_contract.parameter_bounds,
         diagnostic_action_contract.abort_specification,
     ):
-        _artifact_path(root, binding)
+        _verify_artifact(root, binding)
     diagnostic_duration = (
         diagnostic_execution.finished_at - diagnostic_execution.started_at
     ).total_seconds()
@@ -2561,7 +2801,7 @@ def _verify_dossier(
         diagnostic_execution.constraint_margins,
         diagnostic_execution.abort_log,
     ):
-        _artifact_path(root, binding)
+        _verify_artifact(root, binding)
 
     _assert_review(
         reviews[ReviewPurpose.MECHANISM],
@@ -2740,7 +2980,7 @@ def _verify_dossier(
         settled.recurrence_evidence,
         *settled.outcome_artifacts,
     ):
-        _artifact_path(root, binding)
+        _verify_artifact(root, binding)
     for evidence_item in evidence.evidence:
         _verify_artifact_ref(
             root,
@@ -2775,7 +3015,7 @@ def _verify_dossier(
             "stationary-image-proxy: evidence lacks both a time-varying sensor stream and an "
             "action or event stream"
         )
-    _artifact_path(root, incident_resources.measurement_artifact)
+    _verify_artifact(root, incident_resources.measurement_artifact)
     if (
         incident_resources.incident_id != incident_id
         or incident_resources.diagnostic_test_seconds
@@ -2971,9 +3211,9 @@ def audit_acquisition(
             or control_suite.dependency_lock_sha256 != contract.dependency_lock_sha256
         ):
             raise AcquisitionAuditError("control suite differs from the acquisition contract")
-        _artifact_path(input_root, control_suite.execution_manifest)
+        _verify_artifact(input_root, control_suite.execution_manifest)
         for control in control_suite.controls:
-            _artifact_path(input_root, control.evidence)
+            _verify_artifact(input_root, control.evidence)
         _verify_anchor_attestation(
             control_suite.attestation,
             expected_kind=AttestationSubjectKind.CONTROL_SUITE,
@@ -3005,7 +3245,7 @@ def audit_acquisition(
                 or candidate_root.source_id not in source_by_id
             ):
                 raise AcquisitionAuditError("candidate registry contains a nonphysical root")
-            _artifact_path(input_root, candidate_root.discovery_evidence)
+            _verify_artifact(input_root, candidate_root.discovery_evidence)
     except (AcquisitionAuditError, KeyError) as error:
         raise AcquisitionAuditError("acquisition trust or control authority is invalid") from error
     candidate_by_incident = {
@@ -3075,10 +3315,9 @@ def audit_acquisition(
                 item.model_visible_projection,
                 ModelVisibleProjection,
             )
-            capture_path = _artifact_path(input_root, provenance.physical_capture)
-            model_paths = [
-                _artifact_path(input_root, binding) for binding in projection.model_input_artifacts
-            ]
+            _verify_artifact(input_root, provenance.physical_capture)
+            for binding in projection.model_input_artifacts:
+                _verify_artifact(input_root, binding)
             if provenance.physical_capture.bytes < _MIN_PHYSICAL_CAPTURE_BYTES:
                 raise AcquisitionAuditError("physical capture is too small for uniqueness audit")
             if sum(binding.bytes for binding in projection.model_input_artifacts) < (
@@ -3107,13 +3346,14 @@ def audit_acquisition(
                 (
                     item.group.incident_id,
                     _identity_stripped_shingles(
-                        _bounded_artifact_sample(capture_path),
+                        _bounded_artifact_sample(input_root, provenance.physical_capture),
                         identity_values,
                     ),
                 )
             )
             model_sample = b"\x00MODEL-STREAM\x00".join(
-                _bounded_artifact_sample(path) for path in model_paths
+                _bounded_artifact_sample(input_root, binding)
+                for binding in projection.model_input_artifacts
             )
             model_fingerprints.append(
                 (
@@ -3192,8 +3432,8 @@ def audit_acquisition(
         if shortcut_report.attestation.issued_at != shortcut_report.evaluated_at:
             raise AcquisitionAuditError("shortcut report attestation time differs")
         for result in shortcut_report.results:
-            _artifact_path(input_root, result.implementation)
-            _artifact_path(input_root, result.evaluation)
+            _verify_artifact(input_root, result.implementation)
+            _verify_artifact(input_root, result.evaluation)
         shortcut_kill = any(
             result.resolves_mechanism_without_action for result in shortcut_report.results
         )
@@ -3221,8 +3461,8 @@ def audit_acquisition(
         if comparator_registry.attestation.issued_at != comparator_registry.committed_at:
             raise AcquisitionAuditError("comparator registry attestation time differs")
         for comparator in comparator_registry.comparators:
-            _artifact_path(input_root, comparator.implementation)
-            _artifact_path(input_root, comparator.evaluation_plan)
+            _verify_artifact(input_root, comparator.implementation)
+            _verify_artifact(input_root, comparator.evaluation_plan)
     except (AcquisitionAuditError, KeyError) as error:
         integrity_failures.append(f"intervention comparators: {error}")
 
@@ -3242,7 +3482,7 @@ def audit_acquisition(
             protocol_review_actors,
             strict=True,
         ):
-            _artifact_path(input_root, review.review_artifact)
+            _verify_artifact(input_root, review.review_artifact)
             subject = _unsigned_subject(review, exclude={"attestation"})
             _verify_attestation(
                 review.attestation,
@@ -3267,7 +3507,7 @@ def audit_acquisition(
         resource_measurer = actors[usage.measurer_id]
         if RoleKind.STATISTICIAN not in resource_measurer.authorized_roles:
             raise AcquisitionAuditError("resource measurer is not independently authorized")
-        _artifact_path(input_root, usage.measurement_artifact)
+        _verify_artifact(input_root, usage.measurement_artifact)
         usage_subject = _unsigned_subject(usage, exclude={"attestation"})
         _verify_attestation(
             usage.attestation,
@@ -3454,78 +3694,783 @@ def load_acquisition_contract(path: Path) -> AcquisitionContract:
         raise AcquisitionAuditError(f"invalid acquisition contract: {path}") from error
 
 
-def verify_preregistration_binding(repo_root: Path, contract: AcquisitionContract) -> None:
-    """Verify both current bytes and the preregistration commit without replacement objects."""
+def _read_binding_file(path: Path, label: str) -> bytes:
+    maximum_bytes = 16 * 1024 * 1024
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise AcquisitionAuditError(f"{label} requires file no-follow support")
+    try:
+        lexical = path.lstat()
+        if (
+            not stat.S_ISREG(lexical.st_mode)
+            or lexical.st_nlink != 1
+            or lexical.st_size > maximum_bytes
+        ):
+            raise AcquisitionAuditError(f"{label} must be a bounded regular file")
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NONBLOCK", 0),
+        )
+    except AcquisitionAuditError:
+        raise
+    except OSError as error:
+        raise AcquisitionAuditError(f"{label} is unavailable") from error
+    try:
+        before = os.fstat(descriptor)
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            data = handle.read(maximum_bytes + 1)
+        after = os.fstat(descriptor)
+        current = path.lstat()
+    except OSError as error:
+        raise AcquisitionAuditError(f"{label} changed while being read") from error
+    finally:
+        os.close(descriptor)
+    stable_fields = (
+        "st_dev",
+        "st_ino",
+        "st_mode",
+        "st_nlink",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+        "st_uid",
+        "st_gid",
+    )
+    if (
+        not stat.S_ISREG(before.st_mode)
+        or before.st_nlink != 1
+        or any(getattr(lexical, field) != getattr(before, field) for field in stable_fields)
+        or any(getattr(before, field) != getattr(after, field) for field in stable_fields)
+        or any(getattr(after, field) != getattr(current, field) for field in stable_fields)
+        or len(data) != before.st_size
+        or len(data) > maximum_bytes
+    ):
+        raise AcquisitionAuditError(f"{label} changed while being read")
+    return data
+
+
+_MAX_ACQUISITION_SOURCE_FILES = 64
+_MAX_ACQUISITION_SOURCE_DESCENDANTS = 128
+_MAX_ACQUISITION_SOURCE_TOTAL_BYTES = 32 * 1024 * 1024
+_MAX_GIT_SOURCE_CENSUS_BYTES = 1024 * 1024
+_GIT_OBJECT_ID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+_SOURCE_PATH = re.compile(r"src/fieldtrue/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+")
+_STABLE_SOURCE_FIELDS = (
+    "st_dev",
+    "st_ino",
+    "st_mode",
+    "st_nlink",
+    "st_size",
+    "st_mtime_ns",
+    "st_ctime_ns",
+)
+
+
+def _isolated_launcher_flags_present() -> bool:
+    flags = sys.flags
+    return (
+        flags.isolated == 1
+        and flags.no_site == 1
+        and flags.ignore_environment == 1
+        and flags.safe_path is True
+        and flags.dont_write_bytecode == 1
+    )
+
+
+def _code_objects(root: CodeType) -> dict[tuple[str, int], CodeType]:
+    discovered: dict[tuple[str, int], CodeType] = {}
+    pending = [root]
+    while pending:
+        code = pending.pop()
+        identity = (code.co_qualname, code.co_firstlineno)
+        if identity in discovered:
+            raise AcquisitionAuditError("validator source contains ambiguous code identities")
+        discovered[identity] = code
+        pending.extend(value for value in code.co_consts if isinstance(value, CodeType))
+    return discovered
+
+
+def _executing_validator_matches_source(repo_root: Path, validator_bytes: bytes) -> bool:
+    expected_path = repo_root / "src" / "fieldtrue" / "acquisition.py"
+    try:
+        executing_path = Path(__file__).resolve(strict=True)
+        canonical_path = expected_path.resolve(strict=True)
+        specification_origin = None if __spec__ is None else __spec__.origin
+        if specification_origin is None:
+            return False
+        if executing_path != canonical_path or Path(specification_origin).resolve(strict=True) != (
+            canonical_path
+        ):
+            return False
+        compiled = compile(
+            validator_bytes,
+            str(canonical_path),
+            "exec",
+            dont_inherit=True,
+            optimize=sys.flags.optimize,
+        )
+    except (OSError, SyntaxError, ValueError):
+        return False
+    expected_codes = _code_objects(compiled)
+    critical_functions = (
+        _isolated_launcher_flags_present,
+        _code_objects,
+        _executing_validator_matches_source,
+        _read_binding_file,
+        _git_source_census,
+        _git_source_contents,
+        _source_file_mode,
+        _working_source_census,
+        _acquisition_source_closure,
+        _clean_repository_status,
+        verify_preregistration_binding,
+    )
+    for function in critical_functions:
+        code = function.__code__
+        expected = expected_codes.get((code.co_qualname, code.co_firstlineno))
+        if function.__module__ != __name__ or expected is None or code != expected:
+            return False
+    return True
+
+
+def _git_source_census(
+    git: str,
+    repo_root: Path,
+    environment: dict[str, str],
+    commit: str,
+) -> tuple[tuple[str, str, str], ...]:
+    result = subprocess.run(  # noqa: S603 - fixed trusted Git and validated commit identity
+        [git, "ls-tree", "-r", "-z", "--full-tree", commit, "--", "src/fieldtrue"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=environment,
+        timeout=10,
+    )
+    if result.returncode != 0:
+        raise AcquisitionAuditError("Git source census failed")
+    if len(result.stdout) > _MAX_GIT_SOURCE_CENSUS_BYTES:
+        raise AcquisitionAuditError("Git source census exceeds its byte ceiling")
+    if not result.stdout or not result.stdout.endswith(b"\0"):
+        raise AcquisitionAuditError("Git source census is empty or malformed")
+    entries: list[tuple[str, str, str]] = []
+    for raw_entry in result.stdout[:-1].split(b"\0"):
+        try:
+            raw_header, raw_path = raw_entry.split(b"\t", 1)
+            mode, object_type, blob = raw_header.decode("ascii").split(" ")
+            path = raw_path.decode("ascii")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise AcquisitionAuditError("Git source census is malformed") from error
+        if (
+            mode not in {"100644", "100755"}
+            or object_type != "blob"
+            or _GIT_OBJECT_ID.fullmatch(blob) is None
+            or _SOURCE_PATH.fullmatch(path) is None
+            or PurePosixPath(path).as_posix() != path
+        ):
+            raise AcquisitionAuditError(f"Git source census contains an invalid entry: {path}")
+        entries.append((path, mode, blob))
+        if len(entries) > _MAX_ACQUISITION_SOURCE_FILES:
+            raise AcquisitionAuditError("acquisition source census exceeds its file ceiling")
+    ordered = tuple(sorted(entries))
+    if len({path for path, _, _ in ordered}) != len(ordered):
+        raise AcquisitionAuditError("Git source census contains duplicate paths")
+    return ordered
+
+
+def _git_source_contents(
+    git: str,
+    repo_root: Path,
+    environment: dict[str, str],
+    census: tuple[tuple[str, str, str], ...],
+) -> dict[str, bytes]:
+    requested = tuple(blob for _, _, blob in census)
+    request = "".join(f"{blob}\n" for blob in requested).encode("ascii")
+    size_result = subprocess.run(  # noqa: S603 - fixed trusted Git and validated object IDs
+        [git, "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=environment,
+        input=request,
+        timeout=10,
+    )
+    if size_result.returncode != 0:
+        raise AcquisitionAuditError("Git source sizes failed to resolve")
+    size_lines = size_result.stdout.splitlines()
+    if len(size_lines) != len(requested):
+        raise AcquisitionAuditError("Git source size census is incomplete")
+    sizes: list[int] = []
+    for expected_blob, raw_line in zip(requested, size_lines, strict=True):
+        try:
+            blob, object_type, raw_size = raw_line.decode("ascii").split(" ")
+            size = int(raw_size)
+        except (UnicodeDecodeError, ValueError) as error:
+            raise AcquisitionAuditError("Git source size census is malformed") from error
+        if blob != expected_blob or object_type != "blob" or size < 0 or size > 16 * 1024 * 1024:
+            raise AcquisitionAuditError("Git source size census contains an invalid blob")
+        sizes.append(size)
+    if sum(sizes) > _MAX_ACQUISITION_SOURCE_TOTAL_BYTES:
+        raise AcquisitionAuditError("acquisition source census exceeds its total byte ceiling")
+
+    content_result = subprocess.run(  # noqa: S603 - fixed trusted Git and validated object IDs
+        [git, "cat-file", "--batch"],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        env=environment,
+        input=request,
+        timeout=10,
+    )
+    if content_result.returncode != 0:
+        raise AcquisitionAuditError("Git source contents failed to resolve")
+    output = memoryview(content_result.stdout)
+    offset = 0
+    contents: dict[str, bytes] = {}
+    for expected_blob, expected_size in zip(requested, sizes, strict=True):
+        newline = content_result.stdout.find(b"\n", offset)
+        if newline < 0:
+            raise AcquisitionAuditError("Git source content census is truncated")
+        try:
+            raw_header = content_result.stdout[offset:newline].decode("ascii")
+            blob, object_type, raw_size = raw_header.split(" ")
+            size = int(raw_size)
+        except (UnicodeDecodeError, ValueError) as error:
+            raise AcquisitionAuditError("Git source content census is malformed") from error
+        start = newline + 1
+        end = start + size
+        if (
+            blob != expected_blob
+            or object_type != "blob"
+            or size != expected_size
+            or end >= len(output)
+            or output[end] != 0x0A
+        ):
+            raise AcquisitionAuditError("Git source content census is incoherent")
+        contents[blob] = bytes(output[start:end])
+        offset = end + 1
+    if offset != len(output):
+        raise AcquisitionAuditError("Git source content census has trailing output")
+    return contents
+
+
+def _source_file_mode(metadata: os.stat_result) -> str:
+    permissions = stat.S_IMODE(metadata.st_mode)
+    if permissions == 0o644:
+        return "100644"
+    if permissions == 0o755:
+        return "100755"
+    raise AcquisitionAuditError("acquisition source file has noncanonical permissions")
+
+
+def _working_source_census(
+    repo_root: Path,
+) -> tuple[tuple[tuple[str, str, bytes], ...], tuple[str, ...]]:
+    root_path = repo_root / "src" / "fieldtrue"
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise AcquisitionAuditError(
+            "acquisition source census requires no-follow directory support"
+        )
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    file_flags = (
+        os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NONBLOCK", 0)
+    )
+    directories: list[tuple[int, os.stat_result, int | None, str | None, str]] = []
+    files: list[tuple[int, os.stat_result, int, str, str, bytes]] = []
+    descendants = 0
+    total_bytes = 0
+    try:
+        try:
+            root_lexical = root_path.lstat()
+            if not stat.S_ISDIR(root_lexical.st_mode):
+                raise AcquisitionAuditError("acquisition source root must be a regular directory")
+            root_descriptor = os.open(root_path, directory_flags)
+            try:
+                root_metadata = os.fstat(root_descriptor)
+            except OSError:
+                os.close(root_descriptor)
+                raise
+        except AcquisitionAuditError:
+            raise
+        except OSError as error:
+            raise AcquisitionAuditError("acquisition source root is unavailable") from error
+        if not stat.S_ISDIR(root_metadata.st_mode):
+            os.close(root_descriptor)
+            raise AcquisitionAuditError("acquisition source root must be a regular directory")
+        if any(
+            getattr(root_lexical, field) != getattr(root_metadata, field)
+            for field in _STABLE_SOURCE_FIELDS
+        ):
+            os.close(root_descriptor)
+            raise AcquisitionAuditError("acquisition source root changed during census")
+        directories.append((root_descriptor, root_metadata, None, None, "src/fieldtrue"))
+
+        cursor = 0
+        while cursor < len(directories):
+            descriptor, _, _, _, relative_directory = directories[cursor]
+            cursor += 1
+            try:
+                with os.scandir(descriptor) as entries:
+                    names = sorted(entry.name for entry in entries)
+            except OSError as error:
+                raise AcquisitionAuditError(
+                    "acquisition source directory cannot be read"
+                ) from error
+            if len(names) != len(set(names)):
+                raise AcquisitionAuditError("acquisition source directory contains duplicate names")
+            for name in names:
+                descendants += 1
+                if descendants > _MAX_ACQUISITION_SOURCE_DESCENDANTS:
+                    raise AcquisitionAuditError(
+                        "acquisition source census exceeds its descendant ceiling"
+                    )
+                relative = f"{relative_directory}/{name}"
+                if _SOURCE_PATH.fullmatch(relative) is None:
+                    raise AcquisitionAuditError(
+                        f"acquisition source census contains an invalid path: {relative}"
+                    )
+                try:
+                    lexical = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+                except OSError as error:
+                    raise AcquisitionAuditError(
+                        f"acquisition source changed during census: {relative}"
+                    ) from error
+                if stat.S_ISDIR(lexical.st_mode):
+                    child: int | None = None
+                    try:
+                        child = os.open(name, directory_flags, dir_fd=descriptor)
+                        opened = os.fstat(child)
+                    except OSError as error:
+                        if child is not None:
+                            with suppress(OSError):
+                                os.close(child)
+                        raise AcquisitionAuditError(
+                            f"acquisition source directory is unsafe: {relative}"
+                        ) from error
+                    if any(
+                        getattr(lexical, field) != getattr(opened, field)
+                        for field in _STABLE_SOURCE_FIELDS
+                    ):
+                        os.close(child)
+                        raise AcquisitionAuditError(
+                            f"acquisition source directory changed during census: {relative}"
+                        )
+                    directories.append((child, opened, descriptor, name, relative))
+                    continue
+                if not stat.S_ISREG(lexical.st_mode) or lexical.st_nlink != 1:
+                    raise AcquisitionAuditError(
+                        f"acquisition source descendant is not a regular file: {relative}"
+                    )
+                child = None
+                try:
+                    child = os.open(name, file_flags, dir_fd=descriptor)
+                    opened = os.fstat(child)
+                    with os.fdopen(child, "rb", closefd=False) as handle:
+                        content = handle.read(16 * 1024 * 1024 + 1)
+                    after = os.fstat(child)
+                    current = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+                except OSError as error:
+                    if child is not None:
+                        with suppress(OSError):
+                            os.close(child)
+                    raise AcquisitionAuditError(
+                        f"acquisition source file changed during census: {relative}"
+                    ) from error
+                if (
+                    not stat.S_ISREG(opened.st_mode)
+                    or opened.st_nlink != 1
+                    or len(content) != opened.st_size
+                    or len(content) > 16 * 1024 * 1024
+                    or any(
+                        getattr(lexical, field) != getattr(opened, field)
+                        or getattr(opened, field) != getattr(after, field)
+                        or getattr(after, field) != getattr(current, field)
+                        for field in _STABLE_SOURCE_FIELDS
+                    )
+                ):
+                    os.close(child)
+                    raise AcquisitionAuditError(
+                        f"acquisition source file changed during census: {relative}"
+                    )
+                total_bytes += len(content)
+                if total_bytes > _MAX_ACQUISITION_SOURCE_TOTAL_BYTES:
+                    os.close(child)
+                    raise AcquisitionAuditError(
+                        "acquisition source census exceeds its total byte ceiling"
+                    )
+                files.append((child, opened, descriptor, name, relative, content))
+                if len(files) > _MAX_ACQUISITION_SOURCE_FILES:
+                    raise AcquisitionAuditError(
+                        "acquisition source census exceeds its file ceiling"
+                    )
+
+        for descriptor, opened, parent, directory_name, relative in directories:
+            after = os.fstat(descriptor)
+            if any(
+                getattr(opened, field) != getattr(after, field) for field in _STABLE_SOURCE_FIELDS
+            ):
+                raise AcquisitionAuditError(
+                    f"acquisition source directory changed during census: {relative}"
+                )
+            if parent is not None and directory_name is not None:
+                current = os.stat(directory_name, dir_fd=parent, follow_symlinks=False)
+                if any(
+                    getattr(after, field) != getattr(current, field)
+                    for field in _STABLE_SOURCE_FIELDS
+                ):
+                    raise AcquisitionAuditError(
+                        f"acquisition source directory changed during census: {relative}"
+                    )
+        root_current = root_path.lstat()
+        if any(
+            getattr(root_metadata, field) != getattr(root_current, field)
+            for field in _STABLE_SOURCE_FIELDS
+        ):
+            raise AcquisitionAuditError("acquisition source root changed during census")
+        for descriptor, opened, parent, name, relative, _ in files:
+            after = os.fstat(descriptor)
+            current = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            if any(
+                getattr(opened, field) != getattr(after, field)
+                or getattr(after, field) != getattr(current, field)
+                for field in _STABLE_SOURCE_FIELDS
+            ):
+                raise AcquisitionAuditError(
+                    f"acquisition source file changed during census: {relative}"
+                )
+        source_files = tuple(
+            sorted(
+                (relative, _source_file_mode(opened), content)
+                for _, opened, _, _, relative, content in files
+            )
+        )
+        source_directories = tuple(sorted(relative for *_, relative in directories))
+        return source_files, source_directories
+    except AcquisitionAuditError:
+        raise
+    except OSError as error:
+        raise AcquisitionAuditError("acquisition source census failed") from error
+    finally:
+        for descriptor, *_ in reversed(files):
+            with suppress(OSError):
+                os.close(descriptor)
+        for descriptor, *_ in reversed(directories):
+            with suppress(OSError):
+                os.close(descriptor)
+
+
+def _acquisition_source_closure(
+    git: str,
+    repo_root: Path,
+    environment: dict[str, str],
+    *,
+    authority_commit: str,
+    repository_head: str,
+    expected_validator_blob: str,
+    expected_validator_sha256: str,
+) -> AcquisitionSourceClosure:
+    authority_census = _git_source_census(
+        git,
+        repo_root,
+        environment,
+        authority_commit,
+    )
+    head_census = _git_source_census(
+        git,
+        repo_root,
+        environment,
+        repository_head,
+    )
+    if head_census != authority_census:
+        raise AcquisitionAuditError(
+            "acquisition source tree differs from control execution authority"
+        )
+    authority_contents = _git_source_contents(
+        git,
+        repo_root,
+        environment,
+        authority_census,
+    )
+    working_files, working_directories = _working_source_census(repo_root)
+    expected_directories = {"src/fieldtrue"}
+    expected_working: list[tuple[str, str, bytes]] = []
+    sources: list[tuple[str, str, str, str, int]] = []
+    for path, mode, authority_blob in authority_census:
+        parent = PurePosixPath(path).parent
+        while parent.as_posix().startswith("src/fieldtrue"):
+            expected_directories.add(parent.as_posix())
+            if parent.as_posix() == "src/fieldtrue":
+                break
+            parent = parent.parent
+        authority_bytes = authority_contents[authority_blob]
+        expected_working.append((path, mode, authority_bytes))
+        sources.append(
+            (
+                path,
+                mode,
+                authority_blob,
+                sha256_bytes(authority_bytes),
+                len(authority_bytes),
+            )
+        )
+    if working_files != tuple(expected_working) or working_directories != tuple(
+        sorted(expected_directories)
+    ):
+        raise AcquisitionAuditError(
+            "working acquisition source census differs from control execution authority"
+        )
+
+    root_sources = [item for item in sources if item[0] == "src/fieldtrue/acquisition.py"]
+    if len(root_sources) != 1 or (
+        root_sources[0][2] != expected_validator_blob
+        or root_sources[0][3] != expected_validator_sha256
+    ):
+        raise AcquisitionAuditError("validator source closure differs from the sealed contract")
+    source_tuple = tuple(sources)
+    return AcquisitionSourceClosure(
+        authority_commit=authority_commit,
+        repository_head=repository_head,
+        sources=source_tuple,
+        closure_sha256=sha256_value(
+            [
+                {
+                    "path": path,
+                    "mode": mode,
+                    "git_blob": blob,
+                    "sha256": digest,
+                    "bytes": size,
+                }
+                for path, mode, blob, digest, size in source_tuple
+            ]
+        ),
+    )
+
+
+def _clean_repository_status(
+    git: str,
+    repo_root: Path,
+    environment: dict[str, str],
+) -> bytes:
+    status_result = subprocess.run(  # noqa: S603 - fixed trusted Git status query
+        [git, "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        env=environment,
+        timeout=10,
+    )
+    return status_result.stdout
+
+
+def verify_preregistration_binding(
+    repo_root: Path,
+    contract: AcquisitionContract,
+    execution_commit: str | None = None,
+) -> AcquisitionSourceClosure:
+    """Verify preregistration and exact on-disk package sources against Git authority.
+
+    This self-observation is a necessary gate, not executable or runtime attestation.
+    """
 
     canonical_contract_path = repo_root / "protocol" / "acquisition" / "iter001_contract.json"
     try:
-        canonical_contract = AcquisitionContract.model_validate(read_json(canonical_contract_path))
-    except (OSError, ValueError) as error:
+        canonical_contract_bytes = _read_binding_file(
+            canonical_contract_path,
+            "canonical acquisition contract",
+        )
+        canonical_contract = AcquisitionContract.model_validate_json(canonical_contract_bytes)
+    except (AcquisitionAuditError, ValueError) as error:
         raise AcquisitionAuditError("canonical acquisition contract is invalid") from error
     if contract != canonical_contract:
         raise AcquisitionAuditError("selected acquisition contract is not the canonical contract")
     if contract.control_authority_status != "sealed":
         raise AcquisitionAuditError("canonical control authority is not sealed")
+    if not _isolated_launcher_flags_present():
+        raise AcquisitionAuditError(
+            "sealed acquisition binding requires isolated launcher process flags"
+        )
     current_path = repo_root.joinpath(*PurePosixPath(contract.preregistration_path).parts)
-    if not current_path.is_file() or sha256_file(current_path) != contract.preregistration_sha256:
+    preregistration_bytes = _read_binding_file(current_path, "current preregistration")
+    if sha256_bytes(preregistration_bytes) != contract.preregistration_sha256:
         raise AcquisitionAuditError("current preregistration bytes do not match the contract")
-    git = shutil.which("git")
-    if git is None:
-        raise AcquisitionAuditError("git is required to verify the preregistration binding")
-    environment = {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
-    commit_check = subprocess.run(  # noqa: S603 - fixed arguments and typed Git object ID
-        [git, "cat-file", "-e", f"{contract.preregistration_commit}^{{commit}}"],
-        cwd=repo_root,
-        check=False,
-        env=environment,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    if commit_check.returncode != 0:
-        raise AcquisitionAuditError("preregistration commit does not resolve")
-    committed = subprocess.run(  # noqa: S603 - fixed arguments and validated contract fields
-        [
+    try:
+        git = trusted_repository_git(repo_root)
+    except GitTrustError as error:
+        raise AcquisitionAuditError("Git preregistration trust failed") from error
+    environment = git_environment()
+    try:
+        head_before = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+        if _GIT_OBJECT_ID.fullmatch(head_before) is None:
+            raise AcquisitionAuditError("canonical acquisition HEAD is invalid")
+        if _clean_repository_status(git, repo_root, environment):
+            raise AcquisitionAuditError("production acquisition requires a clean repository")
+        authority_commit = execution_commit or head_before
+        if _GIT_OBJECT_ID.fullmatch(authority_commit) is None:
+            raise AcquisitionAuditError("control execution commit is invalid")
+        authority_check = subprocess.run(  # noqa: S603 - fixed trusted Git and object ID
+            [git, "cat-file", "-e", f"{authority_commit}^{{commit}}"],
+            cwd=repo_root,
+            check=False,
+            env=environment,
+            timeout=10,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        authority_ancestry = subprocess.run(  # noqa: S603 - fixed trusted Git ancestry query
+            [git, "merge-base", "--is-ancestor", authority_commit, head_before],
+            cwd=repo_root,
+            check=False,
+            env=environment,
+            timeout=10,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if authority_check.returncode != 0 or authority_ancestry.returncode != 0:
+            raise AcquisitionAuditError("control execution commit is not trusted HEAD ancestry")
+        commit_check = subprocess.run(  # noqa: S603 - fixed arguments and typed Git object ID
+            [git, "cat-file", "-e", f"{contract.preregistration_commit}^{{commit}}"],
+            cwd=repo_root,
+            check=False,
+            env=environment,
+            timeout=10,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if commit_check.returncode != 0:
+            raise AcquisitionAuditError("preregistration commit does not resolve")
+        committed = subprocess.run(  # noqa: S603 - fixed arguments and validated contract fields
+            [
+                git,
+                "show",
+                f"{contract.preregistration_commit}:{contract.preregistration_path}",
+            ],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            env=environment,
+            timeout=10,
+        )
+        if committed.returncode != 0:
+            raise AcquisitionAuditError("preregistration path is absent from its frozen commit")
+        if sha256_bytes(committed.stdout) != contract.preregistration_sha256:
+            raise AcquisitionAuditError("committed preregistration bytes do not match the contract")
+        validator_path = "src/fieldtrue/acquisition.py"
+        validator_bytes = _read_binding_file(
+            repo_root / validator_path,
+            "validator source",
+        )
+        lock_bytes = _read_binding_file(repo_root / "uv.lock", "dependency lock")
+        validator_blob = subprocess.run(  # noqa: S603 - fixed path and validated Git object ID
+            [git, "cat-file", "blob", contract.validator_git_blob],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            env=environment,
+            timeout=10,
+        )
+        if (
+            validator_blob.returncode != 0
+            or sha256_bytes(validator_blob.stdout) != contract.validator_source_sha256
+            or sha256_bytes(validator_bytes) != contract.validator_source_sha256
+        ):
+            raise AcquisitionAuditError("validator source differs from its control-suite authority")
+        if not _executing_validator_matches_source(repo_root, validator_bytes):
+            raise AcquisitionAuditError(
+                "executing validator does not match the canonical source snapshot"
+            )
+        if sha256_bytes(lock_bytes) != contract.dependency_lock_sha256:
+            raise AcquisitionAuditError("dependency lock differs from the control-suite authority")
+        source_closure_before = _acquisition_source_closure(
             git,
-            "show",
-            f"{contract.preregistration_commit}:{contract.preregistration_path}",
-        ],
-        cwd=repo_root,
-        check=False,
-        capture_output=True,
-        env=environment,
-    )
-    if committed.returncode != 0:
-        raise AcquisitionAuditError("preregistration path is absent from its frozen commit")
-    if sha256_bytes(committed.stdout) != contract.preregistration_sha256:
-        raise AcquisitionAuditError("committed preregistration bytes do not match the contract")
-    validator_path = "src/fieldtrue/acquisition.py"
-    validator_blob = subprocess.run(  # noqa: S603 - fixed path and validated Git object ID
-        [git, "cat-file", "blob", contract.validator_git_blob],
-        cwd=repo_root,
-        check=False,
-        capture_output=True,
-        env=environment,
-    )
-    if (
-        validator_blob.returncode != 0
-        or sha256_bytes(validator_blob.stdout) != contract.validator_source_sha256
-        or sha256_file(repo_root / validator_path) != contract.validator_source_sha256
-    ):
-        raise AcquisitionAuditError("validator source differs from its control-suite authority")
-    if sha256_file(repo_root / "uv.lock") != contract.dependency_lock_sha256:
-        raise AcquisitionAuditError("dependency lock differs from the control-suite authority")
-    head_contract = subprocess.run(  # noqa: S603 - fixed Git operation and path
-        [git, "show", "HEAD:protocol/acquisition/iter001_contract.json"],
-        cwd=repo_root,
-        check=False,
-        capture_output=True,
-        env=environment,
-    )
-    if (
-        head_contract.returncode != 0
-        or head_contract.stdout != canonical_contract_path.read_bytes()
-    ):
+            repo_root,
+            environment,
+            authority_commit=authority_commit,
+            repository_head=head_before,
+            expected_validator_blob=contract.validator_git_blob,
+            expected_validator_sha256=contract.validator_source_sha256,
+        )
+        head_contract = subprocess.run(  # noqa: S603 - fixed Git operation and path
+            [git, "show", f"{head_before}:protocol/acquisition/iter001_contract.json"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            env=environment,
+            timeout=10,
+        )
+        head_after = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+        status_after = _clean_repository_status(git, repo_root, environment)
+        source_closure_after = _acquisition_source_closure(
+            git,
+            repo_root,
+            environment,
+            authority_commit=authority_commit,
+            repository_head=head_after,
+            expected_validator_blob=contract.validator_git_blob,
+            expected_validator_sha256=contract.validator_source_sha256,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise AcquisitionAuditError("Git preregistration verification failed to run") from error
+    if head_contract.returncode != 0 or head_contract.stdout != canonical_contract_bytes:
         raise AcquisitionAuditError("canonical acquisition contract is not committed at HEAD")
+    try:
+        if trusted_repository_git(repo_root) != git:
+            raise AcquisitionAuditError("Git preregistration trust changed")
+        final_status = _clean_repository_status(git, repo_root, environment)
+        head_final = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+        source_closure_final = _acquisition_source_closure(
+            git,
+            repo_root,
+            environment,
+            authority_commit=authority_commit,
+            repository_head=head_final,
+            expected_validator_blob=contract.validator_git_blob,
+            expected_validator_sha256=contract.validator_source_sha256,
+        )
+    except GitTrustError as error:
+        raise AcquisitionAuditError("Git preregistration trust changed") from error
+    except (OSError, subprocess.SubprocessError) as error:
+        raise AcquisitionAuditError("Git preregistration verification failed to run") from error
+    if (
+        head_after != head_before
+        or head_final != head_before
+        or status_after
+        or final_status
+        or source_closure_after != source_closure_before
+        or source_closure_final != source_closure_before
+        or _read_binding_file(current_path, "current preregistration") != preregistration_bytes
+        or _read_binding_file(repo_root / validator_path, "validator source") != validator_bytes
+        or _read_binding_file(repo_root / "uv.lock", "dependency lock") != lock_bytes
+        or _read_binding_file(canonical_contract_path, "canonical acquisition contract")
+        != canonical_contract_bytes
+    ):
+        raise AcquisitionAuditError("preregistration binding inputs changed during verification")
+    return source_closure_before
 
 
 def render_admission_result(report: AcquisitionAdmissionReport) -> bytes:

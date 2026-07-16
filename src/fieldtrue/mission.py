@@ -5,13 +5,15 @@ from __future__ import annotations
 import ast
 import json
 import os
+import platform  # noqa: F401 - retained for historical test monkeypatches
 import re
-import shutil
+import shutil  # noqa: F401 - retained for historical test monkeypatches
 import ssl
 import stat
 import subprocess
-import sys
 import tomllib
+import urllib.request  # noqa: F401 - retained for historical test monkeypatches
+import xml.etree.ElementTree as ET
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
 from itertools import pairwise
@@ -23,8 +25,10 @@ from urllib.parse import urlsplit
 import certifi
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
+from packaging.tags import platform_tags
 from pydantic import BaseModel, ConfigDict
 
+import fieldtrue.runner_trust as runner_trust
 from fieldtrue.acquisition import (
     AcquisitionAuditError,
     load_acquisition_contract,
@@ -34,6 +38,12 @@ from fieldtrue.adapters import adapt as adapt_adapter
 from fieldtrue.adapters.adapt import load_adapt_lock
 from fieldtrue.canonical import canonical_json, canonical_json_pretty, sha256_bytes, sha256_value
 from fieldtrue.domain import ClaimRecord
+from fieldtrue.git_trust import (
+    TRUSTED_GIT_PATH,
+    GitTrustError,
+    git_environment,
+    trusted_repository_git,
+)
 from fieldtrue.memory import load_memory_records, verify_memory
 from fieldtrue.receipts import (
     LedgerEvent,
@@ -77,6 +87,10 @@ _ITER000_ANCHOR_PATH = "protocol/trust/iter000_signer_anchor.json"
 _ITER000_DATASET_PATH = "protocol/datasets/nasa_adapt_v1.json"
 _ITER000_GATE_CONTROL_PATH = "protocol/gate_controls/v1.json"
 _ITER000_GATE_CONTROL_COMMIT = "d07789886f7350a0405f49a358e3dabfdca6c878"
+_TRUSTED_GIT_PATH = TRUSTED_GIT_PATH
+_GIT_TIMEOUT_SECONDS = 10
+_GATE_CONTROL_REPORT = ".inbar-gate-controls.xml"
+_GATE_CONTROL_ROOT_DISTRIBUTIONS = frozenset({"certifi", "networkx", "pydantic", "pytest"})
 _ITER000_HYPOTHESIS_PATH = f"experiments/{_ITER000_ID}/HYPOTHESIS.md"
 _ITER000_ATTEMPT_001_AUTHORITY_PATH = "protocol/attempt_authorities/iter000_001.json"
 _ITER000_ATTEMPT_001_RECEIPT_PATH = (
@@ -359,7 +373,7 @@ def _materialize_gate_control_snapshot(
     git: str,
     destination: Path,
 ) -> bool:
-    paths = {"pyproject.toml", "tests/__init__.py", "tests/unit/__init__.py"}
+    paths = {"pyproject.toml", "tests/__init__.py", "tests/unit/__init__.py", "uv.lock"}
     for prefix in ("src/fieldtrue", "tests"):
         discovered = _git_tree_paths(repo_root, git, _ITER000_GATE_CONTROL_COMMIT, prefix)
         if discovered is None:
@@ -380,21 +394,167 @@ def _materialize_gate_control_snapshot(
     return True
 
 
+_GateControlRunner = runner_trust.AuthenticatedRunner
+_LockedWheel = runner_trust.LockedWheel
+
+
+def _authenticated_artifact_bytes(
+    *,
+    url: str,
+    expected_sha256: str,
+    expected_size: int,
+    cache_root: Path,
+    cache_namespace: str,
+) -> bytes | None:
+    try:
+        return runner_trust.authenticated_artifact_bytes(
+            url=url,
+            expected_sha256=expected_sha256,
+            expected_size=expected_size,
+            cache_root=cache_root,
+            cache_namespace=cache_namespace,
+        )
+    except runner_trust.RunnerTrustError:
+        return None
+
+
+def _locked_gate_control_packages(
+    lock: dict[str, object],
+) -> dict[str, dict[str, object]] | None:
+    try:
+        return runner_trust.resolve_locked_packages(
+            lock,
+            _GATE_CONTROL_ROOT_DISTRIBUTIONS,
+        )
+    except runner_trust.RunnerTrustError:
+        return None
+
+
+def _locked_gate_control_wheels(
+    lock: dict[str, object],
+) -> tuple[_LockedWheel, ...] | None:
+    try:
+        return runner_trust.resolve_locked_wheels(
+            lock,
+            root_distributions=_GATE_CONTROL_ROOT_DISTRIBUTIONS,
+            target_platform_tags=tuple(platform_tags()),
+        )
+    except runner_trust.RunnerTrustError:
+        return None
+
+
+def _extract_authenticated_wheels(
+    artifacts: tuple[tuple[_LockedWheel, bytes], ...],
+    site_packages: Path,
+) -> bool:
+    try:
+        runner_trust.extract_authenticated_wheels(artifacts, site_packages)
+    except runner_trust.RunnerTrustError:
+        return False
+    return True
+
+
+def _prepare_gate_control_runner(snapshot_root: Path) -> _GateControlRunner | None:
+    try:
+        return runner_trust.prepare_authenticated_runner(
+            snapshot_root,
+            snapshot_root,
+            root_distributions=_GATE_CONTROL_ROOT_DISTRIBUTIONS,
+            required_imports=("pytest",),
+            mutable_output_paths=(snapshot_root / _GATE_CONTROL_REPORT,),
+        )
+    except runner_trust.RunnerTrustError:
+        return None
+
+
+def _gate_control_runner_is_unchanged(
+    snapshot_root: Path,
+    runner: _GateControlRunner,
+) -> bool:
+    try:
+        snapshot_matches = snapshot_root.resolve(strict=True) == runner.snapshot_root.resolve(
+            strict=True
+        )
+    except OSError:
+        return False
+    return snapshot_matches and runner_trust.runner_is_unchanged(runner)
+
+
 def _run_gate_control_nodes(
     snapshot_root: Path,
     node_ids: list[str],
+    runner: _GateControlRunner,
 ) -> subprocess.CompletedProcess[str]:
-    environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(snapshot_root / "src")
-    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    if not _gate_control_runner_is_unchanged(snapshot_root, runner):
+        raise OSError("gate-control runner changed before child execution")
+    if not runner_trust.ensure_private_directory(runner.scratch_root):
+        raise OSError("gate-control scratch directory is not private")
+    environment = {
+        "HOME": "/nonexistent",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "NO_COLOR": "1",
+        "PATH": "/usr/bin:/bin",
+        "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "TEMP": str(runner.scratch_root),
+        "TMP": str(runner.scratch_root),
+        "TMPDIR": str(runner.scratch_root),
+        "TZ": "UTC",
+    }
+    report_path = snapshot_root / _GATE_CONTROL_REPORT
+    if report_path.exists() or report_path.is_symlink():
+        raise OSError("gate-control report path already exists")
     return subprocess.run(  # noqa: S603 - node IDs and paths are validated before execution
-        [sys.executable, "-m", "pytest", "-q", *node_ids],
+        [
+            str(runner.python_path),
+            "-I",
+            "-B",
+            "-S",
+            "-c",
+            "import sys;sys.path[:0]=sys.argv[1:3];import pytest;"
+            "raise SystemExit(pytest.main(sys.argv[3:]))",
+            str(snapshot_root / "src"),
+            str(runner.site_packages),
+            "-q",
+            "--strict-config",
+            "--strict-markers",
+            "-p",
+            "no:cacheprovider",
+            "-o",
+            "addopts=",
+            "--junitxml",
+            str(report_path),
+            *node_ids,
+        ],
         cwd=snapshot_root,
         check=False,
         capture_output=True,
         text=True,
         timeout=120,
         env=environment,
+    )
+
+
+def _gate_control_report_is_exact(snapshot_root: Path, node_ids: list[str]) -> bool:
+    report_path = snapshot_root / _GATE_CONTROL_REPORT
+    data = runner_trust.stable_regular_bytes(report_path, maximum_bytes=1024 * 1024)
+    if data is None:
+        return False
+    try:
+        document = ET.fromstring(  # noqa: S314 - bounded output from pinned isolated pytest
+            data
+        )
+    except ET.ParseError:
+        return False
+    cases = document.findall(".//testcase")
+    expected_names = [node_id.rsplit("::", 1)[1] for node_id in node_ids]
+    observed_names = [case.attrib.get("name") for case in cases]
+    if observed_names != expected_names:
+        return False
+    return all(
+        not any(case.find(tag) is not None for tag in ("error", "failure", "skipped"))
+        for case in cases
     )
 
 
@@ -445,10 +605,13 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
         or tuple(sealed_paths) != _GATE_CONTROL_SEALED_PATHS
     ):
         return False, "Gate control execution seal is malformed or has incomplete source coverage."
-    git = shutil.which("git")
-    if git is None or not _git_commit_resolves(repo_root, git, _ITER000_GATE_CONTROL_COMMIT):
-        return False, "Gate control historical implementation commit is unavailable."
     try:
+        git = _trusted_git(repo_root)
+    except ValueError as error:
+        return False, f"Gate control Git trust failed: {error}."
+    try:
+        if not _git_commit_resolves(repo_root, git, _ITER000_GATE_CONTROL_COMMIT):
+            return False, "Gate control historical implementation commit is unavailable."
         historical_registry = _git_blob_at_path(
             repo_root,
             git,
@@ -465,6 +628,9 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
                 destination=snapshot_root,
             ):
                 return False, "Gate control historical implementation cannot be materialized."
+            runner = _prepare_gate_control_runner(snapshot_root)
+            if runner is None:
+                return False, "Gate control runner does not match the frozen historical lock."
             failures: list[str] = []
             node_ids: list[str] = []
             for gate_id, failure_class in _ITER000_GATE_FAILURE_CLASSES.items():
@@ -500,20 +666,46 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
                 or execution_seal.get("control_set_sha256") != control_set_hash
             ):
                 return False, "Gate control source seal does not match the executable control set."
-            if path.read_bytes() != historical_registry:
+            registry_bytes = runner_trust.stable_regular_bytes(
+                path,
+                maximum_bytes=2 * 1024 * 1024,
+            )
+            if registry_bytes != historical_registry:
                 return False, "Gate control registry differs from its historical Git binding."
-            execution = _run_gate_control_nodes(snapshot_root, node_ids)
-    except (OSError, subprocess.TimeoutExpired) as error:
+            execution = _run_gate_control_nodes(snapshot_root, node_ids, runner)
+            exact_execution = _gate_control_report_is_exact(snapshot_root, node_ids)
+            if not _gate_control_runner_is_unchanged(snapshot_root, runner):
+                return False, "Gate control runner identity changed during historical execution."
+            if (
+                _gate_control_set_hash(
+                    snapshot_root,
+                    iteration_id=registry["iteration_id"],
+                    controls=controls,
+                    sealed_paths=tuple(sealed_paths),
+                )
+                != control_set_hash
+                or runner_trust.stable_regular_bytes(
+                    path,
+                    maximum_bytes=2 * 1024 * 1024,
+                )
+                != registry_bytes
+            ):
+                return False, "Gate control source or registry changed during execution."
+    except (OSError, subprocess.SubprocessError) as error:
         return False, f"Gate control execution failed to run: {type(error).__name__}."
     result = {
         "schema_version": "fieldtrue.gate-control-execution-result.v1",
         "control_set_sha256": control_set_hash,
         "executed_nodes": node_ids,
         "exit_code": execution.returncode,
-        "outcome": "passed" if execution.returncode == 0 else "failed",
+        "outcome": "passed" if execution.returncode == 0 and exact_execution else "failed",
     }
     result_hash = sha256_value(result)
-    if execution.returncode != 0 or execution_seal.get("passing_result_sha256") != result_hash:
+    if (
+        execution.returncode != 0
+        or not exact_execution
+        or execution_seal.get("passing_result_sha256") != result_hash
+    ):
         output = (execution.stdout + execution.stderr).strip()[-500:]
         return False, f"Gate controls did not reproduce their sealed passing result: {output}"
     return (
@@ -523,19 +715,22 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
 
 
 def _git_environment() -> dict[str, str]:
-    return {**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"}
+    return git_environment()
+
+
+def _trusted_git(repo_root: Path) -> str:
+    return trusted_repository_git(repo_root, _TRUSTED_GIT_PATH)
 
 
 def _root_commit(repo_root: Path) -> str:
-    git = shutil.which("git")
-    if git is None:
-        raise FileNotFoundError("git is required for mission validation")
+    git = _trusted_git(repo_root)
     root_commit = subprocess.run(  # noqa: S603 - fixed executable and literal arguments
         [git, "rev-list", "--max-parents=0", "HEAD"],
         cwd=repo_root,
         check=True,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
         text=True,
     ).stdout.strip()
     if re.fullmatch(r"[0-9a-f]{40}", root_commit) is None:
@@ -544,9 +739,7 @@ def _root_commit(repo_root: Path) -> str:
 
 
 def _first_commit_files(repo_root: Path) -> list[str]:
-    git = shutil.which("git")
-    if git is None:
-        raise FileNotFoundError("git is required for mission validation")
+    git = _trusted_git(repo_root)
     root_commit = _root_commit(repo_root)
     output = subprocess.run(  # noqa: S603 - root_commit is validated hexadecimal Git output
         [git, "show", "--pretty=", "--name-only", root_commit],
@@ -554,21 +747,21 @@ def _first_commit_files(repo_root: Path) -> list[str]:
         check=True,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
         text=True,
     ).stdout
     return sorted(line for line in output.splitlines() if line)
 
 
 def _root_preregistration_bytes(repo_root: Path, relative_path: str) -> bytes:
-    git = shutil.which("git")
-    if git is None:
-        raise FileNotFoundError("git is required for mission validation")
+    git = _trusted_git(repo_root)
     return subprocess.run(  # noqa: S603 - fixed Git command and validated root commit
         [git, "show", f"{_root_commit(repo_root)}:{relative_path}"],
         cwd=repo_root,
         check=True,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
     ).stdout
 
 
@@ -582,6 +775,7 @@ def _git_commit_resolves(repo_root: Path, git: str, object_id: str) -> bool:
         env=_git_environment(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        timeout=_GIT_TIMEOUT_SECONDS,
     )
     return result.returncode == 0
 
@@ -603,6 +797,7 @@ def _git_blob_at_path(
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
     )
     entries = [entry for entry in tree_result.stdout.split(b"\0") if entry]
     if tree_result.returncode != 0 or len(entries) != 1:
@@ -624,32 +819,53 @@ def _git_blob_at_path(
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
     )
     return blob_result.stdout if blob_result.returncode == 0 else None
 
 
 def _verify_memory_git_anchors(repo_root: Path, memory_path: Path) -> tuple[bool, str]:
-    git = shutil.which("git")
-    if git is None:
-        return False, "Research memory Git anchors cannot verify because Git is unavailable."
+    try:
+        git = _trusted_git(repo_root)
+        head = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
+            text=True,
+        ).stdout.strip()
+    except ValueError as error:
+        return False, f"Research memory Git trust failed: {error}."
+    except (OSError, subprocess.SubprocessError):
+        return False, "Research memory Git HEAD cannot be captured."
+    if _GIT_OBJECT_ID_PATTERN.fullmatch(head) is None:
+        return False, "Research memory Git HEAD has an invalid object identity."
     records = load_memory_records(memory_path)
     failures: list[str] = []
     commit_results: dict[str, bool] = {}
 
-    def commit_resolves(object_id: str) -> bool:
+    def commit_is_recoverable(object_id: str) -> bool:
         if object_id not in commit_results:
-            commit_results[object_id] = _git_commit_resolves(repo_root, git, object_id)
+            commit_results[object_id] = _git_commit_resolves(
+                repo_root, git, object_id
+            ) and _git_is_ancestor(repo_root, git, object_id, head)
         return commit_results[object_id]
 
     for record in records:
-        if not commit_resolves(record.source_commit):
-            failures.append(f"{record.event_id}: source_commit is not a Git commit")
+        if not commit_is_recoverable(record.source_commit):
+            failures.append(
+                f"{record.event_id}: source_commit is not a Git commit reachable from HEAD"
+            )
         for index, evidence in enumerate(record.evidence):
             if urlsplit(evidence.uri).scheme:
                 continue
             evidence_label = f"{record.event_id}: evidence[{index}] {evidence.uri}"
-            if evidence.git_commit is None or not commit_resolves(evidence.git_commit):
-                failures.append(f"{evidence_label}: git_commit is not a Git commit")
+            if evidence.git_commit is None or not commit_is_recoverable(evidence.git_commit):
+                failures.append(
+                    f"{evidence_label}: git_commit is not a Git commit reachable from HEAD"
+                )
                 continue
             blob = _git_blob_at_path(repo_root, git, evidence.git_commit, evidence.uri)
             if blob is None:
@@ -658,6 +874,21 @@ def _verify_memory_git_anchors(repo_root: Path, memory_path: Path) -> tuple[bool
             if evidence.sha256 is not None and sha256_bytes(blob) != evidence.sha256:
                 failures.append(f"{evidence_label}: sha256 does not match the historical Git blob")
 
+    try:
+        _trusted_git(repo_root)
+        final_head = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
+            text=True,
+        ).stdout.strip()
+    except (GitTrustError, OSError, subprocess.SubprocessError, ValueError):
+        return False, "Research memory Git trust changed during verification."
+    if final_head != head:
+        return False, "Research memory Git HEAD changed during verification."
     if failures:
         return False, "Research memory Git anchors failed: " + "; ".join(failures)
     event_label = "event" if len(records) == 1 else "events"
@@ -733,6 +964,7 @@ def _git_is_ancestor(repo_root: Path, git: str, ancestor: str, descendant: str) 
         env=_git_environment(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        timeout=_GIT_TIMEOUT_SECONDS,
     )
     return result.returncode == 0
 
@@ -746,6 +978,7 @@ def _git_object_type(repo_root: Path, git: str, object_id: str) -> str | None:
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
         text=True,
     )
     return result.stdout.strip() if result.returncode == 0 else None
@@ -760,6 +993,7 @@ def _git_tree_id(repo_root: Path, git: str, commit: str) -> str | None:
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
         text=True,
     )
     tree = result.stdout.strip()
@@ -783,6 +1017,7 @@ def _git_path_object_id(
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
         text=True,
     )
     object_id = result.stdout.strip()
@@ -800,6 +1035,7 @@ def _verify_iter000_history(repo_root: Path, git: str, head: str) -> tuple[bool,
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
         text=True,
     )
     if replacements.returncode != 0 or replacements.stdout.strip():
@@ -896,6 +1132,7 @@ def _verify_attempt_001_proof_preserved(
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
     )
     if status.returncode != 0 or status.stdout:
         return False, "Attempt 001 proof or consumed authority has uncommitted changes."
@@ -1146,6 +1383,7 @@ def _git_tree_paths(repo_root: Path, git: str, commit: str, prefix: str) -> set[
         check=False,
         capture_output=True,
         env=_git_environment(),
+        timeout=_GIT_TIMEOUT_SECONDS,
     )
     if result.returncode != 0:
         return None
@@ -1510,19 +1748,20 @@ def _verify_iteration_amendment_001(repo_root: Path) -> tuple[bool, str]:
     ):
         return False, "Attempt 000 recorded data acceptance or a different failure cause."
 
-    git = shutil.which("git")
-    if git is None:
-        return False, "Amendment 001 cannot verify committed evidence without Git."
     try:
+        git = _trusted_git(repo_root)
         head = subprocess.run(  # noqa: S603 - fixed Git command
             [git, "rev-parse", "HEAD"],
             cwd=repo_root,
             check=True,
             capture_output=True,
             env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
             text=True,
         ).stdout.strip()
-    except subprocess.CalledProcessError:
+    except GitTrustError as error:
+        return False, f"Amendment 001 Git trust failed: {error}."
+    except (OSError, subprocess.SubprocessError, ValueError):
         return False, "Amendment 001 cannot resolve HEAD."
     if (
         _GIT_OBJECT_ID_PATTERN.fullmatch(head) is None
@@ -1742,18 +1981,20 @@ def _verify_publication_transition(
     except (BadSignatureError, ValueError):
         return False, "Publication receipt signature does not match the pinned signer."
 
-    git = shutil.which("git")
-    if git is None:
-        return False, "Publication evidence cannot verify because Git is unavailable."
     try:
+        git = _trusted_git(repo_root)
         head = subprocess.run(  # noqa: S603 - fixed Git command
             [git, "rev-parse", "HEAD"],
             cwd=repo_root,
             check=True,
             capture_output=True,
+            env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
             text=True,
         ).stdout.strip()
-    except subprocess.CalledProcessError:
+    except GitTrustError as error:
+        return False, f"Publication evidence Git trust failed: {error}."
+    except (OSError, subprocess.SubprocessError, ValueError):
         return False, "Publication evidence cannot resolve HEAD."
     if _GIT_OBJECT_ID_PATTERN.fullmatch(head) is None:
         return False, "Publication evidence resolved an invalid HEAD."

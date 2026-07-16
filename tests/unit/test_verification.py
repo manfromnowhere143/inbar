@@ -30,7 +30,7 @@ from fieldtrue.verification import (
     render_iter000_result_from_proof,
     verify_iter000_proof_bundle,
 )
-from tests.helpers import create_adapt_source, runtime_identity
+from tests.helpers import create_adapt_source, legacy_runtime_identity, runtime_identity
 
 _ITERATION_ID = "iter000_nasa_adapt_corpus_readiness"
 _GATE_IDS = (
@@ -473,6 +473,26 @@ def test_verification_amendments_bind_the_original_verifier(
     monkeypatch.setattr(verification_module, "_ORIGINAL_VERIFIER_SHA256", "0" * 64)
     with pytest.raises(ProofBundleVerificationError, match="original verifier binding"):
         verification_module._load_verification_amendments(repository)
+
+
+def test_verification_surface_ignores_inherited_git_redirection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = Path(__file__).resolve().parents[2]
+    fake_git = tmp_path / "git"
+    fake_git.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
+    fake_git.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("GIT_DIR", "/does/not/exist")
+    monkeypatch.setenv("GIT_WORK_TREE", "/does/not/exist")
+    monkeypatch.setenv("GIT_OBJECT_DIRECTORY", "/does/not/exist")
+    monkeypatch.setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", "/does/not/exist")
+
+    valid, detail = verification_module.validate_iter000_verification_correction_surface(repository)
+
+    assert valid
+    assert "proof-bound" in detail
 
 
 def test_verification_signer_must_differ_from_execution_signer(
@@ -1069,6 +1089,37 @@ def test_amended_runtime_must_match_the_external_authority() -> None:
                 runtime=candidate_runtime,
                 authority=authority,
                 protocol_hashes=protocol_hashes,
+            )
+
+    legacy = legacy_runtime_identity().model_copy(
+        update={
+            "repository_dirty": False,
+            "dirty_state_hash": sha256_bytes(b""),
+            "lockfile_hash": "b" * 64,
+            "command": ("fieldtrue", "experiment", "iter000-amendment-001"),
+        }
+    )
+    with pytest.raises(ProofBundleVerificationError, match="requires observed-v1"):
+        verification_module._verify_authorized_runtime(
+            run_id=f"iter000-attempt_001-{legacy.git_commit[:12]}",
+            runtime=legacy,
+            authority=authority,
+            protocol_hashes=protocol_hashes,
+        )
+
+
+def test_verification_authority_consumption_refuses_legacy_runtime() -> None:
+    legacy = legacy_runtime_identity()
+    promoted = legacy.model_copy(update={"provenance_state": "observed-v1"})
+    for candidate in (legacy, promoted):
+        with pytest.raises(ProofBundleVerificationError, match="requires observed-v1"):
+            verification_module._consumption_record(
+                authority={},
+                authority_data=b"authority",
+                amendment={},
+                runtime=candidate,
+                signer_public_key="0" * 64,
+                signing_key=SigningKey.generate(),
             )
 
 

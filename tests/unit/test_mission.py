@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import io
 import json
 import shutil
 import ssl
+import stat
 import subprocess
+import tomllib
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -28,9 +32,12 @@ from fieldtrue.mission import (
     _claims,
     _control_node_is_substantive,
     _first_commit_files,
+    _gate_control_runner_is_unchanged,
     _gate_control_set_hash,
     _gate_controls_valid,
     _json,
+    _materialize_gate_control_snapshot,
+    _prepare_gate_control_runner,
     _pytest_node_exists,
     _root_preregistration_bytes,
     _verified_tls_runtime_active,
@@ -729,10 +736,10 @@ def test_amendment_001_fails_closed_when_external_verifiers_fail(
     assert "ledger does not verify" in detail
 
     with monkeypatch.context() as scoped:
-        scoped.setattr(mission_module.shutil, "which", lambda _name: None)
+        scoped.setattr(mission_module, "_TRUSTED_GIT_PATH", tmp_path / "missing-git")
         passed, detail = _verify_iteration_amendment_001(repo)
     assert not passed
-    assert "without Git" in detail
+    assert "Git trust failed" in detail
 
     def fail_subprocess(*_args: object, **_kwargs: object) -> object:
         raise subprocess.CalledProcessError(1, "git")
@@ -741,7 +748,7 @@ def test_amendment_001_fails_closed_when_external_verifiers_fail(
         scoped.setattr(mission_module.subprocess, "run", fail_subprocess)
         passed, detail = _verify_iteration_amendment_001(repo)
     assert not passed
-    assert "cannot resolve HEAD" in detail
+    assert "Git trust failed" in detail
 
     with monkeypatch.context() as scoped:
         scoped.setattr(mission_module, "_git_commit_resolves", lambda *_args: False)
@@ -791,7 +798,10 @@ def test_gate_falsification_policy_rejects_paper_only_controls() -> None:
     assert not _gate_controls_valid(weakened)
 
 
-def test_gate_control_registry_resolves_executable_pytest_nodes(tmp_path: Path) -> None:
+def test_gate_control_registry_resolves_executable_pytest_nodes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     repo = _repo()
     registry = repo / "protocol" / "gate_controls" / "v1.json"
     registry_value = _json(registry)
@@ -810,6 +820,9 @@ def test_gate_control_registry_resolves_executable_pytest_nodes(tmp_path: Path) 
         )
         != seal["control_set_sha256"]
     )
+    monkeypatch.setenv("PYTEST_ADDOPTS", "--collect-only")
+    monkeypatch.setenv("PYTEST_PLUGINS", "hostile_plugin")
+    monkeypatch.setenv("PYTHONPATH", "/does/not/exist")
     passed, detail = _verify_gate_control_registry(repo, registry)
     assert passed
     assert "Executed and verified 16 distinct controls" in detail
@@ -824,6 +837,296 @@ def test_gate_control_registry_resolves_executable_pytest_nodes(tmp_path: Path) 
     passed, detail = _verify_gate_control_registry(repo, broken_path)
     assert not passed
     assert "source-integrity: negative_control" in detail
+
+
+def test_gate_control_runner_is_bound_to_the_historical_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _repo()
+    poisoned_uv_cache = tmp_path / "poisoned-uv-cache"
+    poisoned_pytest = poisoned_uv_cache / "archive-v0" / "poison" / "_pytest"
+    poisoned_pytest.mkdir(parents=True)
+    poisoned_pytest.joinpath("__init__.py").write_text(
+        "raise RuntimeError('mutable uv cache executed')\n", encoding="utf-8"
+    )
+    poisoned_python = tmp_path / "poisoned-python"
+    poisoned_json = poisoned_python / "cpython-3.12.13-macos-aarch64-none" / "lib" / "python3.12"
+    poisoned_json.mkdir(parents=True)
+    poisoned_json.joinpath("json.py").write_text(
+        "raise RuntimeError('mutable managed Python executed')\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("UV_CACHE_DIR", str(poisoned_uv_cache))
+    monkeypatch.setenv("UV_PYTHON_INSTALL_DIR", str(poisoned_python))
+    monkeypatch.setenv("UV_PYTHON_DOWNLOADS_JSON_URL", "file:///tmp/hostile-python.json")
+    monkeypatch.setenv("UV_PYTHON_INSTALL_MIRROR", "file:///tmp/hostile-mirror")
+    monkeypatch.setenv("UV_ASTRAL_MIRROR_URL", "https://example.invalid")
+    monkeypatch.setenv("HTTPS_PROXY", "http://example.invalid:8080")
+    monkeypatch.setenv("DYLD_INSERT_LIBRARIES", str(tmp_path / "hostile.dylib"))
+    monkeypatch.setenv("LD_PRELOAD", str(tmp_path / "hostile.so"))
+    snapshot = tmp_path / "snapshot"
+    snapshot.mkdir()
+    assert _materialize_gate_control_snapshot(
+        repo,
+        git=mission_module._trusted_git(repo),
+        destination=snapshot,
+    )
+    runner = _prepare_gate_control_runner(snapshot)
+    assert runner is not None
+    assert (
+        b"mutable uv cache executed"
+        not in (runner.site_packages / "_pytest" / "__init__.py").read_bytes()
+    )
+    assert not runner.interpreter_root.is_relative_to(poisoned_python)
+    assert (
+        b"mutable managed Python executed"
+        not in (
+            runner.interpreter_root / "lib" / "python3.12" / "json" / "__init__.py"
+        ).read_bytes()
+    )
+    lock_path = snapshot / "uv.lock"
+    lock_bytes = lock_path.read_bytes()
+    assert runner.lock_sha256 == sha256_bytes(lock_bytes)
+
+    source = snapshot / "src" / "fieldtrue" / "readiness.py"
+    source.write_bytes(source.read_bytes() + b"\n")
+    assert not _gate_control_runner_is_unchanged(snapshot, runner)
+    with pytest.raises(OSError, match="changed before child execution"):
+        mission_module._run_gate_control_nodes(snapshot, [], runner)
+
+    lock_path.unlink()
+    assert _prepare_gate_control_runner(snapshot) is None
+
+    mutated_snapshot = tmp_path / "mutated-snapshot"
+    mutated_snapshot.mkdir()
+    assert _materialize_gate_control_snapshot(
+        repo,
+        git=mission_module._trusted_git(repo),
+        destination=mutated_snapshot,
+    )
+    mutated_lock = mutated_snapshot / "uv.lock"
+    mutated_lock.write_bytes(
+        mutated_lock.read_bytes().replace(b'version = "9.1.1"', b'version = "9.1.0"')
+    )
+    assert _prepare_gate_control_runner(mutated_snapshot) is None
+
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_uv.chmod(0o755)
+    monkeypatch.setattr(mission_module.shutil, "which", lambda _name: str(fake_uv))
+    passed, detail = _verify_gate_control_registry(
+        repo,
+        repo / "protocol" / "gate_controls" / "v1.json",
+    )
+    assert not passed
+    assert "runner does not match" in detail
+
+
+class _ArtifactResponse:
+    def __init__(self, url: str, payload: bytes) -> None:
+        self._url = url
+        self._payload = payload
+
+    def __enter__(self) -> _ArtifactResponse:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def geturl(self) -> str:
+        return self._url
+
+    def read(self, maximum_bytes: int) -> bytes:
+        assert maximum_bytes == len(self._payload) + 1
+        return self._payload
+
+
+def test_authenticated_artifact_cache_is_advisory_and_repaired_atomically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = b"locked artifact bytes"
+    digest = sha256_bytes(payload)
+    url = f"https://files.pythonhosted.org/packages/frozen/{digest}/fixture.whl"
+    cache_root = tmp_path / "cache"
+    namespace = "frozen-lock"
+    cache_directory = cache_root / namespace
+    cache_directory.mkdir(parents=True)
+    cache_path = cache_directory / f"{digest}-fixture.whl"
+    cache_path.write_bytes(b"x" * len(payload))
+    downloads = 0
+
+    def urlopen(*_args: object, **_kwargs: object) -> _ArtifactResponse:
+        nonlocal downloads
+        downloads += 1
+        return _ArtifactResponse(url, payload)
+
+    monkeypatch.setattr(mission_module.urllib.request, "urlopen", urlopen)
+    assert (
+        mission_module._authenticated_artifact_bytes(
+            url=url,
+            expected_sha256=digest,
+            expected_size=len(payload),
+            cache_root=cache_root,
+            cache_namespace=namespace,
+        )
+        == payload
+    )
+    assert downloads == 1
+    assert cache_path.read_bytes() == payload
+
+    external = tmp_path / "external"
+    external.write_bytes(b"do not replace")
+    cache_path.unlink()
+    cache_path.symlink_to(external)
+    assert (
+        mission_module._authenticated_artifact_bytes(
+            url=url,
+            expected_sha256=digest,
+            expected_size=len(payload),
+            cache_root=cache_root,
+            cache_namespace=namespace,
+        )
+        == payload
+    )
+    assert downloads == 2
+    assert external.read_bytes() == b"do not replace"
+    assert not cache_path.is_symlink()
+    assert cache_path.read_bytes() == payload
+
+    cache_path.unlink()
+    hardlink_source = tmp_path / "hardlink-source"
+    hardlink_source.write_bytes(payload)
+    cache_path.hardlink_to(hardlink_source)
+    assert (
+        mission_module._authenticated_artifact_bytes(
+            url=url,
+            expected_sha256=digest,
+            expected_size=len(payload),
+            cache_root=cache_root,
+            cache_namespace=namespace,
+        )
+        == payload
+    )
+    assert downloads == 3
+    assert cache_path.stat().st_nlink == 1
+    assert hardlink_source.read_bytes() == payload
+
+
+def test_gate_control_wheels_are_a_minimal_locked_cpython_312_closure() -> None:
+    lock = tomllib.loads((_repo() / "uv.lock").read_text(encoding="utf-8"))
+    packages = mission_module._locked_gate_control_packages(lock)
+    wheels = mission_module._locked_gate_control_wheels(lock)
+
+    assert packages is not None
+    assert set(packages) == {
+        "annotated-types",
+        "certifi",
+        "iniconfig",
+        "networkx",
+        "packaging",
+        "pluggy",
+        "pydantic",
+        "pydantic-core",
+        "pygments",
+        "pytest",
+        "typing-extensions",
+        "typing-inspection",
+    }
+    assert wheels is not None
+    assert {wheel.distribution for wheel in wheels} == set(packages)
+    pydantic_core = next(wheel for wheel in wheels if wheel.distribution == "pydantic-core")
+    assert "-cp312-cp312-" in pydantic_core.filename
+
+
+@pytest.mark.parametrize(
+    ("system", "machine", "platform_tag", "wheel_platform"),
+    [
+        ("Darwin", "arm64", "macosx_11_0_arm64", "macosx_11_0_arm64"),
+        (
+            "Linux",
+            "x86_64",
+            "manylinux_2_17_x86_64",
+            "manylinux_2_17_x86_64",
+        ),
+    ],
+)
+def test_gate_control_wheel_selection_targets_supported_cpython_312_platforms(
+    monkeypatch: pytest.MonkeyPatch,
+    system: str,
+    machine: str,
+    platform_tag: str,
+    wheel_platform: str,
+) -> None:
+    monkeypatch.setattr(mission_module.platform, "system", lambda: system)
+    monkeypatch.setattr(mission_module.platform, "machine", lambda: machine)
+    monkeypatch.setattr(mission_module, "platform_tags", lambda: iter((platform_tag,)))
+    lock = tomllib.loads((_repo() / "uv.lock").read_text(encoding="utf-8"))
+
+    wheels = mission_module._locked_gate_control_wheels(lock)
+
+    assert wheels is not None
+    pydantic_core = next(wheel for wheel in wheels if wheel.distribution == "pydantic-core")
+    assert "-cp312-cp312-" in pydantic_core.filename
+    assert wheel_platform in pydantic_core.filename
+
+
+def _malformed_wheel(case: str) -> bytes:
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        if case == "traversal":
+            archive.writestr("../escape.py", "pass\n")
+        elif case == "symlink":
+            member = zipfile.ZipInfo("package/link.py")
+            member.create_system = 3
+            member.external_attr = (stat.S_IFLNK | 0o777) << 16
+            archive.writestr(member, "target.py")
+        elif case == "case-collision":
+            archive.writestr("package/Module.py", "pass\n")
+            archive.writestr("package/module.py", "pass\n")
+        else:
+            archive.writestr("fixture.data/scripts/fixture", "pass\n")
+    return output.getvalue()
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["traversal", "symlink", "case-collision", "unsupported-data-scheme"],
+)
+def test_authenticated_wheel_extraction_rejects_unsafe_members(
+    tmp_path: Path,
+    case: str,
+) -> None:
+    data = _malformed_wheel(case)
+    wheel = mission_module._LockedWheel(
+        distribution="fixture",
+        version="1.0",
+        url="https://files.pythonhosted.org/packages/frozen/fixture.whl",
+        sha256=sha256_bytes(data),
+        size=len(data),
+        filename="fixture-1.0-py3-none-any.whl",
+    )
+
+    assert not mission_module._extract_authenticated_wheels(
+        ((wheel, data),), tmp_path / "site-packages"
+    )
+    assert not (tmp_path / "escape.py").exists()
+
+
+def test_gate_control_registry_maps_historical_git_timeout_to_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def timeout(*_args: object, **_kwargs: object) -> bool:
+        raise subprocess.TimeoutExpired(cmd="git", timeout=10)
+
+    monkeypatch.setattr(mission_module, "_git_commit_resolves", timeout)
+    passed, detail = _verify_gate_control_registry(
+        _repo(),
+        _repo() / "protocol" / "gate_controls" / "v1.json",
+    )
+
+    assert not passed
+    assert "TimeoutExpired" in detail
 
 
 def _write_registry_case(tmp_path: Path, name: str, value: object) -> Path:
@@ -937,6 +1240,19 @@ def test_gate_control_registry_requires_a_reproduced_passing_execution(
     passed, detail = _verify_gate_control_registry(repo, registry)
     assert not passed
     assert "failed control" in detail
+
+    monkeypatch.setattr(
+        mission_module,
+        "_run_gate_control_nodes",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="16 collected",
+            stderr="",
+        ),
+    )
+    passed, detail = _verify_gate_control_registry(repo, registry)
+    assert not passed
+    assert "sealed passing result" in detail
 
 
 def test_gate_control_nodes_must_be_gate_specific_and_substantive(tmp_path: Path) -> None:
@@ -1208,6 +1524,18 @@ def test_research_memory_git_anchors_use_historical_blob_bytes(tmp_path: Path) -
     assert detail == "Research memory Git anchors verify (1 event)."
 
 
+def test_research_memory_git_anchors_reject_unreachable_commits(tmp_path: Path) -> None:
+    repo, _, _, _ = _fixture_git_repo(tmp_path)
+    tree = _git(repo, "rev-parse", "HEAD^{tree}")
+    orphan = _git(repo, "commit-tree", tree, "-m", "unreachable evidence")
+    memory_path = _write_memory(repo, source_commit=orphan)
+
+    passed, detail = _verify_memory_git_anchors(repo, memory_path)
+
+    assert not passed
+    assert "reachable from HEAD" in detail
+
+
 @pytest.mark.parametrize(
     ("failure", "expected_detail"),
     [
@@ -1242,3 +1570,132 @@ def test_research_memory_git_anchor_failures_are_reported(
 
     assert not passed
     assert expected_detail in detail
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "dependency", "arguments", "expected"),
+    [
+        (
+            "_authenticated_artifact_bytes",
+            "authenticated_artifact_bytes",
+            {
+                "url": "https://example.invalid/artifact.whl",
+                "expected_sha256": "0" * 64,
+                "expected_size": 1,
+                "cache_root": Path("cache"),
+                "cache_namespace": "fixture",
+            },
+            None,
+        ),
+        (
+            "_locked_gate_control_packages",
+            "resolve_locked_packages",
+            {"lock": {}},
+            None,
+        ),
+        (
+            "_locked_gate_control_wheels",
+            "resolve_locked_wheels",
+            {"lock": {}},
+            None,
+        ),
+        (
+            "_extract_authenticated_wheels",
+            "extract_authenticated_wheels",
+            {"artifacts": (), "site_packages": Path("site-packages")},
+            False,
+        ),
+        (
+            "_prepare_gate_control_runner",
+            "prepare_authenticated_runner",
+            {"snapshot_root": Path("snapshot")},
+            None,
+        ),
+    ],
+)
+def test_gate_control_trust_adapters_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    wrapper: str,
+    dependency: str,
+    arguments: dict[str, object],
+    expected: object,
+) -> None:
+    def reject(*_args: object, **_kwargs: object) -> None:
+        raise mission_module.runner_trust.RunnerTrustError("fixture rejection")
+
+    monkeypatch.setattr(mission_module.runner_trust, dependency, reject)
+    monkeypatch.setattr(mission_module, "platform_tags", lambda: ())
+
+    assert getattr(mission_module, wrapper)(**arguments) is expected
+
+
+def test_gate_control_snapshot_and_source_seal_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert (
+        _gate_control_set_hash(
+            tmp_path,
+            iteration_id="iter000_nasa_adapt_corpus_readiness",
+            controls=[],
+            sealed_paths=("missing.py",),
+        )
+        is None
+    )
+
+    monkeypatch.setattr(mission_module, "_git_tree_paths", lambda *_args: None)
+    assert not _materialize_gate_control_snapshot(tmp_path, git="git", destination=tmp_path / "a")
+
+    monkeypatch.setattr(mission_module, "_git_tree_paths", lambda *_args: [])
+    monkeypatch.setattr(mission_module, "_git_blob_at_path", lambda *_args: None)
+    assert not _materialize_gate_control_snapshot(tmp_path, git="git", destination=tmp_path / "b")
+
+
+def test_gate_control_runner_preflight_rejects_missing_or_preexisting_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = SimpleNamespace(
+        snapshot_root=tmp_path / "missing-snapshot",
+        scratch_root=tmp_path / "scratch",
+        python_path=tmp_path / "python",
+        site_packages=tmp_path / "site-packages",
+    )
+    assert not _gate_control_runner_is_unchanged(tmp_path / "missing", runner)
+
+    monkeypatch.setattr(mission_module, "_gate_control_runner_is_unchanged", lambda *_args: False)
+    with pytest.raises(OSError, match="changed before child execution"):
+        mission_module._run_gate_control_nodes(tmp_path, [], runner)
+
+    monkeypatch.setattr(mission_module, "_gate_control_runner_is_unchanged", lambda *_args: True)
+    monkeypatch.setattr(mission_module.runner_trust, "ensure_private_directory", lambda _path: True)
+    runner.scratch_root.mkdir()
+    (tmp_path / mission_module._GATE_CONTROL_REPORT).write_text("occupied", encoding="utf-8")
+    with pytest.raises(OSError, match="report path already exists"):
+        mission_module._run_gate_control_nodes(tmp_path, [], runner)
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        None,
+        b"not xml",
+        b'<testsuite><testcase name="wrong"/></testsuite>',
+        b'<testsuite><testcase name="test_expected"><failure/></testcase></testsuite>',
+    ],
+)
+def test_gate_control_report_rejects_missing_malformed_or_nonpassing_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    report: bytes | None,
+) -> None:
+    monkeypatch.setattr(
+        mission_module.runner_trust,
+        "stable_regular_bytes",
+        lambda *_args, **_kwargs: report,
+    )
+
+    assert not mission_module._gate_control_report_is_exact(
+        tmp_path,
+        ["tests/unit/test_gate.py::test_expected"],
+    )

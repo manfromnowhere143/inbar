@@ -22,7 +22,7 @@ from fieldtrue.canonical import (
     sha256_value,
 )
 from fieldtrue.domain import Ed25519PublicKey, HexSignature, Identifier, Sha256
-from fieldtrue.runtime import RuntimeIdentity
+from fieldtrue.runtime import RuntimeIdentity, RuntimeProvenanceError
 
 GENESIS_HASH = "0" * 64
 
@@ -340,6 +340,12 @@ class SignedLedger:
         approval_receipt_hash: Sha256 | None = None,
         timestamp: datetime | None = None,
     ) -> LedgerEvent:
+        try:
+            runtime.require_observed_provenance()
+        except RuntimeProvenanceError as error:
+            raise LedgerVerificationError(
+                "new ledger events require observed-v1 runtime provenance"
+            ) from error
         self.ledger_path.parent.mkdir(parents=True, exist_ok=True)
         with self.ledger_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)

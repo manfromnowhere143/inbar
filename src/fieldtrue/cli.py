@@ -21,6 +21,7 @@ from fieldtrue.adapters.adapt import (
 )
 from fieldtrue.control_authority import ControlAuthorityError, verify_admission_control_bundle
 from fieldtrue.experiment import run_iter000, run_iter000_amendment_001
+from fieldtrue.handoff import HandoffError, check_handoff, write_handoff
 from fieldtrue.memory import verify_memory, verify_memory_prefix
 from fieldtrue.mission import validate_mission
 from fieldtrue.receipts import (
@@ -77,6 +78,11 @@ def _parser() -> argparse.ArgumentParser:
     memory_actions.add_parser("verify")
     memory_prefix = memory_actions.add_parser("verify-prefix")
     memory_prefix.add_argument("base_path")
+
+    handoff = groups.add_parser("handoff")
+    handoff_actions = handoff.add_subparsers(dest="action", required=True)
+    handoff_actions.add_parser("render")
+    handoff_actions.add_parser("check")
 
     ledger = groups.add_parser("ledger")
     ledger_verify = ledger.add_subparsers(dest="action", required=True).add_parser("verify")
@@ -144,6 +150,20 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(json.dumps({"base_count": base_count, "current_count": current_count}))
         return 0
+    if arguments.group == "handoff" and arguments.action == "render":
+        try:
+            path = write_handoff(repo)
+        except HandoffError as error:
+            _fail(str(error))
+        print(path.relative_to(repo).as_posix())
+        return 0
+    if arguments.group == "handoff" and arguments.action == "check":
+        try:
+            check_handoff(repo)
+        except HandoffError as error:
+            _fail(str(error))
+        print("HANDOFF_VERIFIED")
+        return 0
     if arguments.group == "ledger" and arguments.action == "verify":
         ledger_path = Path(arguments.ledger_path)
         head_path = Path(arguments.head_path)
@@ -192,10 +212,24 @@ def main(argv: list[str] | None = None) -> int:
             verify_preregistration_binding(repo, contract)
             resolved_input = input_root.resolve()
             resolved_output = output_root.resolve()
-            verify_admission_control_bundle(repo, resolved_input, contract)
+            control_receipt = verify_admission_control_bundle(repo, resolved_input, contract)
+            source_closure = verify_preregistration_binding(
+                repo,
+                contract,
+                control_receipt.execution_commit,
+            )
             if resolved_output.is_relative_to(resolved_input):
                 raise AcquisitionAuditError("output root cannot be inside the acquisition input")
             admission = audit_acquisition(contract, resolved_input)
+            if (
+                verify_preregistration_binding(
+                    repo,
+                    contract,
+                    control_receipt.execution_commit,
+                )
+                != source_closure
+            ):
+                raise AcquisitionAuditError("acquisition source closure changed during audit")
             write_admission_output(resolved_output, admission)
         except (AcquisitionAuditError, ControlAuthorityError, OSError) as error:
             _fail(str(error), 3)

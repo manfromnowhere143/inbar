@@ -1,0 +1,84 @@
+name: inbar-memory-integrity
+
+on:
+  pull_request_target:
+    types:
+      - edited
+      - opened
+      - reopened
+      - synchronize
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  base-controlled-history:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: Fetch the immutable pull-request head without checking it out
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          INBAR_FETCH_TOKEN: ${{ github.token }}
+        run: |
+          test -n "${INBAR_FETCH_TOKEN}"
+          authorization=$(printf 'x-access-token:%s' "${INBAR_FETCH_TOKEN}" | base64 | tr -d '\n')
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${authorization}" \
+            git fetch --no-tags --no-recurse-submodules origin "${EXPECTED_HEAD}"
+          unset authorization INBAR_FETCH_TOKEN
+          observed_head=$(git rev-parse 'FETCH_HEAD^{commit}')
+          test "${observed_head}" = "${EXPECTED_HEAD}"
+          git update-ref refs/remotes/origin/inbar-pr-head "${EXPECTED_HEAD}"
+          local_config_names=$(mktemp)
+          local_config_values=$(mktemp)
+          effective_config_names=$(mktemp)
+          trap 'rm -f -- "${local_config_names}" "${local_config_values}" "${effective_config_names}"' EXIT
+          git config --local --name-only --list > "${local_config_names}"
+          git config --local --null --list > "${local_config_values}"
+          git config --includes --name-only --list > "${effective_config_names}"
+          if grep -Eiq '^include(if)?\.' "${local_config_names}"; then
+            echo "Persisted Git config include remains after the candidate fetch." >&2
+            exit 1
+          fi
+          if grep -aEiq \
+            'authorization[=:]|x-access-token:|github_pat_|gh[pousr]_[A-Za-z0-9_]{20,}' \
+            "${local_config_values}"; then
+            echo "Persisted Git credential material remains after the candidate fetch." >&2
+            exit 1
+          fi
+          if grep -Eiq '(^|\.)extraheader$' "${effective_config_names}"; then
+            echo "Effective Git credential header remains after the candidate fetch." >&2
+            exit 1
+          fi
+      - name: Verify every candidate commit with base-controlled policy
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/ci/verify_history.py \
+            --repo . \
+            --base "${BASE_SHA}" \
+            --head "${HEAD_SHA}"
+          git show "${BASE_SHA}:memory/research_engine_extraction.jsonl" > /tmp/base-memory.jsonl
+          git show "${HEAD_SHA}:memory/research_engine_extraction.jsonl" > /tmp/head-memory.jsonl
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
+        with:
+          version: "0.11.28"
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --group dev --frozen
+      - name: Verify the candidate ledger with the base verifier
+        run: |
+          cp /tmp/head-memory.jsonl memory/research_engine_extraction.jsonl
+          uv run inbar memory verify-prefix /tmp/base-memory.jsonl

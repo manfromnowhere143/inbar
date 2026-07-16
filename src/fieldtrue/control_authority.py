@@ -14,18 +14,23 @@ import ctypes
 import errno
 import json
 import os
+import selectors
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal, NoReturn, Self
+from typing import Any, Literal, NoReturn, Self, TypeVar
 
 from nacl.exceptions import BadSignatureError
 from nacl.signing import SigningKey, VerifyKey
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
+import fieldtrue.runner_trust as runner_trust
 from fieldtrue.acquisition import (
     _CONTROL_REQUIREMENTS,
     _REQUIRED_CONTROL_IDS,
@@ -49,7 +54,16 @@ from fieldtrue.canonical import (
     sha256_value,
 )
 from fieldtrue.domain import FrozenModel, GitObjectId, Identifier, Sha256
+from fieldtrue.git_trust import GitTrustError, git_environment, trusted_repository_git
 from fieldtrue.receipts import load_or_create_signing_key
+from fieldtrue.runner_trust import (
+    MAX_RUNNER_FILE_BYTES,
+    MAX_RUNNER_TREE_BYTES,
+    MAX_RUNNER_TREE_ENTRIES,
+    RUNNER_PYTHON_FULL_VERSION,
+    AuthenticatedRunner,
+    RunnerTrustError,
+)
 
 _OBSERVATION_ENV = "FIELDTRUE_CONTROL_OBSERVATION_PATH"
 _OUTCOME_ENV = "FIELDTRUE_CONTROL_PYTEST_OUTCOME_PATH"
@@ -65,6 +79,33 @@ _SOURCE_PATHS = (
     ("dependency_lock", "uv.lock"),
 )
 _MAX_CAPTURE_BYTES = 4 * 1024 * 1024
+_MAX_AGGREGATE_CAPTURE_BYTES = 4 * 1024 * 1024
+_MAX_CONTROL_SIDECAR_BYTES = 4 * 1024 * 1024
+_CAPTURE_READ_BYTES = 64 * 1024
+_PROCESS_TERMINATION_GRACE_SECONDS = 0.25
+_PROCESS_GROUP_POLL_SECONDS = 0.01
+_RUNNER_ROOT_DISTRIBUTIONS = frozenset({"certifi", "networkx", "pydantic", "pynacl", "pytest"})
+_RUNNER_SNAPSHOT_PATHS = (
+    "pyproject.toml",
+    "uv.lock",
+    "src/fieldtrue",
+    "tests/__init__.py",
+    "tests/acquisition_helpers.py",
+    "tests/unit/__init__.py",
+    "tests/unit/test_acquisition.py",
+)
+_PARENT_SOURCE_MODULES = (
+    ("fieldtrue.acquisition", "src/fieldtrue/acquisition.py"),
+    ("fieldtrue.approvals", "src/fieldtrue/approvals.py"),
+    ("fieldtrue.canonical", "src/fieldtrue/canonical.py"),
+    ("fieldtrue.control_authority", "src/fieldtrue/control_authority.py"),
+    ("fieldtrue.domain", "src/fieldtrue/domain.py"),
+    ("fieldtrue.git_trust", "src/fieldtrue/git_trust.py"),
+    ("fieldtrue.planning", "src/fieldtrue/planning.py"),
+    ("fieldtrue.receipts", "src/fieldtrue/receipts.py"),
+    ("fieldtrue.runner_trust", "src/fieldtrue/runner_trust.py"),
+    ("fieldtrue.splits", "src/fieldtrue/splits.py"),
+)
 
 Verdict = Literal[
     "PASS_PILOT",
@@ -73,6 +114,8 @@ Verdict = Literal[
     "INVALID",
     "KILL_CONSTRUCT",
 ]
+
+ControlSidecarT = TypeVar("ControlSidecarT", bound=BaseModel)
 
 
 class ControlAuthorityError(RuntimeError):
@@ -174,10 +217,14 @@ class ControlExecutionManifest(FrozenModel):
     finished_at: datetime
     repository_clean_before: Literal[True]
     repository_clean_after: Literal[True]
-    dependency_mode: Literal["uv-offline-frozen"]
+    dependency_mode: Literal["lock-hash-authenticated-wheels"]
     uv_executable: str
     uv_executable_sha256: Sha256
     uv_version: str
+    python_executable_sha256: Sha256
+    python_version: str
+    runner_environment_sha256: Sha256
+    artifact_set_sha256: Sha256
     environment_policy: tuple[str, ...]
     sources: tuple[GitBoundSource, ...]
     controls: tuple[ControlManifestEntry, ...]
@@ -490,13 +537,22 @@ def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
 
 
 def _run_git(repo: Path, *arguments: str, text: bool = True) -> str | bytes:
-    completed = subprocess.run(  # noqa: S603 - fixed executable and internal arguments
-        ("git", "-C", str(repo), *arguments),  # noqa: S607 - fixed Git executable
-        check=True,
-        capture_output=True,
-        text=text,
-        env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
-    )
+    try:
+        git = trusted_repository_git(repo)
+    except GitTrustError as error:
+        raise ControlAuthorityError("control authority Git trust failed") from error
+    try:
+        completed = subprocess.run(  # noqa: S603 - fixed executable and internal arguments
+            (git, *arguments),
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=text,
+            env=git_environment(),
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ControlAuthorityError("control authority Git command failed") from error
     output: str | bytes = completed.stdout
     return output.strip() if text else output
 
@@ -509,7 +565,7 @@ def _assert_clean_repo(repo: Path) -> None:
 
 def _git_identity(repo: Path) -> tuple[str, str]:
     commit = str(_run_git(repo, "rev-parse", "HEAD"))
-    tree = str(_run_git(repo, "rev-parse", "HEAD^{tree}"))
+    tree = str(_run_git(repo, "rev-parse", f"{commit}^{{tree}}"))
     if len(commit) not in (40, 64) or len(tree) not in (40, 64):
         raise ControlAuthorityError("Git returned an unsupported object identity")
     return commit, tree
@@ -537,6 +593,34 @@ def _git_bound_source(repo: Path, commit: str, name: str, relative: str) -> GitB
     )
 
 
+def _assert_parent_process_trusted(repo: Path) -> None:
+    if any(name in os.environ for name in ("PYTHONHOME", "PYTHONPATH")):
+        raise ControlAuthorityError("parent Python startup injection environment is present")
+    if any(sys.modules.get(name) is not None for name in ("sitecustomize", "usercustomize")):
+        raise ControlAuthorityError("parent Python startup customization is loaded")
+    for module_name, relative in _PARENT_SOURCE_MODULES:
+        module = sys.modules.get(module_name)
+        origin = getattr(module, "__file__", None) if module is not None else None
+        if not isinstance(origin, str):
+            raise ControlAuthorityError(f"parent source module has no file origin: {module_name}")
+        candidate = Path(origin)
+        expected = repo / relative
+        try:
+            if (
+                candidate.is_symlink()
+                or expected.is_symlink()
+                or candidate.resolve(strict=True) != expected.resolve(strict=True)
+                or not candidate.is_file()
+            ):
+                raise ControlAuthorityError(
+                    f"parent source module origin is unexpected: {module_name}"
+                )
+        except OSError as error:
+            raise ControlAuthorityError(
+                f"parent source module origin cannot be verified: {module_name}"
+            ) from error
+
+
 def _sanitized_environment(
     *,
     control_id: str,
@@ -544,55 +628,133 @@ def _sanitized_environment(
     observation_path: Path,
     outcome_path: Path,
 ) -> dict[str, str]:
-    environment = {
-        "HOME": os.environ.get("HOME", str(Path.home())),
-        "LANG": "C.UTF-8",
-        "LC_ALL": "C.UTF-8",
+    return {
+        "HOME": "/nonexistent",
+        "LANG": "C",
+        "LC_ALL": "C",
         "NO_COLOR": "1",
-        "PATH": os.environ.get("PATH", os.defpath),
+        "PATH": os.defpath,
         "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONHASHSEED": "0",
         "TZ": "UTC",
-        "UV_FROZEN": "1",
-        "UV_OFFLINE": "1",
         _CONTROL_ENV: control_id,
         _NODE_ENV: node_id,
         _OBSERVATION_ENV: str(observation_path),
         _OUTCOME_ENV: str(outcome_path),
     }
-    for name in ("TMPDIR", "UV_CACHE_DIR"):
-        value = os.environ.get(name)
-        if value:
-            environment[name] = value
-    return environment
 
 
 def _resolve_uv_executable() -> str:
-    executable = shutil.which("uv", path=os.environ.get("PATH", os.defpath))
-    if executable is None:
-        raise ControlAuthorityError("uv is not available on the execution PATH")
-    resolved = Path(executable).resolve(strict=True)
-    if not resolved.is_file():
-        raise ControlAuthorityError("resolved uv executable is not a regular file")
-    return str(resolved)
+    try:
+        return str(runner_trust.resolve_pinned_uv().executable.resolved_path)
+    except RunnerTrustError as error:
+        raise ControlAuthorityError(str(error)) from error
 
 
 def _uv_version(executable: str) -> str:
-    completed = subprocess.run(  # noqa: S603 - resolved absolute executable, fixed argument
-        (executable, "--version"),
-        check=True,
-        capture_output=True,
-        text=True,
-        env={
-            "HOME": os.environ.get("HOME", str(Path.home())),
-            "LANG": "C.UTF-8",
-            "PATH": os.environ.get("PATH", os.defpath),
-        },
+    try:
+        return runner_trust.resolve_pinned_uv(Path(executable)).version
+    except RunnerTrustError as error:
+        raise ControlAuthorityError(str(error)) from error
+
+
+def _materialize_commit_snapshot(repo: Path, commit: str, destination: Path) -> bool:
+    try:
+        raw = _run_git(
+            repo,
+            "ls-tree",
+            "-r",
+            "-z",
+            "--full-tree",
+            commit,
+            "--",
+            *_RUNNER_SNAPSHOT_PATHS,
+            text=False,
+        )
+    except ControlAuthorityError:
+        return False
+    if not isinstance(raw, bytes):
+        return False
+    records = raw.split(b"\0")
+    if records[-1:] != [b""] or len(records) > MAX_RUNNER_TREE_ENTRIES:
+        return False
+    observed: set[str] = set()
+    total_bytes = 0
+    try:
+        destination.mkdir(mode=0o700)
+        for record in records[:-1]:
+            header, raw_path = record.split(b"\t", 1)
+            mode, object_type, object_id = header.decode("ascii").split(" ")
+            relative = raw_path.decode("utf-8")
+            pure = PurePosixPath(relative)
+            if (
+                mode not in {"100644", "100755"}
+                or object_type != "blob"
+                or pure.is_absolute()
+                or ".." in pure.parts
+                or relative != pure.as_posix()
+                or relative in observed
+                or not any(
+                    relative == prefix or relative.startswith(f"{prefix}/")
+                    for prefix in _RUNNER_SNAPSHOT_PATHS
+                )
+            ):
+                return False
+            payload = _run_git(repo, "cat-file", "blob", object_id, text=False)
+            if not isinstance(payload, bytes) or len(payload) > MAX_RUNNER_FILE_BYTES:
+                return False
+            total_bytes += len(payload)
+            if total_bytes > MAX_RUNNER_TREE_BYTES:
+                return False
+            target = destination.joinpath(*pure.parts)
+            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            descriptor = os.open(
+                target,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+                0o500 if mode == "100755" else 0o400,
+            )
+            try:
+                view = memoryview(payload)
+                while view:
+                    written = os.write(descriptor, view)
+                    if written <= 0:
+                        return False
+                    view = view[written:]
+            finally:
+                os.close(descriptor)
+            observed.add(relative)
+    except (OSError, UnicodeDecodeError, ValueError):
+        return False
+    required_files = {"pyproject.toml", "uv.lock", "tests/unit/test_acquisition.py"}
+    return required_files.issubset(observed) and any(
+        path.startswith("src/fieldtrue/") for path in observed
     )
-    version = completed.stdout.strip()
-    if not version.startswith("uv ") or "\n" in version:
-        raise ControlAuthorityError("uv returned an invalid version identity")
-    return version
+
+
+def _prepare_authenticated_runner(
+    repo: Path,
+    commit: str,
+    root: Path,
+) -> AuthenticatedRunner:
+    _resolve_uv_executable()
+    snapshot_root = root / "snapshot"
+    if not _materialize_commit_snapshot(repo, commit, snapshot_root):
+        raise ControlAuthorityError("committed control source snapshot cannot be materialized")
+    try:
+        return runner_trust.prepare_authenticated_runner(
+            root,
+            snapshot_root,
+            root_distributions=_RUNNER_ROOT_DISTRIBUTIONS,
+            required_imports=("nacl", "pytest"),
+            artifact_cache_root=root / "artifact-cache",
+        )
+    except RunnerTrustError as error:
+        raise ControlAuthorityError(str(error)) from error
+
+
+def _authenticated_runner_is_unchanged(runner: AuthenticatedRunner) -> bool:
+    return runner_trust.runner_is_unchanged(runner)
 
 
 def _validate_lifecycle(lifecycle: PytestLifecycle, node_id: str) -> None:
@@ -621,27 +783,239 @@ def _artifact_binding(bundle_root: Path, path: Path) -> ArtifactBinding:
     )
 
 
+def _normalized_control_command(node_id: str) -> tuple[str, ...]:
+    return (
+        "<authenticated-cpython-3.12.13>",
+        "-I",
+        "-B",
+        "-S",
+        "-c",
+        "<isolated-pytest-bootstrap>",
+        "<execution-commit>/src",
+        "<lock-hash-authenticated-site-packages>",
+        "-p",
+        "fieldtrue.control_authority",
+        "-p",
+        "no:cacheprovider",
+        "-o",
+        "addopts=",
+        "--no-header",
+        "--tb=short",
+        node_id,
+    )
+
+
+def _signal_control_process_group(
+    process: subprocess.Popen[bytes],
+    signal_number: signal.Signals,
+) -> None:
+    try:
+        os.killpg(process.pid, signal_number)
+    except ProcessLookupError:
+        return
+    except OSError:
+        if process.poll() is None:
+            with suppress(ProcessLookupError):
+                process.send_signal(signal_number)
+
+
+def _control_process_group_exists(process: subprocess.Popen[bytes]) -> bool:
+    try:
+        os.killpg(process.pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError as error:
+        raise ControlAuthorityError("control process-group state cannot be verified") from error
+    return True
+
+
+def _wait_for_control_process_group_exit(
+    process: subprocess.Popen[bytes],
+    *,
+    timeout_seconds: float,
+) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+    while _control_process_group_exists(process):
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            return False
+        time.sleep(min(_PROCESS_GROUP_POLL_SECONDS, remaining_seconds))
+    return True
+
+
+def _terminate_remaining_control_process_group(process: subprocess.Popen[bytes]) -> None:
+    if not _control_process_group_exists(process):
+        return
+    _signal_control_process_group(process, signal.SIGTERM)
+    if _wait_for_control_process_group_exit(
+        process,
+        timeout_seconds=_PROCESS_TERMINATION_GRACE_SECONDS,
+    ):
+        return
+    _signal_control_process_group(process, signal.SIGKILL)
+    if not _wait_for_control_process_group_exit(
+        process,
+        timeout_seconds=_PROCESS_TERMINATION_GRACE_SECONDS,
+    ):
+        raise ControlAuthorityError("control descendant process group could not be terminated")
+
+
+def _terminate_and_reap_control_process(process: subprocess.Popen[bytes]) -> None:
+    _signal_control_process_group(process, signal.SIGTERM)
+    try:
+        process.wait(timeout=_PROCESS_TERMINATION_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:
+        _signal_control_process_group(process, signal.SIGKILL)
+        try:
+            process.wait(timeout=_PROCESS_TERMINATION_GRACE_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            raise ControlAuthorityError("control process could not be reaped") from error
+    _terminate_remaining_control_process_group(process)
+
+
+def _load_control_sidecar(
+    path: Path,
+    model: type[ControlSidecarT],
+    *,
+    label: str,
+    missing_message: str,
+) -> ControlSidecarT:
+    data = runner_trust.stable_regular_bytes(path, maximum_bytes=_MAX_CONTROL_SIDECAR_BYTES)
+    if data is None:
+        try:
+            path.lstat()
+        except FileNotFoundError as error:
+            raise ControlAuthorityError(missing_message) from error
+        except OSError as error:
+            raise ControlAuthorityError(f"control {label} cannot be inspected") from error
+        raise ControlAuthorityError(f"control {label} is not a bounded stable regular file")
+    try:
+        return model.model_validate_json(data)
+    except ValueError as error:
+        raise ControlAuthorityError(f"control {label} is invalid") from error
+
+
+def _run_bounded_control_process(
+    command: tuple[str, ...],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    timeout_seconds: float,
+) -> subprocess.CompletedProcess[bytes]:
+    process = subprocess.Popen(  # noqa: S603 - runner and source are authenticated
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=0,
+        start_new_session=True,
+    )
+    stdout_pipe = process.stdout
+    stderr_pipe = process.stderr
+    if stdout_pipe is None or stderr_pipe is None:
+        _terminate_and_reap_control_process(process)
+        raise ControlAuthorityError("control capture pipes were not created")
+
+    stdout_capture = bytearray()
+    stderr_capture = bytearray()
+    selector = selectors.DefaultSelector()
+    deadline = time.monotonic() + timeout_seconds
+    try:
+        for pipe, capture in (
+            (stdout_pipe, stdout_capture),
+            (stderr_pipe, stderr_capture),
+        ):
+            os.set_blocking(pipe.fileno(), False)
+            selector.register(pipe, selectors.EVENT_READ, capture)
+
+        while selector.get_map():
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                raise subprocess.TimeoutExpired(command, timeout_seconds)
+            events = selector.select(remaining_seconds)
+            if not events:
+                raise subprocess.TimeoutExpired(command, timeout_seconds)
+            for key, _event_mask in events:
+                capture = key.data
+                stream_remaining = _MAX_CAPTURE_BYTES - len(capture)
+                aggregate_remaining = _MAX_AGGREGATE_CAPTURE_BYTES - (
+                    len(stdout_capture) + len(stderr_capture)
+                )
+                read_bytes = min(
+                    _CAPTURE_READ_BYTES,
+                    stream_remaining + 1,
+                    aggregate_remaining + 1,
+                )
+                try:
+                    chunk = os.read(key.fd, read_bytes)
+                except BlockingIOError:
+                    continue
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                capture.extend(chunk)
+                if (
+                    len(capture) > _MAX_CAPTURE_BYTES
+                    or len(stdout_capture) + len(stderr_capture) > _MAX_AGGREGATE_CAPTURE_BYTES
+                ):
+                    raise ControlAuthorityError("control output exceeded the capture bound")
+
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            raise subprocess.TimeoutExpired(command, timeout_seconds)
+        try:
+            returncode = process.wait(timeout=remaining_seconds)
+        except subprocess.TimeoutExpired as error:
+            raise subprocess.TimeoutExpired(command, timeout_seconds) from error
+        if _control_process_group_exists(process):
+            _terminate_remaining_control_process_group(process)
+            raise ControlAuthorityError("control left descendant processes after completion")
+        return subprocess.CompletedProcess(
+            command,
+            returncode,
+            bytes(stdout_capture),
+            bytes(stderr_capture),
+        )
+    except BaseException:
+        _terminate_and_reap_control_process(process)
+        raise
+    finally:
+        selector.close()
+        stdout_pipe.close()
+        stderr_pipe.close()
+
+
 def _run_control(
-    repo: Path,
     staging: Path,
     *,
     commit: str,
     tree: str,
     control_id: str,
-    uv_executable: str,
+    runner: AuthenticatedRunner,
     timeout_seconds: int,
 ) -> tuple[AdmissionControlResult, ControlManifestEntry]:
     node_id, expected_verdict, expected_gate, expected_failure = _control_requirement(control_id)
-    command = (
-        uv_executable,
-        "run",
-        "--offline",
-        "--frozen",
-        "python",
-        "-m",
-        "pytest",
+    command = _normalized_control_command(node_id)
+    bootstrap = (
+        "import sys;sys.path[:0]=sys.argv[1:3];import pytest;"
+        "raise SystemExit(pytest.main(sys.argv[3:]))"
+    )
+    execution_command = (
+        str(runner.python_path),
+        "-I",
+        "-B",
+        "-S",
+        "-c",
+        bootstrap,
+        str(runner.snapshot_root / "src"),
+        str(runner.site_packages),
         "-p",
         "fieldtrue.control_authority",
+        "-p",
+        "no:cacheprovider",
+        "-o",
+        "addopts=",
         "--no-header",
         "--tb=short",
         node_id,
@@ -651,34 +1025,44 @@ def _run_control(
         observation_path = temporary / "observation.json"
         outcome_path = temporary / "pytest-lifecycle.json"
         try:
-            completed = subprocess.run(  # noqa: S603 - fixed frozen command and authority node
-                command,
-                cwd=repo,
+            completed = _run_bounded_control_process(
+                execution_command,
+                cwd=runner.snapshot_root,
                 env=_sanitized_environment(
                     control_id=control_id,
                     node_id=node_id,
                     observation_path=observation_path,
                     outcome_path=outcome_path,
                 ),
-                capture_output=True,
-                check=False,
-                timeout=timeout_seconds,
+                timeout_seconds=timeout_seconds,
             )
         except subprocess.TimeoutExpired as error:
             raise ControlAuthorityError(f"control timed out: {control_id}") from error
-        if len(completed.stdout) > _MAX_CAPTURE_BYTES or len(completed.stderr) > _MAX_CAPTURE_BYTES:
+        except ControlAuthorityError as error:
+            raise ControlAuthorityError(f"{error}: {control_id}") from error
+        if (
+            len(completed.stdout) > _MAX_CAPTURE_BYTES
+            or len(completed.stderr) > _MAX_CAPTURE_BYTES
+            or len(completed.stdout) + len(completed.stderr) > _MAX_AGGREGATE_CAPTURE_BYTES
+        ):
             raise ControlAuthorityError(f"control output exceeded the capture bound: {control_id}")
-        if not outcome_path.is_file():
-            raise ControlAuthorityError(f"control emitted no pytest lifecycle: {control_id}")
-        lifecycle = PytestLifecycle.model_validate(read_json(outcome_path))
+        lifecycle = _load_control_sidecar(
+            outcome_path,
+            PytestLifecycle,
+            label=f"pytest lifecycle for {control_id}",
+            missing_message=f"control emitted no pytest lifecycle: {control_id}",
+        )
         _validate_lifecycle(lifecycle, node_id)
         if completed.returncode != 0:
             raise ControlAuthorityError(f"control process failed: {control_id}")
-        if not observation_path.is_file():
-            raise ControlAuthorityError(
+        observation = _load_control_sidecar(
+            observation_path,
+            ControlObservation,
+            label=f"audit observation for {control_id}",
+            missing_message=(
                 f"control passed pytest but emitted no audit observation: {control_id}"
-            )
-        observation = ControlObservation.model_validate(read_json(observation_path))
+            ),
+        )
         if (
             observation.control_id != control_id
             or observation.pytest_node_id != node_id
@@ -829,16 +1213,22 @@ def _verify_execution_ancestry(repo: Path, commit: str, tree: str) -> None:
         object_type = str(_run_git(repo, "cat-file", "-t", commit))
         committed_tree = str(_run_git(repo, "rev-parse", f"{commit}^{{tree}}"))
         head = str(_run_git(repo, "rev-parse", "HEAD"))
-    except subprocess.SubprocessError as error:
+    except (ControlAuthorityError, subprocess.SubprocessError) as error:
         raise ControlAuthorityError("control execution Git identity does not resolve") from error
     if object_type != "commit" or committed_tree != tree:
         raise ControlAuthorityError("control execution commit and tree are incoherent")
-    ancestry = subprocess.run(  # noqa: S603 - fixed Git ancestry query
-        ("git", "-C", str(repo), "merge-base", "--is-ancestor", commit, head),  # noqa: S607
-        check=False,
-        capture_output=True,
-        env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
-    )
+    try:
+        git = trusted_repository_git(repo)
+        ancestry = subprocess.run(  # noqa: S603 - fixed trusted Git ancestry query
+            (git, "merge-base", "--is-ancestor", commit, head),
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            env=git_environment(),
+            timeout=10,
+        )
+    except (GitTrustError, OSError, subprocess.SubprocessError) as error:
+        raise ControlAuthorityError("control execution Git ancestry cannot verify") from error
     if ancestry.returncode != 0:
         raise ControlAuthorityError("control execution commit is not an ancestor of HEAD")
 
@@ -871,7 +1261,7 @@ def _verify_historical_sources(
                 _run_git(repo, "rev-parse", f"{receipt.execution_commit}:{source.path}")
             )
             committed_bytes = _run_git(repo, "cat-file", "blob", committed_blob, text=False)
-        except subprocess.SubprocessError as error:
+        except (ControlAuthorityError, subprocess.SubprocessError) as error:
             raise ControlAuthorityError(
                 f"control authority source does not resolve: {source.path}"
             ) from error
@@ -890,20 +1280,8 @@ def _verify_historical_sources(
 
 
 def _expected_control_command(manifest: ControlExecutionManifest, node_id: str) -> tuple[str, ...]:
-    return (
-        manifest.uv_executable,
-        "run",
-        "--offline",
-        "--frozen",
-        "python",
-        "-m",
-        "pytest",
-        "-p",
-        "fieldtrue.control_authority",
-        "--no-header",
-        "--tb=short",
-        node_id,
-    )
+    del manifest
+    return _normalized_control_command(node_id)
 
 
 def _verify_control_evidence(
@@ -1023,6 +1401,7 @@ def generate_admission_control_bundle(
     repo = repo_root.resolve(strict=True)
     if output_directory.exists() or output_directory.is_symlink():
         raise FileExistsError(output_directory)
+    _assert_parent_process_trusted(repo)
     output_parent = output_directory.parent.resolve(strict=True)
     target = output_parent / output_directory.name
     _assert_clean_repo(repo)
@@ -1030,113 +1409,127 @@ def generate_admission_control_bundle(
     sources = tuple(_git_bound_source(repo, commit, name, path) for name, path in _SOURCE_PATHS)
     contract_path = repo / "protocol" / "acquisition" / "iter001_contract.json"
     contract = AcquisitionContract.model_validate(read_json(contract_path))
-    started_at = datetime.now(UTC)
-    uv_executable = _resolve_uv_executable()
-    uv_sha256 = sha256_file(Path(uv_executable))
-    uv_version = _uv_version(uv_executable)
-    staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.tmp-", dir=output_parent))
-    published = False
+    runner_temporary = tempfile.TemporaryDirectory(prefix="fieldtrue-control-runner-")
     try:
-        results: list[AdmissionControlResult] = []
-        entries: list[ControlManifestEntry] = []
-        for control_id in _REQUIRED_CONTROL_IDS:
-            result, entry = _run_control(
-                repo,
-                staging,
-                commit=commit,
-                tree=tree,
-                control_id=control_id,
-                uv_executable=uv_executable,
-                timeout_seconds=timeout_seconds,
+        runner = _prepare_authenticated_runner(repo, commit, Path(runner_temporary.name))
+        started_at = datetime.now(UTC)
+        staging = Path(tempfile.mkdtemp(prefix=f".{target.name}.tmp-", dir=output_parent))
+        published = False
+        try:
+            results: list[AdmissionControlResult] = []
+            entries: list[ControlManifestEntry] = []
+            for control_id in _REQUIRED_CONTROL_IDS:
+                if not _authenticated_runner_is_unchanged(runner):
+                    raise ControlAuthorityError("authenticated runner changed before control")
+                result, entry = _run_control(
+                    staging,
+                    commit=commit,
+                    tree=tree,
+                    control_id=control_id,
+                    runner=runner,
+                    timeout_seconds=timeout_seconds,
+                )
+                if not _authenticated_runner_is_unchanged(runner):
+                    raise ControlAuthorityError("authenticated runner changed after control")
+                results.append(result)
+                entries.append(entry)
+            _assert_clean_repo(repo)
+            if _git_identity(repo) != (commit, tree):
+                raise ControlAuthorityError("repository identity changed during control execution")
+            rebound_sources = tuple(
+                _git_bound_source(repo, commit, name, path) for name, path in _SOURCE_PATHS
             )
-            results.append(result)
-            entries.append(entry)
-        _assert_clean_repo(repo)
-        if _git_identity(repo) != (commit, tree):
-            raise ControlAuthorityError("repository identity changed during control execution")
-        rebound_sources = tuple(
-            _git_bound_source(repo, commit, name, path) for name, path in _SOURCE_PATHS
-        )
-        if rebound_sources != sources:
-            raise ControlAuthorityError("authority source bytes changed during control execution")
-        if sha256_file(Path(uv_executable)) != uv_sha256:
-            raise ControlAuthorityError("uv executable changed during control execution")
-        finished_at = datetime.now(UTC)
-        manifest = ControlExecutionManifest(
-            suite_id=_SUITE_ID,
-            execution_commit=commit,
-            execution_tree=tree,
-            started_at=started_at,
-            finished_at=finished_at,
-            repository_clean_before=True,
-            repository_clean_after=True,
-            dependency_mode="uv-offline-frozen",
-            uv_executable=uv_executable,
-            uv_executable_sha256=uv_sha256,
-            uv_version=uv_version,
-            environment_policy=(
-                "explicit-allowlist",
-                "pytest-plugin-autoload-disabled",
-                "pythonhashseed-zero",
-                "timezone-utc",
-                "network-resolution-disabled-by-uv-offline",
-            ),
-            sources=sources,
-            controls=tuple(entries),
-        )
-        manifest_path = staging / "execution_manifest.json"
-        atomic_write(manifest_path, canonical_json_pretty(manifest), mode=0o444)
-        manifest_binding = _artifact_binding(staging, manifest_path)
-        source_by_name = {item.name: item for item in sources}
-        receipt_body: dict[str, Any] = {
-            "schema_version": "fieldtrue.admission-control-suite-receipt.v1",
-            "suite_id": _SUITE_ID,
-            "validator_git_blob": source_by_name["validator"].git_blob,
-            "validator_source_sha256": source_by_name["validator"].sha256,
-            "fixture_builder_git_blob": source_by_name["fixture_builder"].git_blob,
-            "fixture_builder_sha256": source_by_name["fixture_builder"].sha256,
-            "control_test_git_blob": source_by_name["control_test"].git_blob,
-            "control_test_sha256": source_by_name["control_test"].sha256,
-            "generator_git_blob": source_by_name["generator"].git_blob,
-            "generator_sha256": source_by_name["generator"].sha256,
-            "dependency_lock_git_blob": source_by_name["dependency_lock"].git_blob,
-            "dependency_lock_sha256": source_by_name["dependency_lock"].sha256,
-            "execution_commit": commit,
-            "execution_tree": tree,
-            "execution_manifest": manifest_binding.model_dump(mode="json"),
-            "executed_at": finished_at,
-            "controls": [result.model_dump(mode="json") for result in results],
-        }
-        key = _load_existing_key(signing_key_path.resolve(strict=True))
-        if key.verify_key.encode().hex() != contract.trust_anchor_public_key:
-            raise ControlAuthorityError(
-                "governance signing key differs from the acquisition contract"
+            if rebound_sources != sources:
+                raise ControlAuthorityError(
+                    "authority source bytes changed during control execution"
+                )
+            if not _authenticated_runner_is_unchanged(runner):
+                raise ControlAuthorityError("authenticated runner changed before signing")
+            finished_at = datetime.now(UTC)
+            manifest = ControlExecutionManifest(
+                suite_id=_SUITE_ID,
+                execution_commit=commit,
+                execution_tree=tree,
+                started_at=started_at,
+                finished_at=finished_at,
+                repository_clean_before=True,
+                repository_clean_after=True,
+                dependency_mode="lock-hash-authenticated-wheels",
+                uv_executable=str(runner.uv.executable.resolved_path),
+                uv_executable_sha256=runner.uv.executable.sha256,
+                uv_version=runner.uv.version,
+                python_executable_sha256=runner.python.sha256,
+                python_version=RUNNER_PYTHON_FULL_VERSION,
+                runner_environment_sha256=runner.environment_sha256,
+                artifact_set_sha256=runner.artifact_set_sha256,
+                environment_policy=(
+                    "committed-source-snapshot",
+                    "fresh-private-managed-python",
+                    "lock-hash-authenticated-wheels",
+                    "isolated-python-no-site",
+                    "explicit-environment-allowlist",
+                    "pytest-plugin-autoload-disabled",
+                    "runner-rebound-before-and-after-each-control",
+                ),
+                sources=sources,
+                controls=tuple(entries),
             )
-        attestation = issue_attestation(
-            key,
-            attestation_id="iter001-admission-controls-attestation",
-            signer_id="iter001-governance-root",
-            subject_kind=AttestationSubjectKind.CONTROL_SUITE,
-            subject_sha256=attestation_subject_hash(
-                AttestationSubjectKind.CONTROL_SUITE,
-                receipt_body,
-            ),
-            issued_at=finished_at,
-        )
-        receipt = AdmissionControlSuiteReceipt.model_validate(
-            {**receipt_body, "attestation": attestation.model_dump(mode="json")}
-        )
-        receipt_path = staging / "control_suite_receipt.json"
-        atomic_write(receipt_path, canonical_json_pretty(receipt), mode=0o444)
-        _fsync_directory(staging / "controls")
-        _fsync_directory(staging)
-        _rename_no_replace(staging, target)
-        published = True
-        _fsync_directory(output_parent)
-        return target / "control_suite_receipt.json"
+            manifest_path = staging / "execution_manifest.json"
+            atomic_write(manifest_path, canonical_json_pretty(manifest), mode=0o444)
+            manifest_binding = _artifact_binding(staging, manifest_path)
+            source_by_name = {item.name: item for item in sources}
+            receipt_body: dict[str, Any] = {
+                "schema_version": "fieldtrue.admission-control-suite-receipt.v1",
+                "suite_id": _SUITE_ID,
+                "validator_git_blob": source_by_name["validator"].git_blob,
+                "validator_source_sha256": source_by_name["validator"].sha256,
+                "fixture_builder_git_blob": source_by_name["fixture_builder"].git_blob,
+                "fixture_builder_sha256": source_by_name["fixture_builder"].sha256,
+                "control_test_git_blob": source_by_name["control_test"].git_blob,
+                "control_test_sha256": source_by_name["control_test"].sha256,
+                "generator_git_blob": source_by_name["generator"].git_blob,
+                "generator_sha256": source_by_name["generator"].sha256,
+                "dependency_lock_git_blob": source_by_name["dependency_lock"].git_blob,
+                "dependency_lock_sha256": source_by_name["dependency_lock"].sha256,
+                "execution_commit": commit,
+                "execution_tree": tree,
+                "execution_manifest": manifest_binding.model_dump(mode="json"),
+                "executed_at": finished_at,
+                "controls": [result.model_dump(mode="json") for result in results],
+            }
+            _assert_parent_process_trusted(repo)
+            key = _load_existing_key(signing_key_path.resolve(strict=True))
+            if key.verify_key.encode().hex() != contract.trust_anchor_public_key:
+                raise ControlAuthorityError(
+                    "governance signing key differs from the acquisition contract"
+                )
+            attestation = issue_attestation(
+                key,
+                attestation_id="iter001-admission-controls-attestation",
+                signer_id="iter001-governance-root",
+                subject_kind=AttestationSubjectKind.CONTROL_SUITE,
+                subject_sha256=attestation_subject_hash(
+                    AttestationSubjectKind.CONTROL_SUITE,
+                    receipt_body,
+                ),
+                issued_at=finished_at,
+            )
+            receipt = AdmissionControlSuiteReceipt.model_validate(
+                {**receipt_body, "attestation": attestation.model_dump(mode="json")}
+            )
+            receipt_path = staging / "control_suite_receipt.json"
+            atomic_write(receipt_path, canonical_json_pretty(receipt), mode=0o444)
+            _fsync_directory(staging / "controls")
+            _fsync_directory(staging)
+            _rename_no_replace(staging, target)
+            published = True
+            _fsync_directory(output_parent)
+            return target / "control_suite_receipt.json"
+        finally:
+            if not published:
+                shutil.rmtree(staging, ignore_errors=True)
     finally:
-        if not published:
-            shutil.rmtree(staging, ignore_errors=True)
+        runner_temporary.cleanup()
 
 
 def _parser() -> argparse.ArgumentParser:

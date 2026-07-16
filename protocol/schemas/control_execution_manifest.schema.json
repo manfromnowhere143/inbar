@@ -129,6 +129,11 @@
   },
   "additionalProperties": false,
   "properties": {
+    "artifact_set_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Artifact Set Sha256",
+      "type": "string"
+    },
     "controls": {
       "items": {
         "$ref": "#/$defs/ControlManifestEntry"
@@ -137,7 +142,7 @@
       "type": "array"
     },
     "dependency_mode": {
-      "const": "uv-offline-frozen",
+      "const": "lock-hash-authenticated-wheels",
       "title": "Dependency Mode",
       "type": "string"
     },
@@ -163,6 +168,15 @@
       "title": "Finished At",
       "type": "string"
     },
+    "python_executable_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Python Executable Sha256",
+      "type": "string"
+    },
+    "python_version": {
+      "title": "Python Version",
+      "type": "string"
+    },
     "repository_clean_after": {
       "const": true,
       "title": "Repository Clean After",
@@ -172,6 +186,11 @@
       "const": true,
       "title": "Repository Clean Before",
       "type": "boolean"
+    },
+    "runner_environment_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Runner Environment Sha256",
+      "type": "string"
     },
     "schema_version": {
       "const": "fieldtrue.control-execution-manifest.v1",
@@ -222,6 +241,10 @@
     "uv_executable",
     "uv_executable_sha256",
     "uv_version",
+    "python_executable_sha256",
+    "python_version",
+    "runner_environment_sha256",
+    "artifact_set_sha256",
     "environment_policy",
     "sources",
     "controls"

@@ -6,8 +6,9 @@ Canonical workspace:
 Run first:
 
 ```bash
-uv sync --group dev
+uv sync --group dev --frozen
 uv run inbar mission validate --expect-failure iter001-acquisition-contract
+uv run inbar handoff check
 uv run pytest --cov
 git status --short --branch
 ```
@@ -49,7 +50,7 @@ git status --short --branch
 
 - Machine contract: `mission/contract.json`
 - Lifecycle: `mission/loop.json`
-- Current state: `CONTINUITY.md`
+- Durable mission context: `CONTINUITY.md`
 - Frozen master protocol: `PREREGISTRATION.md`
 - Per-iteration authority: `experiments/<id>/HYPOTHESIS.md`
 - Claims: `claims/registry.jsonl`
