@@ -645,20 +645,6 @@ def _sanitized_environment(
     }
 
 
-def _resolve_uv_executable() -> str:
-    try:
-        return str(runner_trust.resolve_pinned_uv().executable.resolved_path)
-    except RunnerTrustError as error:
-        raise ControlAuthorityError(str(error)) from error
-
-
-def _uv_version(executable: str) -> str:
-    try:
-        return runner_trust.resolve_pinned_uv(Path(executable)).version
-    except RunnerTrustError as error:
-        raise ControlAuthorityError(str(error)) from error
-
-
 def _materialize_commit_snapshot(repo: Path, commit: str, destination: Path) -> bool:
     try:
         raw = _run_git(
@@ -737,7 +723,6 @@ def _prepare_authenticated_runner(
     commit: str,
     root: Path,
 ) -> AuthenticatedRunner:
-    _resolve_uv_executable()
     snapshot_root = root / "snapshot"
     if not _materialize_commit_snapshot(repo, commit, snapshot_root):
         raise ControlAuthorityError("committed control source snapshot cannot be materialized")

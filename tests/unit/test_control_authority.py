@@ -61,19 +61,6 @@ ZERO_HASH = "0" * 64
 ZERO_BLOB = "0" * 40
 
 
-def _bind_test_uv(
-    monkeypatch: pytest.MonkeyPatch,
-    executable: Path,
-    *,
-    target: str = "test-target",
-) -> None:
-    trust = authority.runner_trust
-    key = (trust.platform.system().casefold(), trust.platform.machine().casefold())
-    monkeypatch.setattr(trust, "PINNED_UV_SHA256", {key: sha256_file(executable)})
-    monkeypatch.setattr(trust, "PINNED_UV_TARGET", {key: target})
-    monkeypatch.setattr(trust.shutil, "which", lambda *_args, **_kwargs: str(executable))
-
-
 def _execution_manifest_value() -> dict[str, Any]:
     return {
         "suite_id": "iter001-admission-controls-v1",
@@ -705,38 +692,12 @@ def test_git_binding_detects_working_byte_drift(tmp_path: Path) -> None:
         _git_bound_source(repo, commit, "validator", "source.py")
 
 
-def test_execution_tool_identity_fails_closed(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(authority.runner_trust.shutil, "which", lambda *_args, **_kwargs: None)
-    with pytest.raises(ControlAuthorityError, match="uv is not available"):
-        authority._resolve_uv_executable()
-
-    monkeypatch.setattr(
-        authority.runner_trust.shutil,
-        "which",
-        lambda *_args, **_kwargs: str(tmp_path),
-    )
-    with pytest.raises(ControlAuthorityError, match="not a stable regular file"):
-        authority._resolve_uv_executable()
-
-    executable = tmp_path / "uv"
-    executable.write_bytes(b"pinned-test-executable")
-    executable.chmod(0o500)
-    _bind_test_uv(monkeypatch, executable)
-
-    def malformed_version(*_args: Any, **_kwargs: Any) -> SimpleNamespace:
-        return SimpleNamespace(stdout="substituted tool\n")
-
-    monkeypatch.setattr(authority.runner_trust.subprocess, "run", malformed_version)
-    with pytest.raises(ControlAuthorityError, match="invalid version identity"):
-        authority._uv_version(str(executable))
+def test_missing_signing_key_fails_closed(tmp_path: Path) -> None:
     with pytest.raises(ControlAuthorityError, match="signing key does not exist"):
         authority._load_existing_key(tmp_path / "missing-key")
 
 
-def test_git_and_tool_identifiers_reject_malformed_substitutions(
+def test_git_identifiers_reject_malformed_substitutions(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -750,20 +711,6 @@ def test_git_and_tool_identifiers_reject_malformed_substitutions(
     monkeypatch.setattr(authority, "_run_git", lambda *_args, **_kwargs: next(responses))
     with pytest.raises(ControlAuthorityError, match="not a Git blob"):
         authority._git_bound_source(tmp_path, ZERO_BLOB, "validator", "source.py")
-
-    executable = tmp_path / "uv"
-    executable.write_bytes(b"executable")
-    executable.chmod(0o500)
-    _bind_test_uv(monkeypatch, executable)
-    monkeypatch.setattr(
-        authority.runner_trust.subprocess,
-        "run",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            stdout="uv 0.11.28 (abcdef 2026-07-07 test-target)\n"
-        ),
-    )
-    assert authority._resolve_uv_executable() == str(executable)
-    assert authority._uv_version(str(executable)) == "uv 0.11.28 (abcdef 2026-07-07 test-target)"
 
 
 def test_commit_snapshot_rejects_aggregate_bytes_before_exceeding_bound(
@@ -840,6 +787,13 @@ def test_fake_ambient_uv_cannot_emit_control_evidence_or_reach_signing(
         ),
     )
 
+    def materialize_hostile_snapshot(_repo: Path, _commit: str, destination: Path) -> bool:
+        destination.mkdir(mode=0o700, parents=True)
+        destination.chmod(0o700)
+        return True
+
+    monkeypatch.setattr(authority, "_materialize_commit_snapshot", materialize_hostile_snapshot)
+
     signing_reached = False
 
     def reject_signing(_path: Path) -> Any:
@@ -849,7 +803,7 @@ def test_fake_ambient_uv_cannot_emit_control_evidence_or_reach_signing(
 
     monkeypatch.setattr(authority, "_load_existing_key", reject_signing)
     output = tmp_path / "bundle"
-    with pytest.raises(ControlAuthorityError, match="pinned official release"):
+    with pytest.raises(ControlAuthorityError, match="uv acquisition source"):
         generate_admission_control_bundle(repo, output, tmp_path / "key")
 
     assert not forged_control.exists()

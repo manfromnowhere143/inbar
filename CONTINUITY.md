@@ -74,6 +74,13 @@ configuration and `extensions.worktreeConfig` is absent. Any active extension, i
 unknown key, non-false value, redirection, special file, unsafe permission, or read race remains a
 hard failure.
 
+Runner acquisition treats the ambient `uv` path as untrusted storage, including GitHub's writable
+hosted-toolcache ancestry. Stable descriptor-bound bytes must match the exact official size and hash
+for the execution platform before they are copied exclusively into a private snapshot-local
+directory. Only that staged copy is executed or rebound. Its structured self-version response must
+match the complete platform identity, including the intentionally absent Linux commit metadata, and
+the staged executable remains covered by the authenticated runner tree digest.
+
 ## Conditional research interest
 
 Daniel's deep interest in Einstein field equations, Ricci curvature, and general relativity is

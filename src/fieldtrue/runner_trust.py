@@ -96,11 +96,35 @@ PINNED_UV_SHA256 = {
     ("linux", "aarch64"): "b9f74e398b6b15826a4b68b5a83d039036d47df64013e7faf1a9974ec199c144",
     ("linux", "x86_64"): "1cb9cd0a1749debf6049d7d2bb933882cc52d81016326ee6d99a786d6c988b03",
 }
+PINNED_UV_SIZE = {
+    ("darwin", "arm64"): 52_031_824,
+    ("darwin", "x86_64"): 58_271_524,
+    ("linux", "aarch64"): 56_689_472,
+    ("linux", "x86_64"): 65_794_424,
+}
 PINNED_UV_TARGET = {
     ("darwin", "arm64"): "aarch64-apple-darwin",
     ("darwin", "x86_64"): "x86_64-apple-darwin",
     ("linux", "aarch64"): "aarch64-unknown-linux-gnu",
     ("linux", "x86_64"): "x86_64-unknown-linux-gnu",
+}
+PINNED_UV_COMMIT_INFO: dict[tuple[str, str], dict[str, object] | None] = {
+    ("darwin", "arm64"): {
+        "short_commit_hash": "ebf0f43d7",
+        "commit_hash": "ebf0f43d7c4267876fc256f5fce75982c33f4399",
+        "commit_date": "2026-07-07",
+        "last_tag": None,
+        "commits_since_last_tag": 0,
+    },
+    ("darwin", "x86_64"): {
+        "short_commit_hash": "ebf0f43d7",
+        "commit_hash": "ebf0f43d7c4267876fc256f5fce75982c33f4399",
+        "commit_date": "2026-07-07",
+        "last_tag": None,
+        "commits_since_last_tag": 0,
+    },
+    ("linux", "aarch64"): None,
+    ("linux", "x86_64"): None,
 }
 
 
@@ -494,13 +518,30 @@ def bind_executable(
     )
 
 
-def resolve_pinned_uv(path: Path | None = None) -> PinnedUvBinding:
-    """Resolve and execute only the official per-platform uv 0.11.28 binary."""
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate JSON object key")
+        value[key] = item
+    return value
+
+
+def resolve_pinned_uv(
+    path: Path | None = None,
+    *,
+    required_root: Path | None = None,
+) -> PinnedUvBinding:
+    """Bind and identify only the official per-platform uv 0.11.28 binary."""
 
     platform_key = (platform.system().casefold(), platform.machine().casefold())
     expected_hash = PINNED_UV_SHA256.get(platform_key)
     expected_target = PINNED_UV_TARGET.get(platform_key)
-    if expected_hash is None or expected_target is None:
+    if (
+        expected_hash is None
+        or expected_target is None
+        or platform_key not in PINNED_UV_COMMIT_INFO
+    ):
         raise RunnerTrustError("uv trust is unsupported on this execution platform")
     candidate = path
     if candidate is None:
@@ -508,14 +549,20 @@ def resolve_pinned_uv(path: Path | None = None) -> PinnedUvBinding:
         if discovered is None:
             raise RunnerTrustError("uv is not available on the execution PATH")
         candidate = Path(discovered)
-    binding = bind_executable(candidate)
+    binding = bind_executable(candidate, required_root=required_root)
     if binding is None:
         raise RunnerTrustError("resolved uv executable is not a stable regular file")
     if binding.sha256 != expected_hash:
         raise RunnerTrustError("uv executable does not match the pinned official release")
     try:
         completed = subprocess.run(  # noqa: S603 - executable bytes match the pinned release
-            (str(binding.resolved_path), "--version"),
+            (
+                str(binding.resolved_path),
+                "self",
+                "version",
+                "--output-format",
+                "json",
+            ),
             check=True,
             capture_output=True,
             text=True,
@@ -524,19 +571,36 @@ def resolve_pinned_uv(path: Path | None = None) -> PinnedUvBinding:
         )
     except (OSError, subprocess.SubprocessError) as error:
         raise RunnerTrustError("uv version identity cannot be verified") from error
-    version = completed.stdout.strip()
-    if (
-        re.fullmatch(
-            rf"uv {re.escape(PINNED_UV_VERSION)} "
-            rf"\([0-9a-f]+ 2026-07-07 {re.escape(expected_target)}\)",
-            version,
+    try:
+        identity = json.loads(
+            completed.stdout,
+            object_pairs_hook=_unique_json_object,
         )
-        is None
+    except (json.JSONDecodeError, ValueError) as error:
+        raise RunnerTrustError("uv returned an invalid version identity") from error
+    expected_commit = PINNED_UV_COMMIT_INFO[platform_key]
+    expected_identity = {
+        "package_name": "uv",
+        "version": PINNED_UV_VERSION,
+        "commit_info": expected_commit,
+        "target_triple": expected_target,
+    }
+    if (
+        completed.stderr != ""
+        or len(completed.stdout.encode("utf-8")) > 4096
+        or identity != expected_identity
     ):
         raise RunnerTrustError("uv returned an invalid version identity")
-    rebound = bind_executable(binding.lexical_path)
+    rebound = bind_executable(binding.lexical_path, required_root=required_root)
     if rebound != binding:
         raise RunnerTrustError("uv executable changed during version verification")
+    if expected_commit is None:
+        version = f"uv {PINNED_UV_VERSION} ({expected_target})"
+    else:
+        version = (
+            f"uv {PINNED_UV_VERSION} ({expected_commit['short_commit_hash']} "
+            f"{expected_commit['commit_date']} {expected_target})"
+        )
     return PinnedUvBinding(executable=binding, version=version, target=expected_target)
 
 
@@ -1369,6 +1433,7 @@ def _write_exclusive_stable_bytes(path: Path, data: bytes, *, mode: int = 0o400)
             if written <= 0:
                 raise RunnerTrustError("authenticated mirror write failed")
             view = view[written:]
+        os.fchmod(descriptor, mode)
         os.fsync(descriptor)
         os.close(descriptor)
         descriptor = None
@@ -1380,6 +1445,55 @@ def _write_exclusive_stable_bytes(path: Path, data: bytes, *, mode: int = 0o400)
                 os.close(descriptor)
     if stable_regular_bytes(path, maximum_bytes=len(data)) != data:
         raise RunnerTrustError("authenticated mirror did not preserve exact bytes")
+
+
+def stage_pinned_uv(root: Path, source: Path | None = None) -> PinnedUvBinding:
+    """Copy authenticated uv bytes into a private runner-local execution boundary."""
+
+    platform_key = (platform.system().casefold(), platform.machine().casefold())
+    expected_hash = PINNED_UV_SHA256.get(platform_key)
+    expected_size = PINNED_UV_SIZE.get(platform_key)
+    if expected_hash is None or expected_size is None:
+        raise RunnerTrustError("uv trust is unsupported on this execution platform")
+    candidate = source
+    if candidate is None:
+        discovered = shutil.which("uv")
+        if discovered is None:
+            raise RunnerTrustError("uv is not available on the execution PATH")
+        candidate = Path(discovered)
+    source_bytes = stable_regular_bytes(candidate, maximum_bytes=expected_size)
+    if source_bytes is None or len(source_bytes) != expected_size:
+        raise RunnerTrustError("uv acquisition source is not one stable official-size file")
+    if sha256_bytes(source_bytes) != expected_hash:
+        raise RunnerTrustError("uv acquisition source does not match the pinned official release")
+
+    private_root = root.absolute()
+    staged_root = private_root / "authenticated-uv"
+    staged_path = staged_root / "uv"
+    try:
+        root_metadata = private_root.lstat()
+        if (
+            not _directory_metadata_is_trusted(
+                root_metadata,
+                allowed_owner_uids=frozenset({os.getuid()}),
+            )
+            or staged_root.exists()
+            or staged_root.is_symlink()
+        ):
+            raise RunnerTrustError("private uv staging root is unsafe or already exists")
+        staged_root.mkdir(mode=0o700)
+    except RunnerTrustError:
+        raise
+    except OSError as error:
+        raise RunnerTrustError("private uv staging root cannot be created") from error
+    if not _trusted_directory_chain(
+        staged_root,
+        allowed_owner_uids=frozenset({os.getuid()}),
+        stop=private_root,
+    ):
+        raise RunnerTrustError("private uv staging root cannot be bound")
+    _write_exclusive_stable_bytes(staged_path, source_bytes, mode=0o500)
+    return resolve_pinned_uv(staged_path, required_root=staged_root)
 
 
 def _same_uv_binding(candidate: PinnedUvBinding, expected: PinnedUvBinding) -> bool:
@@ -1435,7 +1549,13 @@ def _install_pinned_python(
         raise RunnerTrustError("private Python mirror URI cannot be bound") from error
 
     host_tool = host_tool_binding()
-    if not _same_uv_binding(resolve_pinned_uv(), uv):
+    if not _same_uv_binding(
+        resolve_pinned_uv(
+            uv.executable.lexical_path,
+            required_root=uv.executable.lexical_path.parent,
+        ),
+        uv,
+    ):
         raise RunnerTrustError("pinned uv changed before private Python installation")
     environment = {
         "HOME": str(runner_home),
@@ -1480,7 +1600,13 @@ def _install_pinned_python(
         installation.returncode != 0
         or len(installation.stdout) + len(installation.stderr) > 1024 * 1024
         or stable_regular_bytes(staged_archive, maximum_bytes=expected_size) != archive
-        or not _same_uv_binding(resolve_pinned_uv(), uv)
+        or not _same_uv_binding(
+            resolve_pinned_uv(
+                uv.executable.lexical_path,
+                required_root=uv.executable.lexical_path.parent,
+            ),
+            uv,
+        )
         or host_tool_binding() != host_tool
     ):
         raise RunnerTrustError("offline pinned Python installation failed closed")
@@ -1546,6 +1672,7 @@ def prepare_authenticated_runner(
         raise RunnerTrustError("authenticated runner requires a root distribution set")
     if any(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]*", name) is None for name in required_imports):
         raise RunnerTrustError("authenticated runner import inventory is invalid")
+    uv = stage_pinned_uv(root)
     excluded_paths = {"runner-scratch"}
     mutable_directories: set[str] = set()
     for output_path in mutable_output_paths:
@@ -1613,7 +1740,6 @@ def prepare_authenticated_runner(
         }
     )
 
-    uv = resolve_pinned_uv()
     (
         interpreter_root,
         python_path,
@@ -1704,7 +1830,13 @@ def prepare_authenticated_runner(
         or identity.get("safe_path") is not True
         or identity.get("distributions") != dict(distribution_versions)
         or len(probe_output.stdout) + len(probe_output.stderr) > 16 * 1024
-        or not _same_uv_binding(resolve_pinned_uv(), uv)
+        or not _same_uv_binding(
+            resolve_pinned_uv(
+                uv.executable.lexical_path,
+                required_root=uv.executable.lexical_path.parent,
+            ),
+            uv,
+        )
         or host_tool_binding() != host_tool
         or bind_executable(python_path, required_root=interpreter_root) != python_binding
     ):
@@ -1745,21 +1877,30 @@ def _runner_directories_are_trusted(runner: AuthenticatedRunner) -> bool:
     allowed_owner_uids = frozenset({invoking_uid})
     try:
         root = runner.root.resolve(strict=True)
+        expected_uv_path = runner.root.absolute() / "authenticated-uv" / "uv"
         directories = (
             runner.root,
             runner.snapshot_root,
             runner.interpreter_root,
             runner.site_packages,
             runner.scratch_root,
+            expected_uv_path.parent,
         )
         resolved_directories = tuple(path.resolve(strict=True) for path in directories)
         python_path = runner.python_path.resolve(strict=True)
+        uv_path = runner.uv.executable.lexical_path.resolve(strict=True)
     except OSError:
         return False
     resolved_interpreter = resolved_directories[2]
-    if any(
-        resolved != root and not resolved.is_relative_to(root) for resolved in resolved_directories
-    ) or not python_path.is_relative_to(resolved_interpreter):
+    if (
+        any(
+            resolved != root and not resolved.is_relative_to(root)
+            for resolved in resolved_directories
+        )
+        or runner.uv.executable.lexical_path != expected_uv_path
+        or uv_path != expected_uv_path.resolve(strict=True)
+        or not python_path.is_relative_to(resolved_interpreter)
+    ):
         return False
     return all(
         _trusted_directory_chain(
@@ -1776,8 +1917,10 @@ def runner_is_unchanged(runner: AuthenticatedRunner) -> bool:
 
     try:
         directories_are_trusted = _runner_directories_are_trusted(runner)
-        discovered_uv = resolve_pinned_uv()
-        direct_uv = resolve_pinned_uv(runner.uv.executable.lexical_path)
+        direct_uv = resolve_pinned_uv(
+            runner.uv.executable.lexical_path,
+            required_root=runner.uv.executable.lexical_path.parent,
+        )
         python = bind_executable(runner.python_path, required_root=runner.interpreter_root)
         lock_bytes = stable_regular_bytes(
             runner.snapshot_root / "uv.lock",
@@ -1790,7 +1933,6 @@ def runner_is_unchanged(runner: AuthenticatedRunner) -> bool:
             python_artifact is not None
             and python_artifact[3] == runner.python_artifact_sha256
             and directories_are_trusted
-            and _same_uv_binding(discovered_uv, runner.uv)
             and _same_uv_binding(direct_uv, runner.uv)
             and host_tool_binding() == runner.host_tool
             and python is not None

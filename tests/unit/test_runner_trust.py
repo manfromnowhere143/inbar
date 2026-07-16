@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import os
 import stat
 import subprocess
@@ -617,13 +618,17 @@ def _directory_runner(tmp_path: Path) -> trust.AuthenticatedRunner:
     interpreter = root / "python-install" / "python"
     site_packages = root / "authenticated-site-packages"
     scratch = root / "runner-scratch"
+    uv_root = root / "authenticated-uv"
+    uv_path = uv_root / "uv"
     python_path = interpreter / "bin" / "python3.12"
-    for directory in (snapshot, interpreter, site_packages, scratch, python_path.parent):
+    for directory in (snapshot, interpreter, site_packages, scratch, uv_root, python_path.parent):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         directory.chmod(0o700)
     root.chmod(0o700)
     python_path.write_bytes(b"python")
     python_path.chmod(0o700)
+    uv_path.write_bytes(b"uv")
+    uv_path.chmod(0o700)
     executable = trust.ExecutableBinding(
         lexical_path=python_path,
         resolved_path=python_path,
@@ -633,6 +638,8 @@ def _directory_runner(tmp_path: Path) -> trust.AuthenticatedRunner:
         owner_uid=os.getuid(),
         owner_gid=os.getgid(),
     )
+    uv_executable = trust.bind_executable(uv_path, required_root=uv_root)
+    assert uv_executable is not None
     return trust.AuthenticatedRunner(
         root=root,
         snapshot_root=snapshot,
@@ -640,7 +647,7 @@ def _directory_runner(tmp_path: Path) -> trust.AuthenticatedRunner:
         site_packages=site_packages,
         interpreter_root=interpreter,
         scratch_root=scratch,
-        uv=trust.PinnedUvBinding(executable=executable, version="uv test", target="test"),
+        uv=trust.PinnedUvBinding(executable=uv_executable, version="uv test", target="test"),
         python=executable,
         python_artifact_sha256="b" * 64,
         host_tool=trust.HostToolBinding(
@@ -686,6 +693,27 @@ def test_runner_directory_trust_rejects_excluded_scratch_symlink(tmp_path: Path)
 
     assert runner.scratch_root.resolve(strict=True) == replacement
     assert not trust._runner_directories_are_trusted(runner)
+
+
+def test_runner_directory_trust_requires_exact_private_uv_location(tmp_path: Path) -> None:
+    runner = _directory_runner(tmp_path)
+    uv_root = runner.uv.executable.lexical_path.parent
+    uv_root.chmod(0o777)
+    assert not trust._runner_directories_are_trusted(runner)
+    uv_root.chmod(0o700)
+
+    alternate_root = runner.root / "alternate-uv"
+    alternate_root.mkdir(mode=0o700)
+    alternate = alternate_root / "uv"
+    alternate.write_bytes(b"uv")
+    alternate.chmod(0o500)
+    alternate_binding = trust.bind_executable(alternate, required_root=alternate_root)
+    assert alternate_binding is not None
+    forged = replace(
+        runner,
+        uv=replace(runner.uv, executable=alternate_binding),
+    )
+    assert not trust._runner_directories_are_trusted(forged)
 
 
 def test_same_uv_binding_compares_the_complete_executable_binding(tmp_path: Path) -> None:
@@ -766,6 +794,12 @@ def test_python_artifact_pins_are_complete_for_supported_platforms() -> None:
         assert len(digest) == 64
         assert size > 20_000_000
 
+    supported = set(trust.PINNED_PYTHON_ARTIFACTS)
+    assert set(trust.PINNED_UV_SHA256) == supported
+    assert set(trust.PINNED_UV_SIZE) == supported
+    assert set(trust.PINNED_UV_TARGET) == supported
+    assert set(trust.PINNED_UV_COMMIT_INFO) == supported
+
 
 def test_runner_distribution_version_is_canonical_and_unique(tmp_path: Path) -> None:
     runner = _directory_runner(tmp_path)
@@ -834,7 +868,19 @@ def test_resolve_pinned_uv_fails_closed_across_platform_process_and_rebind(
     monkeypatch.setattr(trust.platform, "machine", lambda: "TestMachine")
     monkeypatch.setitem(trust.PINNED_UV_SHA256, ("testos", "testmachine"), "a" * 64)
     monkeypatch.setitem(trust.PINNED_UV_TARGET, ("testos", "testmachine"), "test-target")
-    monkeypatch.setattr(trust, "bind_executable", lambda _path: binding)
+    commit_info = {
+        "short_commit_hash": "abc123",
+        "commit_hash": "abc123def456",
+        "commit_date": "2026-07-07",
+        "last_tag": None,
+        "commits_since_last_tag": 0,
+    }
+    monkeypatch.setitem(
+        trust.PINNED_UV_COMMIT_INFO,
+        ("testos", "testmachine"),
+        commit_info,
+    )
+    monkeypatch.setattr(trust, "bind_executable", lambda _path, **_kwargs: binding)
 
     def fail_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
         raise subprocess.TimeoutExpired("uv", 10)
@@ -844,16 +890,197 @@ def test_resolve_pinned_uv_fails_closed_across_platform_process_and_rebind(
         trust.resolve_pinned_uv(candidate)
 
     completed = subprocess.CompletedProcess(
-        args=(str(candidate), "--version"),
+        args=(str(candidate), "self", "version", "--output-format", "json"),
         returncode=0,
-        stdout="uv 0.11.28 (abc123 2026-07-07 test-target)\n",
+        stdout=json.dumps(
+            {
+                "package_name": "uv",
+                "version": "0.11.28",
+                "commit_info": commit_info,
+                "target_triple": "test-target",
+            }
+        ),
         stderr="",
     )
     monkeypatch.setattr(trust.subprocess, "run", lambda *_args, **_kwargs: completed)
     bindings = iter((binding, replace(binding, size=2)))
-    monkeypatch.setattr(trust, "bind_executable", lambda _path: next(bindings))
+    monkeypatch.setattr(trust, "bind_executable", lambda _path, **_kwargs: next(bindings))
     with pytest.raises(trust.RunnerTrustError, match="changed during"):
         trust.resolve_pinned_uv(candidate)
+
+
+def test_stage_pinned_uv_authenticates_unsafe_source_but_executes_only_private_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_bytes = b"pinned official uv bytes"
+    source_root = tmp_path / "hostedtoolcache"
+    source_root.mkdir(mode=0o700)
+    source = source_root / "uv"
+    source.write_bytes(source_bytes)
+    source.chmod(0o500)
+    source_root.chmod(0o777)
+    runner_root = tmp_path / "runner"
+    runner_root.mkdir(mode=0o700)
+    runner_root.chmod(0o700)
+    key = ("testos", "testmachine")
+    monkeypatch.setattr(trust.platform, "system", lambda: "TestOS")
+    monkeypatch.setattr(trust.platform, "machine", lambda: "TestMachine")
+    monkeypatch.setitem(trust.PINNED_UV_SHA256, key, hashlib.sha256(source_bytes).hexdigest())
+    monkeypatch.setitem(trust.PINNED_UV_SIZE, key, len(source_bytes))
+    monkeypatch.setitem(trust.PINNED_UV_TARGET, key, "test-target")
+    monkeypatch.setitem(trust.PINNED_UV_COMMIT_INFO, key, None)
+    observed_paths: list[Path] = []
+
+    def exact_identity(
+        arguments: tuple[str, ...],
+        **_kwargs: Any,
+    ) -> subprocess.CompletedProcess[str]:
+        observed_paths.append(Path(arguments[0]))
+        return subprocess.CompletedProcess(
+            args=arguments,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "package_name": "uv",
+                    "version": "0.11.28",
+                    "commit_info": None,
+                    "target_triple": "test-target",
+                }
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(trust.subprocess, "run", exact_identity)
+
+    assert trust.bind_executable(source) is None
+    staged = trust.stage_pinned_uv(runner_root, source)
+    expected_path = runner_root / "authenticated-uv" / "uv"
+    assert observed_paths == [expected_path]
+    assert staged.executable.resolved_path == expected_path
+    assert staged.executable.sha256 == hashlib.sha256(source_bytes).hexdigest()
+    assert stat.S_IMODE(expected_path.stat().st_mode) == 0o500
+
+    source.unlink()
+    rebound = trust.resolve_pinned_uv(expected_path, required_root=expected_path.parent)
+    assert trust._same_uv_binding(rebound, staged)
+    assert observed_paths == [expected_path, expected_path]
+
+
+def test_stage_pinned_uv_rejects_unstable_or_inexact_acquisition_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner_root = tmp_path / "runner"
+    runner_root.mkdir(mode=0o700)
+    runner_root.chmod(0o700)
+    source_bytes = b"official"
+    source = tmp_path / "uv"
+    source.write_bytes(source_bytes)
+    source.chmod(0o500)
+    key = ("testos", "testmachine")
+    monkeypatch.setattr(trust.platform, "system", lambda: "TestOS")
+    monkeypatch.setattr(trust.platform, "machine", lambda: "TestMachine")
+    monkeypatch.setitem(trust.PINNED_UV_SIZE, key, len(source_bytes))
+    monkeypatch.setitem(trust.PINNED_UV_SHA256, key, "0" * 64)
+
+    with pytest.raises(trust.RunnerTrustError, match="pinned official release"):
+        trust.stage_pinned_uv(runner_root, source)
+    assert not (runner_root / "authenticated-uv").exists()
+
+    monkeypatch.setitem(trust.PINNED_UV_SHA256, key, hashlib.sha256(source_bytes).hexdigest())
+    link = tmp_path / "uv-link"
+    link.symlink_to(source)
+    with pytest.raises(trust.RunnerTrustError, match="stable official-size file"):
+        trust.stage_pinned_uv(runner_root, link)
+
+    hardlink = tmp_path / "uv-hardlink"
+    os.link(source, hardlink)
+    with pytest.raises(trust.RunnerTrustError, match="stable official-size file"):
+        trust.stage_pinned_uv(runner_root, source)
+    hardlink.unlink()
+
+    fifo = tmp_path / "uv-fifo"
+    os.mkfifo(fifo)
+    with pytest.raises(trust.RunnerTrustError, match="stable official-size file"):
+        trust.stage_pinned_uv(runner_root, fifo)
+
+
+def test_stage_pinned_uv_rejects_preexisting_private_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_bytes = b"official"
+    source = tmp_path / "uv"
+    source.write_bytes(source_bytes)
+    source.chmod(0o500)
+    runner_root = tmp_path / "runner"
+    runner_root.mkdir(mode=0o700)
+    runner_root.chmod(0o700)
+    staged_root = runner_root / "authenticated-uv"
+    staged_root.mkdir(mode=0o700)
+    key = ("testos", "testmachine")
+    monkeypatch.setattr(trust.platform, "system", lambda: "TestOS")
+    monkeypatch.setattr(trust.platform, "machine", lambda: "TestMachine")
+    monkeypatch.setitem(trust.PINNED_UV_SIZE, key, len(source_bytes))
+    monkeypatch.setitem(trust.PINNED_UV_SHA256, key, hashlib.sha256(source_bytes).hexdigest())
+
+    with pytest.raises(trust.RunnerTrustError, match="unsafe or already exists"):
+        trust.stage_pinned_uv(runner_root, source)
+
+
+def test_resolve_pinned_uv_requires_exact_structured_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "uv"
+    binding = _executable_binding(candidate)
+    key = ("testos", "testmachine")
+    monkeypatch.setattr(trust.platform, "system", lambda: "TestOS")
+    monkeypatch.setattr(trust.platform, "machine", lambda: "TestMachine")
+    monkeypatch.setitem(trust.PINNED_UV_SHA256, key, "a" * 64)
+    monkeypatch.setitem(trust.PINNED_UV_TARGET, key, "test-target")
+    monkeypatch.setitem(trust.PINNED_UV_COMMIT_INFO, key, None)
+    monkeypatch.setattr(trust, "bind_executable", lambda _path, **_kwargs: binding)
+
+    malformed_outputs = (
+        '{"package_name":"uv","package_name":"uv","version":"0.11.28",'
+        '"commit_info":null,"target_triple":"test-target"}',
+        json.dumps(
+            {
+                "package_name": "uv",
+                "version": "0.11.28",
+                "commit_info": {"unexpected": "commit"},
+                "target_triple": "test-target",
+            }
+        ),
+        json.dumps(
+            {
+                "package_name": "uv",
+                "version": "0.11.28",
+                "commit_info": None,
+                "target_triple": "cross-target",
+            }
+        ),
+    )
+    for stdout in malformed_outputs:
+        completed = subprocess.CompletedProcess(
+            args=(str(candidate),),
+            returncode=0,
+            stdout=stdout,
+            stderr="",
+        )
+
+        def malformed_identity(
+            *_args: Any,
+            _completed: subprocess.CompletedProcess[str] = completed,
+            **_kwargs: Any,
+        ) -> subprocess.CompletedProcess[str]:
+            return _completed
+
+        monkeypatch.setattr(trust.subprocess, "run", malformed_identity)
+        with pytest.raises(trust.RunnerTrustError, match="invalid version identity"):
+            trust.resolve_pinned_uv(candidate)
 
 
 def test_host_tool_binding_covers_supported_and_rejected_hosts(
@@ -1080,11 +1307,56 @@ def test_runner_is_unchanged_returns_false_when_rebinding_raises(
 ) -> None:
     runner = _directory_runner(tmp_path)
 
-    def fail_resolve(_path: Path | None = None) -> trust.PinnedUvBinding:
+    def fail_resolve(
+        _path: Path | None = None,
+        *,
+        required_root: Path | None = None,
+    ) -> trust.PinnedUvBinding:
+        del required_root
         raise trust.RunnerTrustError("rebind failed")
 
     monkeypatch.setattr(trust, "resolve_pinned_uv", fail_resolve)
     assert not trust.runner_is_unchanged(runner)
+
+
+def test_runner_rebinds_only_staged_uv_without_ambient_rediscovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner = _directory_runner(tmp_path)
+    lock_bytes = b"lock"
+    (runner.snapshot_root / "uv.lock").write_bytes(lock_bytes)
+    runner = replace(runner, lock_sha256=hashlib.sha256(lock_bytes).hexdigest())
+    key = (trust.platform.system().casefold(), trust.platform.machine().casefold())
+    artifact = trust.PINNED_PYTHON_ARTIFACTS[key]
+    monkeypatch.setitem(
+        trust.PINNED_PYTHON_ARTIFACTS,
+        key,
+        (*artifact[:3], runner.python_artifact_sha256, artifact[4]),
+    )
+    observed: list[tuple[Path | None, Path | None]] = []
+
+    def rebind_staged(
+        path: Path | None = None,
+        *,
+        required_root: Path | None = None,
+    ) -> trust.PinnedUvBinding:
+        observed.append((path, required_root))
+        return runner.uv
+
+    monkeypatch.setattr(trust, "resolve_pinned_uv", rebind_staged)
+    monkeypatch.setattr(
+        trust,
+        "bind_executable",
+        lambda path, **_kwargs: runner.python if path == runner.python_path else None,
+    )
+    monkeypatch.setattr(trust, "host_tool_binding", lambda: runner.host_tool)
+    monkeypatch.setattr(trust, "tree_digest", lambda *_args, **_kwargs: runner.environment_sha256)
+
+    assert trust.runner_is_unchanged(runner)
+    assert observed == [
+        (runner.uv.executable.lexical_path, runner.uv.executable.lexical_path.parent)
+    ]
 
 
 def _lock_package(
