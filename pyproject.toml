@@ -34,13 +34,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-data = ["pyarrow>=19,<24"]
+data = ["pyarrow>=25.0.0,<26"]
 gpu = ["torch>=2.7,<3"]
 
 [dependency-groups]
 dev = [
   "hypothesis>=6.120,<7",
-  "mypy>=1.14,<2",
+  "mypy>=2.3.0,<3",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
