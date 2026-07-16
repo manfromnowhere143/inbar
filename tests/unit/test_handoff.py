@@ -1082,9 +1082,8 @@ def test_checkpoint_v2_checkout_requires_clean_c_and_bounds_prospective_changes(
         handoff_repo,
         handoff_module.TRUSTED_GIT_PATH,
     )
-    (handoff_repo / handoff_module._MEMORY_PATH).write_text(
-        "prospective final memory\n", encoding="utf-8"
-    )
+    memory_path = handoff_repo / handoff_module._MEMORY_PATH
+    memory_path.write_bytes(memory_path.read_bytes() + b"prospective final memory\n")
     handoff_module._verify_v2_checkout_state(handoff_repo, git, context.evidence_commit)
     (handoff_repo / "unexpected.txt").write_text("unexpected\n", encoding="utf-8")
     with pytest.raises(HandoffError, match="changes outside"):
