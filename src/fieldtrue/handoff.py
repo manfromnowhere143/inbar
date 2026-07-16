@@ -94,6 +94,7 @@ _HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES = frozenset(
         "fieldtrue.ports",
         # A producer tool, not an authority source: nothing in the renderer's import closure
         # depends on it, so it is captured as bound wrapper source rather than bound authority.
+        "fieldtrue.memory_cycle",
         "fieldtrue.validation_producer",
     }
 )
