@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "FrozenIdentifierKind": {
+      "enum": [
+        "doi",
+        "versioned_record",
+        "tagged_release",
+        "authority_assigned_docket_or_report_number",
+        "independent_archival_snapshot_publishing_its_own_content_hash"
+      ],
+      "title": "FrozenIdentifierKind",
+      "type": "string"
+    },
+    "LocatorKind": {
+      "enum": [
+        "pdf_page",
+        "section_path",
+        "line_range",
+        "record_field",
+        "table_cell"
+      ],
+      "title": "LocatorKind",
+      "type": "string"
+    },
+    "MutabilityClass": {
+      "enum": [
+        "content_frozen",
+        "mutable_page"
+      ],
+      "title": "MutabilityClass",
+      "type": "string"
+    },
+    "SourceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/LocatorKind"
+        },
+        "value": {
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "title": "SourceLocator",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One factual assertion about a candidate, bound to exact retrieved bytes.\n\nA `mutable_page` fact can never establish a gate result. This is the frozen remedy for\nthe legacy screen, whose blocking facts rest on pages the mission does not control and\ntherefore cannot be re-checked by an independent auditor.",
+  "properties": {
+    "assertion_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Assertion Id",
+      "type": "string"
+    },
+    "assertion_text": {
+      "minLength": 1,
+      "title": "Assertion Text",
+      "type": "string"
+    },
+    "excerpt_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Excerpt Sha256",
+      "type": "string"
+    },
+    "frozen_identifier_kind": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FrozenIdentifierKind"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "frozen_identifier_value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Frozen Identifier Value"
+    },
+    "locator": {
+      "$ref": "#/$defs/SourceLocator"
+    },
+    "mutability_class": {
+      "$ref": "#/$defs/MutabilityClass"
+    },
+    "response_bytes": {
+      "minimum": 0,
+      "title": "Response Bytes",
+      "type": "integer"
+    },
+    "response_bytes_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Response Bytes Sha256",
+      "type": "string"
+    },
+    "retrieval_method": {
+      "minLength": 1,
+      "title": "Retrieval Method",
+      "type": "string"
+    },
+    "retrieval_uri": {
+      "minLength": 1,
+      "title": "Retrieval Uri",
+      "type": "string"
+    },
+    "retrieved_at": {
+      "format": "date-time",
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.source-fact-locator.v1",
+      "default": "inbar.iter001.source-fact-locator.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Source Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "assertion_id",
+    "source_id",
+    "assertion_text",
+    "retrieval_uri",
+    "retrieval_method",
+    "retrieved_at",
+    "response_bytes_sha256",
+    "response_bytes",
+    "locator",
+    "excerpt_sha256",
+    "mutability_class"
+  ],
+  "title": "SourceFactLocator",
+  "type": "object"
+}

@@ -28,6 +28,23 @@ content-hashed source census with fact locators. The routing decision is Git-anc
 external factual basis is not independently reconstructible. The roles and gaps below are bounded
 legacy reconnaissance statements, not a systematic or exhaustive source-review result.
 
+Census supersession, 2026-07-16. Because this document's verdict rests on a screen it concedes was
+not systematic, the mission's central negative premise is not an established result. Amendment 002
+freezes a prospective, content-bound source-screening census to settle it, and every source table
+below enters that census as **Stratum A: prior-exposed**. That stratum is contaminated, because the
+claimed blocking gaps here are known to the census drafter in advance. Its evidential weight is
+therefore asymmetric and frozen before retrieval: a stratum-A failure merely reproduces this prior
+and is weak, repairing only auditability; a stratum-A pass contradicts this prior, is credible
+against contamination, and must be published at full weight as a correction of this audit.
+
+The census additionally enumerates a Stratum B of investigation-record domains that this
+reconnaissance never covered. This audit ranged almost entirely over machine-learning dataset
+releases, and the complete incident construct is not the shape of a dataset release. Nobody
+assembles a dataset around genuine pre-outcome ambiguity, a committed competing-mechanism set, a
+test chosen to discriminate, an executed recovery, and an independently adjudicated outcome. That is
+the shape of an investigation. Whether this audit's null survives a frame that includes
+investigation records is exactly what the census exists to answer, and it has not yet run.
+
 The mission therefore blocks the present public-source-only route and retains separate physical
 admission, causal-laboratory, and independent-reality tracks. Physical admission may use prospective
 approved testbed work or an existing real-world source that already satisfies every frozen field and

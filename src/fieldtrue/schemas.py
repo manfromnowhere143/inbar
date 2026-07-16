@@ -62,6 +62,16 @@ from fieldtrue.adapters.adapt import (
 )
 from fieldtrue.approvals import ApprovalReceipt
 from fieldtrue.canonical import atomic_write, canonical_json_pretty
+from fieldtrue.census import (
+    CandidateScreening,
+    CensusReport,
+    ChronologyAssessment,
+    RoleInheritanceAssessment,
+    SourceFactLocator,
+)
+from fieldtrue.census import (
+    GateResult as CensusGateResult,
+)
 from fieldtrue.control_authority import (
     ControlExecutionEvidence,
     ControlExecutionManifest,
@@ -209,6 +219,12 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "settled_outcome.schema.json": SettledOutcomeRecord,
     "shortcut_rule_result.schema.json": ShortcutRuleResult,
     "shortcut_baseline_report.schema.json": ShortcutBaselineReport,
+    "census_candidate_screening.schema.json": CandidateScreening,
+    "census_chronology_assessment.schema.json": ChronologyAssessment,
+    "census_gate_result.schema.json": CensusGateResult,
+    "census_report.schema.json": CensusReport,
+    "census_role_inheritance.schema.json": RoleInheritanceAssessment,
+    "census_source_fact_locator.schema.json": SourceFactLocator,
     "shortcut_owner_approval_receipt.schema.json": OwnerAmendmentApprovalReceipt,
     "shortcut_attestation.schema.json": ShortcutAttestation,
     "shortcut_v2_categorical_fitted_state.schema.json": CategoricalFittedState,

@@ -33,6 +33,14 @@ reconstructible. The current protocol therefore blocks the present public-source
 Qualifying physical evidence may come from prospectively approved testbed work or from existing
 real-world evidence that already contains every required field and permits independent audit.
 
+Because that block rests on a screen the mission itself records as not systematic, the mission's
+central negative premise is not an established result. Amendment 002 freezes a prospective,
+content-bound, independently reconstructible source-screening census to settle it. Its contracts are
+implemented and its adversarial controls execute; the census has not run. No domain has been
+enumerated, no artifact retrieved, no candidate screened, and no census verdict issued. A census
+pass would be a nomination for separately authorized acquisition, never an admission. The census
+cannot reach `KILL_PUBLIC_SUBSTRATE`: a bounded frame cannot establish an unbounded negative.
+
 The current research wedge is offline spacecraft and robotics incident replay. The distinct proposed
 first product is a pre-action, offline and shadow-mode evidence dossier compiler with ranked,
 human-reviewable safe-test recommendations. A later post-action assurance stage may ingest receipts

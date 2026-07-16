@@ -81,4 +81,34 @@ changes and evidence.
   executable boundaries. Added a prospective exposure-normalized value refinement that still
   requires a value-stage preregistration or amendment and does not modify the frozen master formula.
 
+### Prospective source-screening census
+
+- Recorded that the mission's central negative premise, that no public source can supply the
+  complete incident construct, was never established under the mission's own evidentiary standard.
+  It rested on a reconnaissance the repository records as not systematic, whose external factual
+  basis is not independently reconstructible, and which had already produced one overclaim narrowed
+  from `KILL_PUBLIC_SUBSTRATE` to `BLOCK_CURRENT_PUBLIC_SOURCE_ONLY_ROUTE`.
+- Added Amendment 002 and its machine proposal, freezing before any retrieval: the enumerated frame
+  and its prior-exposed and prospective strata; the `dataset_release` and `investigation_record`
+  object classes; the fact-locator contract; the cheapest-first gate order; the no-borrowing rule;
+  the retrospective chronology conditions C1 through C6; the inherited role-independence conditions
+  I1 through I4; five frame-scoped verdict classes; the invalidity set; and the census ceiling.
+- Recorded that the owner approved Amendment 002 by delegation rather than review, and that the
+  proposer and signer are the same agent, because the frozen receipt schema has no approval-basis
+  field and an undisclosed delegation would be indistinguishable from a reviewed approval.
+- Added census contracts requiring a content-frozen, authority-identified artifact for every
+  gate-bearing fact. A mutable page can never establish a gate, which is the frozen remedy for the
+  legacy screen's unreconstructible blocking facts.
+- Made `KILL_PUBLIC_SUBSTRATE` unreachable by the census instrument: a bounded frame cannot
+  establish an unbounded negative.
+- Recorded that a reviewer exposed to a determination cannot extract its hypothesis set, so counted
+  historical dossiers require a second unexposed reviewer. Iteration 001 is therefore unlikely to be
+  completable by a single researcher, independent of the census outcome.
+- Advanced source screening ahead of terminal integration. The roadmap grants no authority and its
+  ordering is advisory, so no frozen contract changed.
+
+The census contracts are implemented and their adversarial controls execute. The census has not run:
+no domain enumerated, no artifact retrieved, no candidate screened, and no verdict issued. Execution
+requires a separate prospective resource authority.
+
 No scientific performance, safety, transfer, product-readiness, or economic claim has been made.
