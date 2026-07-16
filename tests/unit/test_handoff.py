@@ -489,6 +489,7 @@ def _v2_validation_context(
     actor_id: str | None = None,
     coverage_observation: tuple[int, int, int, int] | None = None,
     coverage_paths_override: tuple[str, ...] | None = None,
+    credential_artifact: bool = False,
     empty_step_logs: bool = False,
     executable_artifact: bool = False,
     executable_source: bool = False,
@@ -548,10 +549,13 @@ def _v2_validation_context(
     base_time = datetime(2026, 7, 16, 10, 0, tzinfo=UTC)
     steps: list[EngineeringValidationStep] = []
     for index, (step_id, argv) in enumerate(expected_plan):
+        stdout_data = b"" if empty_step_logs else f"{step_id}: pass\n".encode()
+        if credential_artifact and step_id == "ruff-check":
+            stdout_data = ("AK" + "IA" + "A" * 16).encode("ascii")
         stdout = _write_validation_artifact(
             repo,
             f"{evidence_root}/{step_id}.stdout.txt",
-            b"" if empty_step_logs else f"{step_id}: pass\n".encode(),
+            stdout_data,
             handoff_module._VALIDATION_LOG_MEDIA_TYPE,
         )
         stderr = _write_validation_artifact(
@@ -899,6 +903,7 @@ def test_checkpoint_v2_rejects_self_report_and_lineage_counterexamples(
             {"extra_evidence_path": "evidence/validation/validation.fixture.v2/unlisted.txt"},
             "directory contains an unlisted artifact",
         ),
+        ({"credential_artifact": True}, "credential signature"),
         ({"extra_evidence_path": "unexpected-validation-commit-path.txt"}, "paths outside"),
         ({"preexisting_validation_file": True}, "directory contains an unlisted artifact"),
         ({"insert_parent_commit": True}, "single-parent child"),

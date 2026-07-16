@@ -7,6 +7,7 @@ import html
 import json
 import math
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -144,6 +145,23 @@ _VALIDATION_RECEIPT_MEDIA_TYPE = "application/json"
 _VALIDATION_JUNIT_MEDIA_TYPE = "application/xml"
 _VALIDATION_COVERAGE_MEDIA_TYPE = "application/json"
 _VALIDATION_LOG_MEDIA_TYPE = "text/plain; charset=utf-8"
+_VALIDATION_CREDENTIAL_RE = re.compile(
+    rb"BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY|"
+    rb"(AKIA|ASIA)[0-9A-Z]{16}|"
+    rb"gh[pousr]_[A-Za-z0-9_]{20,}|"
+    rb"github_pat_[A-Za-z0-9_]{20,}|"
+    rb"sk-proj-[A-Za-z0-9_-]{20,}|"
+    rb"sk-ant-[A-Za-z0-9_-]{20,}|"
+    rb"AIza[0-9A-Za-z_-]{35}|"
+    rb"glpat-[A-Za-z0-9_-]{20,}|"
+    rb"xox[baprs]-[0-9A-Za-z-]{20,}|"
+    rb"(sk|rk)_(live|test)_[0-9A-Za-z]{16,}|"
+    rb"npm_[0-9A-Za-z]{36}|"
+    rb"pypi-[0-9A-Za-z_-]{40,}|"
+    rb"hf_[0-9A-Za-z]{20,}|"
+    rb"ya29\.[0-9A-Za-z_-]{20,}|"
+    rb"sk-[A-Za-z0-9]{20,}"
+)
 _MAX_VALIDATION_RECEIPT_BYTES = 2 * 1024 * 1024
 _MAX_VALIDATION_LOG_BYTES = 8 * 1024 * 1024
 _MAX_VALIDATION_STRUCTURED_ARTIFACT_BYTES = 16 * 1024 * 1024
@@ -2153,6 +2171,10 @@ def _verify_checkpoint_v2_receipt(
         ):
             raise HandoffError(
                 f"validation artifact differs from its receipt binding: {artifact.path}"
+            )
+        if _VALIDATION_CREDENTIAL_RE.search(data) is not None:
+            raise HandoffError(
+                f"validation artifact contains a credential signature: {artifact.path}"
             )
         if artifact.media_type == _VALIDATION_LOG_MEDIA_TYPE:
             try:

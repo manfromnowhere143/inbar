@@ -795,6 +795,20 @@ def test_history_verifier_scans_intermediate_trees_without_disclosing_content(
         "h" + "f_" + "I" * 24,
         "ya" + "29." + "J" * 24,
     ],
+    ids=(
+        "aws-session-key",
+        "openai-project-key",
+        "anthropic-key",
+        "google-api-key",
+        "gitlab-access-key",
+        "slack-bot-key",
+        "stripe-live-key",
+        "github-fine-grained-key",
+        "npm-access-key",
+        "pypi-access-key",
+        "hugging-face-key",
+        "google-oauth-key",
+    ),
 )
 def test_history_verifier_rejects_modern_credential_signatures_without_disclosure(
     credential: str,
