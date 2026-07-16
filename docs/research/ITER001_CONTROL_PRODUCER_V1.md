@@ -92,6 +92,32 @@ The producer implementation is V1, while its receipt and execution-manifest wire
 The new schema identities are required because authority-profile, execution-contract, and source-
 closure fields are mandatory additions; the committed V1 schema identities are not reinterpreted.
 
+## Local committed-snapshot rehearsal
+
+A non-replayable macOS rehearsal used a fresh full-history clone, an ephemeral fixture signer at the
+fixed fixture path, a committed `test_fixture` contract, the unmodified launcher, and the frozen
+dependency lock. The launcher published one V2 receipt, one V2 execution manifest, and the exact 22
+bound control artifacts. A second fresh checkout received the bundle but not the fixture private
+signing key, rebound its contract to the receipt, and accepted the bundle through
+`verify_admission_control_bundle`. That verifier is a read-only V1 fixture verifier in the same
+codebase, not an independent terminal authority. The disposable commits and full 24-file bundle were
+not promoted, so the observation cannot be replayed from the main repository. Exact local identifiers
+are retained in the append-only research memory with this limitation.
+
+Three failed rehearsals preceded the pass. First, macOS resolved `/var` through `/private/var` and
+CPython supplied one deterministic platform environment field, so lexical path and environment
+checks rejected the child. Second, ambient launcher imports created ignored bytecode in the working
+checkout while execution correctly used the committed snapshot. Third, Git's `0644/0755` source
+modes were intentionally materialized as private `0400/0500` snapshot modes. The corrections bind
+temporary roots by resolved identity, share an exact allowlisted platform environment, and census
+the authenticated snapshot rather than the ambient checkout. The producer is the only production
+call site opting into the explicit private-mode translation. An unmocked source-closure regression
+test covers regular, executable, wrong, and noncanonical private modes.
+
+The passing local observation provides integration evidence for Producer V1 mechanics. It does not
+close any residual boundary below, change the canonical `bootstrap` contract, or grant an action
+listed under Non-activation.
+
 ## Kill gates
 
 Implementation fails if any of the following is possible:

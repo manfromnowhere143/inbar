@@ -98,6 +98,13 @@ verification, and terminal mission integration. Until those artifacts and approv
 `inbar` invocation cannot authorize acquisition and CI must retain the sole
 `iter001-acquisition-contract` blocker.
 
+A non-replayable local fixture rehearsal on macOS was observed to pass from a clean committed
+snapshot. A second clean checkout without the fixture private signing key accepted the rebound
+bundle through the same-code, nonterminal V1 verifier. The disposable commits and full bundle were
+not promoted, so this is a recorded local integration observation rather than reconstructible or
+independent acceptance evidence. It produced no canonical receipt, admitted no corpus, exercised no
+physical system, and established no scientific, safety, transfer, product, or value result.
+
 These blockers are preserved as blockers. CI accepts the checkpoint only when the mission validator
 reports the exact registered blocker set and no additional failure.
 

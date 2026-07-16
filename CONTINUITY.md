@@ -76,6 +76,19 @@ and atomic publication logic do not grant canonical sealing authority. Hostile s
 dependency preparation, same-user key access, acknowledgment-loss recovery, and the absent exact
 independent terminal verifier are explicit residual boundaries.
 
+One non-replayable local macOS rehearsal ran from a fresh full-history clone. The unmodified launcher
+produced 22 control-evidence files plus one V2 receipt and one V2 execution manifest. A second clean
+checkout without the fixture private signing key accepted the rebound bundle through the same-code,
+nonterminal read-only V1 verifier. Git worktree status was clean before and after producer execution.
+The disposable commits and full bundle were not promoted, so this is a recorded local integration
+observation rather than reconstructible acceptance evidence, independent adjudication, or a
+scientific result. The rehearsal exposed and corrected three integration defects that mock-based unit
+tests had missed: macOS temporary-path aliasing and inherited platform environment, ignored bytecode
+in the ambient checkout, and Git modes translated to private read-only snapshot modes. The source
+closure is now bound to the authenticated snapshot. The producer is the only production call site
+opting into the explicit `0400/0500` private-mode policy; ordinary source trees still require
+`0644/0755`.
+
 The current mission inventory, Git anchors, memory head, and activation gates are rendered into
 `HANDOFF.md` from verified machine state. Checkpoint metrics in that document are explicitly labeled
 as historical results from their linked implementation commit. This continuity document does not

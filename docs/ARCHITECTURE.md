@@ -89,6 +89,13 @@ descriptor-relative no-replace semantics. Producer V1 receipts use V2 wire schem
 `test_fixture`, use a distinct signer and key path, and reject the canonical trust anchor. The
 canonical `bootstrap` contract cannot reach key access or publication.
 
+The snapshot materializer preserves committed `0644/0755` semantics while narrowing filesystem
+access to owner-only `0400/0500`. The producer is the only production call site that opts into the
+explicit private-mode translation when checking its authenticated snapshot. Canonical working-tree
+verification and every other production caller retain the ordinary mode policy. This keeps snapshot
+files owner-readable or owner-executable only without widening the accepted source state on those
+other paths.
+
 The fresh process does not inherit ambient live Python objects, but it cannot authenticate itself
 against an ambient process that controls its arguments or prepared dependency bytes before import.
 Nor is it an independent custody boundary: a hostile process with the same operating-system identity
