@@ -20,22 +20,23 @@ gate are recorded in `mission/name.json`, `docs/IDENTITY.md`, and the append-onl
 ## Scientific state
 
 Iteration 001 was preregistered at commit
-`52d71e16a75df12adf47e943fd5c329f6e04d5c0`. The source-role audit returned
-`KILL_PUBLIC_SUBSTRATE`: no screened public source supplies the complete same-incident chain for
-multimodal evidence, pre-outcome ambiguity, independently verified mechanism, reviewed diagnostic
-action, realized execution and recovery, and settled physical outcome.
+`52d71e16a75df12adf47e943fd5c329f6e04d5c0`. The legacy source-role record used the routing label
+`KILL_PUBLIC_SUBSTRATE`: its dated reconnaissance did not establish the complete same-incident chain
+among the enumerated sources. That screen was not systematic, and its external factual basis was not
+preserved in independently reconstructible form.
 
-Public data remains role-limited to parsers, simulators, priors, shift tests, and shortcut controls.
-The initial product boundary is an offline and shadow-mode evidence dossier compiler with ranked,
-human-reviewable safe tests and no command authority. Qualifying physical evidence requires
-prospective, approved testbed work.
+The currently enumerated public data remains role-limited to parsers, simulators, priors, shift
+tests, and shortcut controls. The proposed initial product boundary is an offline and shadow-mode
+evidence dossier compiler with ranked, human-reviewable safe tests and no command authority.
+Qualifying physical evidence may come from prospective approved testbed work or from existing
+real-world evidence that already satisfies every frozen field and independent-audit requirement.
 
 The canonical acquisition contract remains `bootstrap`. No production control receipt, pilot
 verdict, training authority, or scientific claim exists.
 
-The implementation-only committed launcher runs control execution, manifest and receipt assembly,
-fixture-key access, signing, and atomic no-replace publication in a fresh child started with `-I`,
-`-B`, and `-S` from a clean committed snapshot. The child checks an exact snapshot census, locked
+The implementation-only committed launcher starts a fresh child with `-I`, `-B`, and `-S` from a
+clean committed snapshot. That child runs control execution, manifest and receipt assembly,
+fixture-key access, signing, and atomic no-replace publication. It checks an exact snapshot census, locked
 distribution inventory, complete source closure, Git identity, committed contract, preregistration
 ancestry and bytes, and descriptor-relative fixture-key and publication boundaries. The launcher has
 no signing import or key access and accepts only a bounded canonical acknowledgment tied to its
@@ -164,15 +165,34 @@ checkpoint must not imply a scientific result.
 
 ## Resource state
 
-Iteration 001 has used zero GPU seconds, cloud jobs, paid calls, live-system actions, and public
-dataset downloads. Unmeasured engineering wall time, CPU time, and peak memory remain unknown.
-Daniel's reported shared Google Cloud credits are mutable operating context and require a separate
-approved compute plan before use.
+The ledger records zero mission-authorized GPU seconds, GCP scientific jobs, paid-provider calls,
+live-system actions, and public dataset downloads in the documented Iteration 001 fixture-production
+scope. Private GitHub Actions did run hosted Ubuntu and macOS engineering validation; its hosted
+compute time and cost were not metered in the ledger. Engineering wall time, local CPU time, and peak
+memory also remain unmeasured. Daniel's reported shared Google Cloud credits are mutable operating
+context and require a separate approved compute plan before use.
 
 ## Resume state
 
 Resume from the generated `HANDOFF.md`, run its exact verification commands, verify Git and memory
-anchors, and keep the standalone general research engine out of this repository. `inbar handoff
-check` must fail whenever that document no longer matches the verified contracts, schemas, blocker
-set, or append-only memory chain. This is deterministic candidate-tree consistency, not independent
-or base-controlled attestation; renderer and transitive verifier changes still require source review.
+anchors, and keep the standalone general research engine out of this repository. Recovery rendering
+uses a private, no-hardlink clone of the selected committed tree, exact path, content, size, and
+executable-mode binding for every eligible tracked recovery file, a descriptor-verified memory
+overlay, a fixed authority-source manifest, and a fresh interpreter. Ignored, untracked, dirty,
+linked, or special-file inputs fail closed. The parent validates the framed result's contract and
+integrity and rechecks the selected source and recovery state before accepting it.
+
+`inbar handoff check` must fail whenever that document no longer matches the verified contracts,
+schemas, blocker set, append-only memory chain, or a linked engineering-validation receipt. A current
+receipt must be a separately committed single-parent child of the exact implementation subject; its
+command plan, artifacts, JUnit observations with zero skipped cases, passed registered-control
+results recorded in JUnit evidence, complete committed Python source coverage inventory, coverage
+observations, and mission inventory are recomputed from committed bytes. The final clean recovery
+commit must be its single-parent child, may change only the memory ledger and generated handoff,
+must strictly append the evidence parent's memory bytes, and must retain regular nonexecutable blobs.
+Prospective rendering at the
+evidence commit does not satisfy final checking. These controls establish same-operator
+candidate-tree consistency, not independent or base-controlled attestation, scientific evidence, or
+authority. Renderer and transitive verifier changes still require source review. Bound logs and
+self-recorded exit codes are not proof of execution; base-controlled CI must independently run its
+applicable contract and quality checks on the exact candidate head.

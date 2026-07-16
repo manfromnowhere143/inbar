@@ -37,7 +37,7 @@ from fieldtrue.acquisition import (
 from fieldtrue.adapters import adapt as adapt_adapter
 from fieldtrue.adapters.adapt import load_adapt_lock
 from fieldtrue.canonical import canonical_json, canonical_json_pretty, sha256_bytes, sha256_value
-from fieldtrue.domain import ClaimRecord
+from fieldtrue.domain import ClaimRecord, ClaimStatus
 from fieldtrue.git_trust import (
     TRUSTED_GIT_PATH,
     GitTrustError,
@@ -63,6 +63,220 @@ _REQUIRED_GATE_CONTROLS = {
     "executable_sensitivity_test",
     "sealed_control_result",
 }
+_CREDIBILITY_GATE_CONTROL_PATH = "protocol/gate_controls/credibility_v1.json"
+_CREDIBILITY_GATE_CONTROL_SCHEMA = "inbar.credibility-gate-control-registry.v1"
+_CREDIBILITY_GATE_CONTROL_SCOPE = (
+    "same-operator-bootstrap-credibility-controls-no-scientific-authority"
+)
+_CREDIBILITY_GATE_CONTROL_RUNNER = (
+    "required-full-pytest-suite-in-validation-receipt-and-base-controlled-ci"
+)
+_CREDIBILITY_GATE_CONTROL_NODES = (
+    (
+        "claim-contract-integrity",
+        None,
+        "tests/unit/test_mission.py::"
+        "test_claim_registry_binds_exact_contracts_registry_and_evidence",
+        "tests/unit/test_mission.py::"
+        "test_claim_registry_rejects_committed_semantic_substitution_and_extra_claim",
+        "tests/unit/test_mission.py::"
+        "test_claim_registry_rejects_committed_evidence_content_substitution",
+    ),
+    (
+        "handoff-recovery-integrity",
+        ("implementation.inbar.handoff-recovery.v1",),
+        "tests/unit/test_handoff.py::"
+        "test_checkpoint_v2_recomputes_committed_validation_and_renders_same_operator_scope",
+        "tests/unit/test_handoff.py::"
+        "test_checkpoint_v2_rejects_self_report_and_lineage_counterexamples",
+        "tests/unit/test_handoff.py::test_checkpoint_v2_rejects_current_artifact_drift",
+    ),
+    (
+        "engineering-validation-receipt-integrity",
+        ("implementation.inbar.engineering-validation-receipt.v1",),
+        "tests/unit/test_handoff.py::"
+        "test_checkpoint_v2_recomputes_committed_validation_and_renders_same_operator_scope",
+        "tests/unit/test_handoff.py::"
+        "test_coverage_recomputation_rejects_duplicate_and_self_reported_counts",
+        "tests/unit/test_handoff.py::test_checkpoint_v2_rejects_receipt_evidence_ref_substitution",
+    ),
+    (
+        "credibility-registry-integrity",
+        ("implementation.inbar.credibility-controls.v1",),
+        "tests/unit/test_mission.py::"
+        "test_current_credibility_registry_binds_exact_claims_and_control_nodes",
+        "tests/unit/test_mission.py::"
+        "test_current_credibility_registry_rejects_dirty_or_noncanonical_contract",
+        "tests/unit/test_mission.py::"
+        "test_current_credibility_registry_rejects_unresolved_control_node",
+    ),
+)
+# Claim wording, scope, lineage, and evidence references are an executable review boundary.
+_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS = {
+    "scope.integrated-loop.v1": (
+        "53ebfc828cbe48541107e89c8fd18ffa0eee0f68cf6037325d8303084ec42cea"
+    ),
+    "scope.integrated-loop.v2": (
+        "b001b0684f451301a747b1bd0f17bb3bd2e0b0e554df1d45f4214552c2a658f8"
+    ),
+    "result.iter000.adapt-readiness.v1": (
+        "597c4a205fb8c3a1f81e1e52886dc00973f02550ed21c92f7e4da20900287d3d"
+    ),
+    "state.iter001.authority-bootstrap.v1": (
+        "dac34eaaca8d4acab7d69d00eaa9c1e0550f3c0048e0b89b205f19ecc8a39950"
+    ),
+    "decision.iter001.public-source-only-route.v1": (
+        "65faf0ed5c4e972abb7f997def0398f04694c39fd9caa6cfd22fcd0f3265f2cd"
+    ),
+    "decision.iter001.public-source-only-route.v2": (
+        "49bc1a86df746d044effcaae2eb549891232337868b044855447947b78e5091f"
+    ),
+    "screening.iter001.enumerated-source-sufficiency.v1": (
+        "4d928fe9faffc05a1560e6ccbe1ca5037d16394b5a863734f0602b40c0c5b860"
+    ),
+    "state.iter001.qualifying-source-admission.v1": (
+        "c10ac8402e715c51b3778d1d7be673492522f9c75001e10a6a1414564d41f184"
+    ),
+    "correction.iter001.alfa-unit-wording.v1": (
+        "766e6ed5de7048d7ddc27cb9ec2e7aa6c30001021589a53efd90672cc26e5d67"
+    ),
+    "implementation.iter001.bootstrap-admission.v1": (
+        "c0eb605260b38961f5c69226859bf74049eab7b68b776c252b701bb492c8af1d"
+    ),
+    "implementation.iter001.shortcut-v2-primitives.v1": (
+        "0349ac8604002e6bd257090f023bf324f2cc0b4b074a3736452227ebf40a68b5"
+    ),
+    "implementation.inbar.credibility-controls.v1": (
+        "309a6c216e95277625ac074bb6a99b6a465a2d7cace9441d7420c3be86cc0f5b"
+    ),
+    "implementation.inbar.handoff-recovery.v1": (
+        "ba35949852a2db0d75646191d39d303aedf1f5404d5678b1d2a35844284e3993"
+    ),
+    "implementation.inbar.engineering-validation-receipt.v1": (
+        "2509ec3e54df6e910b666390d83986363a5ab0d0604d6383fd9aa8e3d905f822"
+    ),
+    "product.inbar.offline-dossier-compiler.v1": (
+        "83d8a59edec6b88c71ba1bff864c1389b83a0681c06e5be9f330ab03452497f1"
+    ),
+    "scientific.integrated-loop-performance.v1": (
+        "94e55d035d5dd01027c0d1f49cdb7b3dba167e93c76eda575a3157803c1cd05f"
+    ),
+    "novelty.integrated-loop.v1": (
+        "27b1eb125465eba59179e5e3edf4702a997b2d08d4304eea5fe160e9ba5dbd83"
+    ),
+}
+_REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
+    "scope.integrated-loop.v1": ClaimStatus.CORRECTED,
+    "scope.integrated-loop.v2": ClaimStatus.UNTESTED,
+    "result.iter000.adapt-readiness.v1": ClaimStatus.SUPPORTED,
+    "state.iter001.authority-bootstrap.v1": ClaimStatus.SUPPORTED,
+    "decision.iter001.public-source-only-route.v1": ClaimStatus.CORRECTED,
+    "decision.iter001.public-source-only-route.v2": ClaimStatus.SUPPORTED,
+    "screening.iter001.enumerated-source-sufficiency.v1": ClaimStatus.SUPPORTED,
+    "state.iter001.qualifying-source-admission.v1": ClaimStatus.BLOCKED,
+    "correction.iter001.alfa-unit-wording.v1": ClaimStatus.SUPPORTED,
+    "implementation.iter001.bootstrap-admission.v1": ClaimStatus.SUPPORTED,
+    "implementation.iter001.shortcut-v2-primitives.v1": ClaimStatus.SUPPORTED,
+    "implementation.inbar.credibility-controls.v1": ClaimStatus.SUPPORTED,
+    "implementation.inbar.handoff-recovery.v1": ClaimStatus.SUPPORTED,
+    "implementation.inbar.engineering-validation-receipt.v1": ClaimStatus.SUPPORTED,
+    "product.inbar.offline-dossier-compiler.v1": ClaimStatus.UNTESTED,
+    "scientific.integrated-loop-performance.v1": ClaimStatus.BLOCKED,
+    "novelty.integrated-loop.v1": ClaimStatus.BLOCKED,
+}
+# The reviewed evidence surface is content-addressed independently of the claim records. A commit
+# can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
+# adequate semantic review boundary.
+_REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
+    "CONTINUITY.md": ("4ba251d829203170956e85358aeb4868f655bae1f7649d7ac7a60c82fd24d962"),
+    "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
+    "README.md": "5310ea3fd8bdd3469dbbab5b6d3a665a6f545102d0099df65c31944553a44669",
+    "docs/ARCHITECTURE.md": ("30d6df5d3fda894fdb344c92f4df0330e2984ad54791689e94f9a0ad521ad05d"),
+    "docs/CLAIM_BOUNDARIES.md": (
+        "6b21b47508462c0ccb5e199f00d51b7399cc11aee7199aa79a54b266f17ac85a"
+    ),
+    "docs/FRONTIER_RESEARCH_2026.md": (
+        "0c9d2e6cc1bb9b34db8113bb3bcc62077d4f125126af280fa4bf456b90850621"
+    ),
+    "docs/MATHEMATICS.md": ("2e10eda460f4483c050ae61c379fcab30a34de8ec3222f2aa3dfabff0fa07551"),
+    "docs/ROADMAP.md": ("82e62f4769331810fe3be9b94aaa28bc3d4aaa04c3056c3106ea95aa6df9ece6"),
+    "docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md": (
+        "8e92178ba3d300e445bb4423f2e4ac7bf33bcc5d68e8d34a24578aa7496c5ee8"
+    ),
+    "docs/research/ITER001_SOURCE_ROLE_AUDIT.md": (
+        "889a6687cd79ed551c3b184cef0ccc3c8c2a713d16861e7410df602635f0982f"
+    ),
+    "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_001/RESULT.md": (
+        "28e6448047902e395c08c0fc51a432e88958a8c06adb34c619b7c304bbdb7df9"
+    ),
+    (
+        "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_001/artifact_bundle.json"
+    ): "043e1f4f015378a6626923b36d90b5d56c13396ab3b88275d6a193870318e697",
+    (
+        "experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_001/readiness_report.json"
+    ): "15a680d3c6b8f845277e5a6ade562fa542e37c2e555a3ff1771ad3ec50566b86",
+    "experiments/iter001_physical_causal_evidence_acquisition/HYPOTHESIS.md": (
+        "47a1920b1b5326601c7404d17a6aac0df3309c2433fa76f56f0dffedf2511ad8"
+    ),
+    "mission/contract.json": ("97d0b2cf5281f386ab0986b7311dd83d8c36b246a6db5edd4b04b17a6b21d8f6"),
+    "mission/loop.json": ("97274381a035513159927a17f08cdafa04a23b2b3a6b7f1f04daa7e9c1826cfe"),
+    "protocol/acquisition/iter001_contract.json": (
+        "c5cf91b620ae3f34cc9ecebf936c4f48014f04cfa21e3fdc1cf0713f440b1804"
+    ),
+    "protocol/amendments/iter000_verification_002.json": (
+        "45d5d90c63bfda2b84bf962c9d7bf4c76db58fb241b7eb6d1b146a5535c7382c"
+    ),
+    "protocol/gate_controls/credibility_v1.json": (
+        "ea2c66a8e877877d4a9a0a456594893273eca87ae2078bede178f34c26584bf3"
+    ),
+    "protocol/schemas/engineering_validation_receipt.schema.json": (
+        "6f673d3da17b0c29a25d876c255c67016cb352a698a88a4435c8f94ffb06a660"
+    ),
+    "protocol/verification_authorities/iter000_verification_001.json": (
+        "154dee03ea4dc30507b9b2bcd57d83617655da7d10501f9f0e881088a7ed5dd9"
+    ),
+    "pyproject.toml": ("317391041d968f321d559272f5607e8e59caeab0e0c949c29bdd42bc32a2570f"),
+    "src/fieldtrue/acquisition.py": (
+        "1db52fa08405ce5f28013715c34782475b57c814becd6e50aa0729353cc101ce"
+    ),
+    "src/fieldtrue/domain.py": ("7648d416e3843dac5d1cf9c3c3be81b8d7cba235ec33c135d2697383a3d8474a"),
+    "src/fieldtrue/handoff.py": (
+        "e224b6983d997480e7257800b4516fdf54d48121f66048a8729739a6baaf9d6d"
+    ),
+    "src/fieldtrue/schemas.py": (
+        "965d0e01ef5c9b1a2e703fb5ceb39f7727ae35c29e8046f004e5279ec569e5ff"
+    ),
+    "src/fieldtrue/shortcut_v2_crossfit.py": (
+        "4beb28f55c8903c10c1744ead56757dc3d3994cb56b4c3b1ba58faf742ea17e5"
+    ),
+    "src/fieldtrue/shortcut_v2_release.py": (
+        "64d334aedf633c353a3c3b10931b6cf4757de9b213f4d773cb776bf201243b50"
+    ),
+    "src/fieldtrue/shortcut_v2_tree.py": (
+        "8f5969d9723be0f694b27a594d7c3fe4dd254ee9d321382f3e16b6ea152d8119"
+    ),
+    "tests/unit/test_acquisition.py": (
+        "76b3dc4550c5948d5b1c92bf4255358a9c0425b29396a43339ab179439244ea4"
+    ),
+    "tests/unit/test_domain.py": (
+        "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
+    ),
+    "tests/unit/test_handoff.py": (
+        "df2d03387fbbb761eaae76680895bb56f0cd5c6f0248a86aca79a22946004bdc"
+    ),
+    "tests/unit/test_mission.py": (
+        "09b6915f052f333f21889dc2c0e42cf3b0ad85b072d8cf15bc4394644b71b3da"
+    ),
+    "tests/unit/test_release_contract.py": (
+        "e8d6d726eed62f1c4eb004f33ca22813d4ac0be96d7ec153157f7624ade208d1"
+    ),
+    "tests/unit/test_schemas_runtime.py": (
+        "30beab644cd2823911da3bd1e4a56a5a7241767dfcce913b9949fe8c615226c6"
+    ),
+}
+_REQUIRED_BOOTSTRAP_REGISTRY_SHA256 = (
+    "ad9ccd235570c8fb6f863451095dad35127ff9c052d306c077e1d64c0f8490ee"
+)
 _ITER000_GATE_FAILURE_CLASSES = {
     "source-integrity": "invalid",
     "parser-integrity": "invalid",
@@ -253,14 +467,156 @@ def _json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _claims(path: Path) -> list[ClaimRecord]:
+def _claims_bytes(data: bytes) -> list[ClaimRecord]:
+    if not data or not data.endswith(b"\n") or b"\r" in data:
+        raise ValueError("claim registry must use nonempty LF-terminated framing")
+    try:
+        lines = data[:-1].decode("utf-8").split("\n")
+    except UnicodeDecodeError as error:
+        raise ValueError("claim registry must be valid UTF-8") from error
+    if any(not line for line in lines):
+        raise ValueError("claim registry cannot contain blank records")
+
     claims: list[ClaimRecord] = []
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, line in enumerate(lines, start=1):
+
+        def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            value: dict[str, Any] = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError("duplicate claim field")
+                value[key] = item
+            return value
+
         try:
-            claims.append(ClaimRecord.model_validate_json(line))
-        except ValueError as error:
+            raw = json.loads(line, object_pairs_hook=unique_object)
+            claims.append(ClaimRecord.model_validate(raw))
+        except (json.JSONDecodeError, ValueError) as error:
             raise ValueError(f"invalid claim registry line {line_number}") from error
     return claims
+
+
+def _claims(path: Path) -> list[ClaimRecord]:
+    return _claims_bytes(path.read_bytes())
+
+
+def _claim_registry_valid(repo_root: Path) -> tuple[bool, str]:
+    registry_relative = "claims/registry.jsonl"
+    try:
+        git = _trusted_git(repo_root)
+        head = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
+            text=True,
+        ).stdout.strip()
+        if _GIT_OBJECT_ID_PATTERN.fullmatch(head) is None:
+            return False, "Claim registry cannot resolve a valid Git HEAD."
+        registry_bytes = _read_repo_regular_file(repo_root, registry_relative)
+        if _git_blob_at_path(repo_root, git, head, registry_relative) != registry_bytes:
+            return False, "Claim registry is not committed at HEAD."
+        if sha256_bytes(registry_bytes) != _REQUIRED_BOOTSTRAP_REGISTRY_SHA256:
+            return False, "Claim registry bytes differ from the reviewed bootstrap registry."
+        claims = _claims_bytes(registry_bytes)
+        claim_ids = [claim.claim_id for claim in claims]
+        if not claims or len(claim_ids) != len(set(claim_ids)):
+            return False, "Claim registry must be nonempty, typed, and unique."
+        by_id = {claim.claim_id: claim for claim in claims}
+        if set(by_id) != set(_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS):
+            return False, "Claim registry IDs differ from the reviewed bootstrap claim set."
+        wrong_contract = sorted(
+            claim_id
+            for claim_id, expected in _REQUIRED_BOOTSTRAP_CLAIM_DIGESTS.items()
+            if sha256_value(by_id[claim_id].model_dump(mode="json", exclude_none=True)) != expected
+        )
+        if wrong_contract:
+            return False, "Claim records differ from reviewed contracts: " + ", ".join(
+                wrong_contract
+            )
+        wrong_status = sorted(
+            claim_id
+            for claim_id, expected in _REQUIRED_BOOTSTRAP_CLAIM_STATUSES.items()
+            if by_id.get(claim_id) is None or by_id[claim_id].status != expected
+        )
+        if set(_REQUIRED_BOOTSTRAP_CLAIM_STATUSES) != set(by_id) or wrong_status:
+            return False, "Claim statuses violate the bootstrap result boundary: " + ", ".join(
+                wrong_status
+            )
+        successors: dict[str, list[str]] = {}
+        for claim in claims:
+            predecessor_id = claim.supersedes_claim_id
+            if predecessor_id is None:
+                continue
+            predecessor = by_id.get(predecessor_id)
+            if (
+                predecessor is None
+                or predecessor.claim_id == claim.claim_id
+                or predecessor.status != ClaimStatus.CORRECTED
+            ):
+                return False, "Claim correction lineage is invalid."
+            successors.setdefault(predecessor_id, []).append(claim.claim_id)
+        corrected_ids = {
+            claim.claim_id for claim in claims if claim.status == ClaimStatus.CORRECTED
+        }
+        if set(successors) != corrected_ids or any(
+            len(claim_successors) != 1 for claim_successors in successors.values()
+        ):
+            return False, "Claim correction lineage is invalid."
+        if (
+            by_id["scope.integrated-loop.v1"].status != ClaimStatus.CORRECTED
+            or by_id["scope.integrated-loop.v2"].supersedes_claim_id != "scope.integrated-loop.v1"
+        ):
+            return False, "Claim scope lineage is invalid."
+
+        references = {reference for claim in claims for reference in claim.evidence_refs}
+        if references != set(_REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS):
+            return False, "Claim evidence paths differ from the reviewed bootstrap evidence set."
+
+        evidence_bytes: dict[str, bytes] = {}
+        for reference in sorted(references):
+            current = _read_repo_regular_file(repo_root, reference)
+            committed = _git_blob_at_path(repo_root, git, head, reference)
+            if committed is None or committed != current:
+                return False, f"Claim evidence is not committed at HEAD: {reference}."
+            if sha256_bytes(current) != _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS[reference]:
+                return False, f"Claim evidence differs from reviewed content: {reference}."
+            evidence_bytes[reference] = current
+
+        final_head = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
+            text=True,
+        ).stdout.strip()
+        if final_head != head:
+            return False, "Claim registry Git HEAD changed during verification."
+        if _read_repo_regular_file(repo_root, registry_relative) != registry_bytes:
+            return False, "Claim registry changed during verification."
+        if sha256_bytes(registry_bytes) != _REQUIRED_BOOTSTRAP_REGISTRY_SHA256:
+            return False, "Claim registry review binding changed during verification."
+        for reference, initial in evidence_bytes.items():
+            final = _read_repo_regular_file(repo_root, reference)
+            if final != initial:
+                return False, f"Claim evidence changed during verification: {reference}."
+            if sha256_bytes(final) != _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS[reference]:
+                return (
+                    False,
+                    f"Claim evidence review binding changed during verification: {reference}.",
+                )
+    except (GitTrustError, OSError, subprocess.SubprocessError, ValueError):
+        return False, "Claim evidence cannot be reconstructed from the trusted repository."
+    evidence_label = "file" if len(evidence_bytes) == 1 else "files"
+    return (
+        True,
+        f"Claim registry binds {len(claims)} exact claim contracts and "
+        f"{len(evidence_bytes)} evidence {evidence_label} to Git HEAD.",
+    )
 
 
 def _gate_controls_valid(loop: dict[str, Any]) -> bool:
@@ -279,7 +635,140 @@ def _gate_controls_valid(loop: dict[str, Any]) -> bool:
     )
 
 
-def _pytest_node(repo_root: Path, node_id: object) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+def _expected_credibility_gate_control_registry() -> dict[str, Any]:
+    controls: list[dict[str, Any]] = []
+    for gate_id, claim_ids, positive, negative, placebo in _CREDIBILITY_GATE_CONTROL_NODES:
+        controls.append(
+            {
+                "claim_ids": list(
+                    _REQUIRED_BOOTSTRAP_CLAIM_DIGESTS if claim_ids is None else claim_ids
+                ),
+                "gate_id": gate_id,
+                "negative_control": negative,
+                "placebo_control": placebo,
+                "positive_control": positive,
+            }
+        )
+    return {
+        "assurance_scope": _CREDIBILITY_GATE_CONTROL_SCOPE,
+        "controls": controls,
+        "runner": _CREDIBILITY_GATE_CONTROL_RUNNER,
+        "schema_version": _CREDIBILITY_GATE_CONTROL_SCHEMA,
+    }
+
+
+def _verify_credibility_gate_control_registry(repo_root: Path) -> tuple[bool, str]:
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("duplicate credibility-control field")
+            value[key] = item
+        return value
+
+    try:
+        git = _trusted_git(repo_root)
+        head = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
+            text=True,
+        ).stdout.strip()
+        if _GIT_OBJECT_ID_PATTERN.fullmatch(head) is None:
+            return False, "Current credibility-control registry cannot resolve a valid Git HEAD."
+        data = _read_repo_regular_file(repo_root, _CREDIBILITY_GATE_CONTROL_PATH)
+        if _git_blob_at_path(repo_root, git, head, _CREDIBILITY_GATE_CONTROL_PATH) != data:
+            return False, "Current credibility-control registry is not committed at HEAD."
+        document = json.loads(data, object_pairs_hook=unique_object)
+        if (
+            not isinstance(document, dict)
+            or canonical_json_pretty(document) != data
+            or document != _expected_credibility_gate_control_registry()
+        ):
+            return False, "Current credibility-control registry differs from its exact contract."
+        controls = document["controls"]
+        role_nodes: list[str] = []
+        test_file_bytes: dict[str, bytes] = {}
+        for control in controls:
+            nodes = (
+                control["positive_control"],
+                control["negative_control"],
+                control["placebo_control"],
+            )
+            if len(set(nodes)) != 3:
+                return False, "Current credibility controls do not resolve three distinct tests."
+            role_nodes.extend(nodes)
+        for node_id in role_nodes:
+            parts = _pytest_node_parts(node_id)
+            if parts is None:
+                return False, "Current credibility controls do not resolve three distinct tests."
+            relative = parts[0].as_posix()
+            if relative in test_file_bytes:
+                continue
+            current = _read_repo_regular_file(repo_root, relative)
+            committed = _git_blob_at_path(repo_root, git, head, relative)
+            expected_digest = _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS.get(relative)
+            if committed is None or committed != current:
+                return (
+                    False,
+                    f"Current credibility-control tests are not committed at HEAD: {relative}.",
+                )
+            if expected_digest is None or sha256_bytes(current) != expected_digest:
+                return (
+                    False,
+                    f"Current credibility-control tests differ from reviewed evidence: {relative}.",
+                )
+            test_file_bytes[relative] = current
+        resolved_nodes: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
+        for node_id in role_nodes:
+            parts = _pytest_node_parts(node_id)
+            node = (
+                None
+                if parts is None
+                else _pytest_node_from_bytes(node_id, test_file_bytes[parts[0].as_posix()])
+            )
+            if node is None:
+                return False, "Current credibility controls do not resolve three distinct tests."
+            resolved_nodes.append(node)
+        if any(
+            isinstance(node, ast.AsyncFunctionDef) or node.decorator_list for node in resolved_nodes
+        ):
+            return False, "Current credibility controls do not resolve three distinct tests."
+        covered_claims = {claim_id for control in controls for claim_id in control["claim_ids"]}
+        if covered_claims != set(_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS):
+            return False, "Current credibility controls do not cover the exact bootstrap claims."
+        final_head = subprocess.run(  # noqa: S603 - fixed trusted Git identity query
+            [git, "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            env=_git_environment(),
+            timeout=_GIT_TIMEOUT_SECONDS,
+            text=True,
+        ).stdout.strip()
+        if final_head != head:
+            return False, "Current credibility-control Git HEAD changed during verification."
+        if _read_repo_regular_file(repo_root, _CREDIBILITY_GATE_CONTROL_PATH) != data:
+            return False, "Current credibility-control registry changed during verification."
+        for relative, initial in test_file_bytes.items():
+            if _read_repo_regular_file(repo_root, relative) != initial:
+                return (
+                    False,
+                    f"Current credibility-control test changed during verification: {relative}.",
+                )
+    except (GitTrustError, OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        return False, "Current credibility-control registry cannot be reconstructed."
+    return (
+        True,
+        f"Current credibility registry binds {len(controls)} gates, "
+        f"{len(covered_claims)} claims, and {len(role_nodes)} control roles to committed tests.",
+    )
+
+
+def _pytest_node_parts(node_id: object) -> tuple[PurePosixPath, str] | None:
     if not isinstance(node_id, str):
         return None
     parts = node_id.split("::")
@@ -296,15 +785,38 @@ def _pytest_node(repo_root: Path, node_id: object) -> ast.FunctionDef | ast.Asyn
         or pure.as_posix() != relative
     ):
         return None
-    path = repo_root.joinpath(*pure.parts)
-    try:
-        module = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
-    except (OSError, SyntaxError, UnicodeError):
+    return pure, function_name
+
+
+def _pytest_node_from_bytes(
+    node_id: object,
+    data: bytes,
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    parts = _pytest_node_parts(node_id)
+    if parts is None:
         return None
-    for node in module.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
-            return node
-    return None
+    pure, function_name = parts
+    try:
+        module = ast.parse(data.decode("utf-8"), filename=pure.as_posix())
+    except (SyntaxError, UnicodeError):
+        return None
+    matches = [
+        node
+        for node in module.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _pytest_node(repo_root: Path, node_id: object) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    parts = _pytest_node_parts(node_id)
+    if parts is None:
+        return None
+    try:
+        data = _read_repo_regular_file(repo_root, parts[0].as_posix())
+    except OSError:
+        return None
+    return _pytest_node_from_bytes(node_id, data)
 
 
 def _pytest_node_exists(repo_root: Path, node_id: object) -> bool:
@@ -2155,6 +2667,10 @@ def validate_mission(repo_root: Path) -> MissionValidation:
     gate_registry_valid, gate_registry_detail = _verify_gate_control_registry(
         repo_root, repo_root / "protocol" / "gate_controls" / "v1.json"
     )
+    if gate_registry_valid:
+        credibility_valid, credibility_detail = _verify_credibility_gate_control_registry(repo_root)
+        gate_registry_valid = credibility_valid
+        gate_registry_detail = f"{gate_registry_detail} {credibility_detail}"
     checks.append(
         _check(
             "gate-control-registry",
@@ -2232,13 +2748,12 @@ def validate_mission(repo_root: Path) -> MissionValidation:
                 correction_detail,
             )
         )
-    claims = _claims(repo_root / "claims" / "registry.jsonl")
-    claim_ids = [claim.claim_id for claim in claims]
+    claim_registry_valid, claim_registry_detail = _claim_registry_valid(repo_root)
     checks.append(
         _check(
             "claim-registry",
-            bool(claims) and len(claim_ids) == len(set(claim_ids)),
-            "Claim registry must be nonempty, typed, and unique.",
+            claim_registry_valid,
+            claim_registry_detail,
         )
     )
     memory_path = repo_root / "memory" / "research_engine_extraction.jsonl"

@@ -23,10 +23,13 @@
     },
     "evidence_refs": {
       "items": {
+        "pattern": "^(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+)(?:/(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+))*$",
         "type": "string"
       },
+      "minItems": 1,
       "title": "Evidence Refs",
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "forbidden_wording": {
       "minLength": 1,
@@ -50,6 +53,19 @@
     },
     "status": {
       "$ref": "#/$defs/ClaimStatus"
+    },
+    "supersedes_claim_id": {
+      "anyOf": [
+        {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Claim Id"
     },
     "wording": {
       "minLength": 1,

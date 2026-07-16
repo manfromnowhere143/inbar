@@ -1,0 +1,442 @@
+{
+  "$defs": {
+    "EngineeringValidationArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "minimum": 0,
+          "title": "Bytes",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+)(?:/(?:[^./\\\\][^/\\\\]*|\\.[^./\\\\][^/\\\\]*|\\.\\.[^/\\\\]+))*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "bytes",
+        "media_type"
+      ],
+      "title": "EngineeringValidationArtifact",
+      "type": "object"
+    },
+    "EngineeringValidationEnvironment": {
+      "additionalProperties": false,
+      "properties": {
+        "machine": {
+          "minLength": 1,
+          "title": "Machine",
+          "type": "string"
+        },
+        "platform": {
+          "minLength": 1,
+          "title": "Platform",
+          "type": "string"
+        },
+        "python_version": {
+          "minLength": 1,
+          "title": "Python Version",
+          "type": "string"
+        },
+        "uv_version": {
+          "minLength": 1,
+          "title": "Uv Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "platform",
+        "machine",
+        "python_version",
+        "uv_version"
+      ],
+      "title": "EngineeringValidationEnvironment",
+      "type": "object"
+    },
+    "EngineeringValidationMissionObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_blockers": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Expected Blockers",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "missing_expected_blockers": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Missing Expected Blockers",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "mission_check_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Mission Check Ids",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "observed_blockers": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Observed Blockers",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "step_id": {
+          "const": "mission-validate",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "unexpected_blockers": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Unexpected Blockers",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "step_id",
+        "mission_check_ids",
+        "expected_blockers",
+        "observed_blockers",
+        "missing_expected_blockers",
+        "unexpected_blockers"
+      ],
+      "title": "EngineeringValidationMissionObservation",
+      "type": "object"
+    },
+    "EngineeringValidationPytestObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "coverage_json": {
+          "$ref": "#/$defs/EngineeringValidationArtifact"
+        },
+        "covered_branches": {
+          "minimum": 0,
+          "title": "Covered Branches",
+          "type": "integer"
+        },
+        "covered_lines": {
+          "minimum": 0,
+          "title": "Covered Lines",
+          "type": "integer"
+        },
+        "junit_xml": {
+          "$ref": "#/$defs/EngineeringValidationArtifact"
+        },
+        "num_branches": {
+          "exclusiveMinimum": 0,
+          "title": "Num Branches",
+          "type": "integer"
+        },
+        "num_statements": {
+          "exclusiveMinimum": 0,
+          "title": "Num Statements",
+          "type": "integer"
+        },
+        "step_id": {
+          "const": "pytest-cov",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "tests_errors": {
+          "minimum": 0,
+          "title": "Tests Errors",
+          "type": "integer"
+        },
+        "tests_failed": {
+          "minimum": 0,
+          "title": "Tests Failed",
+          "type": "integer"
+        },
+        "tests_passed": {
+          "exclusiveMinimum": 0,
+          "title": "Tests Passed",
+          "type": "integer"
+        },
+        "tests_skipped": {
+          "const": 0,
+          "title": "Tests Skipped",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "step_id",
+        "junit_xml",
+        "coverage_json",
+        "tests_passed",
+        "tests_failed",
+        "tests_errors",
+        "tests_skipped",
+        "covered_lines",
+        "num_statements",
+        "covered_branches",
+        "num_branches"
+      ],
+      "title": "EngineeringValidationPytestObservation",
+      "type": "object"
+    },
+    "EngineeringValidationResourceAccounting": {
+      "additionalProperties": false,
+      "properties": {
+        "cloud_jobs": {
+          "title": "Cloud Jobs",
+          "type": "null"
+        },
+        "direct_cost_usd": {
+          "title": "Direct Cost Usd",
+          "type": "null"
+        },
+        "gpu_seconds": {
+          "title": "Gpu Seconds",
+          "type": "null"
+        },
+        "measurement_status": {
+          "const": "not_metered",
+          "title": "Measurement Status",
+          "type": "string"
+        },
+        "paid_calls": {
+          "title": "Paid Calls",
+          "type": "null"
+        }
+      },
+      "required": [
+        "measurement_status",
+        "direct_cost_usd",
+        "gpu_seconds",
+        "cloud_jobs",
+        "paid_calls"
+      ],
+      "title": "EngineeringValidationResourceAccounting",
+      "type": "object"
+    },
+    "EngineeringValidationStep": {
+      "additionalProperties": false,
+      "properties": {
+        "argv": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Argv",
+          "type": "array"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "expected_exit_code": {
+          "title": "Expected Exit Code",
+          "type": "integer"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "observed_exit_code": {
+          "title": "Observed Exit Code",
+          "type": "integer"
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "title": "Result",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "stderr": {
+          "$ref": "#/$defs/EngineeringValidationArtifact"
+        },
+        "stdout": {
+          "$ref": "#/$defs/EngineeringValidationArtifact"
+        },
+        "step_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "working_directory": {
+          "const": ".",
+          "title": "Working Directory",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "argv",
+        "working_directory",
+        "started_at",
+        "finished_at",
+        "duration_ms",
+        "expected_exit_code",
+        "observed_exit_code",
+        "result",
+        "stdout",
+        "stderr"
+      ],
+      "title": "EngineeringValidationStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assurance_scope": {
+      "const": "same-operator-engineering-observation-no-independent-attestation",
+      "title": "Assurance Scope",
+      "type": "string"
+    },
+    "authority_effect": {
+      "const": "none",
+      "title": "Authority Effect",
+      "type": "string"
+    },
+    "environment": {
+      "$ref": "#/$defs/EngineeringValidationEnvironment"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "independent_attestation": {
+      "const": false,
+      "title": "Independent Attestation",
+      "type": "boolean"
+    },
+    "mission_id": {
+      "const": "inbar",
+      "title": "Mission Id",
+      "type": "string"
+    },
+    "mission_observation": {
+      "$ref": "#/$defs/EngineeringValidationMissionObservation"
+    },
+    "plan_id": {
+      "const": "inbar.core-engineering-validation.v1",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "plan_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Plan Sha256",
+      "type": "string"
+    },
+    "producer_actor_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Producer Actor Id",
+      "type": "string"
+    },
+    "pytest_observation": {
+      "$ref": "#/$defs/EngineeringValidationPytestObservation"
+    },
+    "receipt_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Receipt Id",
+      "type": "string"
+    },
+    "resource_accounting": {
+      "$ref": "#/$defs/EngineeringValidationResourceAccounting"
+    },
+    "result": {
+      "enum": [
+        "pass",
+        "fail"
+      ],
+      "title": "Result",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.engineering-validation-receipt.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scientific_result": {
+      "const": "not_evaluated",
+      "title": "Scientific Result",
+      "type": "string"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/EngineeringValidationStep"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "subject_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Subject Commit",
+      "type": "string"
+    },
+    "subject_tree": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Subject Tree",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "mission_id",
+    "subject_commit",
+    "subject_tree",
+    "plan_id",
+    "plan_sha256",
+    "started_at",
+    "finished_at",
+    "producer_actor_id",
+    "assurance_scope",
+    "independent_attestation",
+    "environment",
+    "steps",
+    "pytest_observation",
+    "mission_observation",
+    "resource_accounting",
+    "scientific_result",
+    "authority_effect",
+    "result"
+  ],
+  "title": "EngineeringValidationReceipt",
+  "type": "object"
+}

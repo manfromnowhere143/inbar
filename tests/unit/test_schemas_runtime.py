@@ -103,6 +103,63 @@ def test_committed_schemas_match_runtime_contracts() -> None:
     assert verify_schemas(repo) == []
 
 
+def test_claim_schema_exposes_evidence_path_and_lineage_constraints() -> None:
+    schema = json.loads(schema_documents()["claim_record.schema.json"])
+    evidence = schema["properties"]["evidence_refs"]
+
+    assert evidence["minItems"] == 1
+    assert evidence["uniqueItems"] is True
+    assert evidence["items"]["pattern"]
+    assert schema["properties"]["supersedes_claim_id"]["anyOf"][1] == {"type": "null"}
+
+
+def test_engineering_validation_receipt_schema_exposes_epistemic_boundaries() -> None:
+    schema = json.loads(schema_documents()["engineering_validation_receipt.schema.json"])
+
+    assert schema["additionalProperties"] is False
+    assert {
+        "schema_version",
+        "subject_commit",
+        "subject_tree",
+        "plan_sha256",
+        "assurance_scope",
+        "independent_attestation",
+        "resource_accounting",
+        "scientific_result",
+        "authority_effect",
+        "result",
+    } <= set(schema["required"])
+    assert schema["properties"]["assurance_scope"]["const"] == (
+        "same-operator-engineering-observation-no-independent-attestation"
+    )
+    assert schema["properties"]["independent_attestation"] == {
+        "const": False,
+        "title": "Independent Attestation",
+        "type": "boolean",
+    }
+    assert schema["properties"]["plan_sha256"]["pattern"] == r"^[0-9a-f]{64}$"
+    assert schema["properties"]["steps"]["minItems"] == 1
+    mission = schema["$defs"]["EngineeringValidationMissionObservation"]
+    for field in (
+        "mission_check_ids",
+        "expected_blockers",
+        "observed_blockers",
+        "missing_expected_blockers",
+        "unexpected_blockers",
+    ):
+        assert mission["properties"][field]["uniqueItems"] is True
+    assert mission["properties"]["step_id"]["const"] == "mission-validate"
+    pytest_observation = schema["$defs"]["EngineeringValidationPytestObservation"]
+    assert pytest_observation["properties"]["step_id"]["const"] == "pytest-cov"
+    assert pytest_observation["properties"]["tests_skipped"]["const"] == 0
+    for field in ("tests_passed", "num_statements", "num_branches"):
+        assert pytest_observation["properties"][field]["exclusiveMinimum"] == 0
+    resources = schema["$defs"]["EngineeringValidationResourceAccounting"]
+    assert resources["properties"]["measurement_status"]["const"] == "not_metered"
+    for field in ("direct_cost_usd", "gpu_seconds", "cloud_jobs", "paid_calls"):
+        assert resources["properties"][field]["type"] == "null"
+
+
 def test_runtime_identity_schema_enforces_complete_provenance_states() -> None:
     schema = json.loads(schema_documents()["runtime_identity.schema.json"])
     alternatives = schema["allOf"][0]["oneOf"]

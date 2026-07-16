@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 import tomllib
 from pathlib import Path
 
@@ -93,3 +94,19 @@ def test_documented_environment_recovery_reinstalls_under_copy_mode() -> None:
     for relative in ("AGENTS.md", "README.md", "CONTRIBUTING.md"):
         document = (_REPO_ROOT / relative).read_text(encoding="utf-8")
         assert "uv sync --link-mode copy --reinstall" in document
+
+
+def test_coverage_floor_cannot_round_a_sub_90_result_to_pass() -> None:
+    project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    report = project["tool"]["coverage"]["report"]
+
+    assert report["precision"] == 2
+    assert report["fail_under"] == 90.01
+    assert round(89.999, report["precision"]) < report["fail_under"]
+
+
+def test_pytest_defaults_execute_xfails_without_selecting_a_subset() -> None:
+    project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    addopts = shlex.split(project["tool"]["pytest"]["ini_options"]["addopts"])
+
+    assert addopts == ["-q", "--strict-markers", "--strict-config", "--runxfail"]

@@ -362,7 +362,10 @@ def test_source_census_rejects_hard_linked_source(tmp_path: Path) -> None:
     try:
         (tmp_path / "external-alias.py").hardlink_to(source)
     except OSError as error:
-        pytest.skip(f"hard links are unavailable on this filesystem: {error}")
+        pytest.fail(
+            f"validation platform cannot create a hard link: {error}",
+            pytrace=False,
+        )
 
     with pytest.raises(AcquisitionAuditError, match="not a regular file"):
         acquisition_module._working_source_census(tmp_path)
@@ -573,15 +576,19 @@ def test_bound_model_rejects_artifact_above_parse_byte_ceiling(tmp_path: Path) -
         acquisition_module._load_bound_model(tmp_path, binding, ArtifactBinding)
 
 
-@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO creation requires POSIX")
 def test_source_census_rejects_special_file(tmp_path: Path) -> None:
+    if not hasattr(os, "mkfifo"):
+        pytest.fail("validation platform does not provide POSIX FIFOs", pytrace=False)
     package = tmp_path / "src" / "fieldtrue"
     package.mkdir(parents=True)
     (package / "acquisition.py").write_text("VALUE = 1\n")
     try:
         os.mkfifo(package / "stream.py")
     except OSError as error:
-        pytest.skip(f"FIFO creation is unavailable on this filesystem: {error}")
+        pytest.fail(
+            f"validation platform cannot create a FIFO: {error}",
+            pytrace=False,
+        )
 
     with pytest.raises(AcquisitionAuditError, match="not a regular file"):
         acquisition_module._working_source_census(tmp_path)

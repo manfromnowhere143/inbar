@@ -1,0 +1,59 @@
+{
+  "assurance_scope": "same-operator-bootstrap-credibility-controls-no-scientific-authority",
+  "controls": [
+    {
+      "claim_ids": [
+        "scope.integrated-loop.v1",
+        "scope.integrated-loop.v2",
+        "result.iter000.adapt-readiness.v1",
+        "state.iter001.authority-bootstrap.v1",
+        "decision.iter001.public-source-only-route.v1",
+        "decision.iter001.public-source-only-route.v2",
+        "screening.iter001.enumerated-source-sufficiency.v1",
+        "state.iter001.qualifying-source-admission.v1",
+        "correction.iter001.alfa-unit-wording.v1",
+        "implementation.iter001.bootstrap-admission.v1",
+        "implementation.iter001.shortcut-v2-primitives.v1",
+        "implementation.inbar.credibility-controls.v1",
+        "implementation.inbar.handoff-recovery.v1",
+        "implementation.inbar.engineering-validation-receipt.v1",
+        "product.inbar.offline-dossier-compiler.v1",
+        "scientific.integrated-loop-performance.v1",
+        "novelty.integrated-loop.v1"
+      ],
+      "gate_id": "claim-contract-integrity",
+      "negative_control": "tests/unit/test_mission.py::test_claim_registry_rejects_committed_semantic_substitution_and_extra_claim",
+      "placebo_control": "tests/unit/test_mission.py::test_claim_registry_rejects_committed_evidence_content_substitution",
+      "positive_control": "tests/unit/test_mission.py::test_claim_registry_binds_exact_contracts_registry_and_evidence"
+    },
+    {
+      "claim_ids": [
+        "implementation.inbar.handoff-recovery.v1"
+      ],
+      "gate_id": "handoff-recovery-integrity",
+      "negative_control": "tests/unit/test_handoff.py::test_checkpoint_v2_rejects_self_report_and_lineage_counterexamples",
+      "placebo_control": "tests/unit/test_handoff.py::test_checkpoint_v2_rejects_current_artifact_drift",
+      "positive_control": "tests/unit/test_handoff.py::test_checkpoint_v2_recomputes_committed_validation_and_renders_same_operator_scope"
+    },
+    {
+      "claim_ids": [
+        "implementation.inbar.engineering-validation-receipt.v1"
+      ],
+      "gate_id": "engineering-validation-receipt-integrity",
+      "negative_control": "tests/unit/test_handoff.py::test_coverage_recomputation_rejects_duplicate_and_self_reported_counts",
+      "placebo_control": "tests/unit/test_handoff.py::test_checkpoint_v2_rejects_receipt_evidence_ref_substitution",
+      "positive_control": "tests/unit/test_handoff.py::test_checkpoint_v2_recomputes_committed_validation_and_renders_same_operator_scope"
+    },
+    {
+      "claim_ids": [
+        "implementation.inbar.credibility-controls.v1"
+      ],
+      "gate_id": "credibility-registry-integrity",
+      "negative_control": "tests/unit/test_mission.py::test_current_credibility_registry_rejects_dirty_or_noncanonical_contract",
+      "placebo_control": "tests/unit/test_mission.py::test_current_credibility_registry_rejects_unresolved_control_node",
+      "positive_control": "tests/unit/test_mission.py::test_current_credibility_registry_binds_exact_claims_and_control_nodes"
+    }
+  ],
+  "runner": "required-full-pytest-suite-in-validation-receipt-and-base-controlled-ci",
+  "schema_version": "inbar.credibility-gate-control-registry.v1"
+}

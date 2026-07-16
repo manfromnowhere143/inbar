@@ -1,9 +1,9 @@
 # Frontier Research Dossier 2026
 
-- Research cutoff: 2026-07-14
+- Research cutoff: 2026-07-16
 - Evidence policy: primary research papers, author-maintained project records, and official NASA
   or model-provider documents only
-- Mission descriptor: Active Causal Mission Assurance
+- Mission descriptor: Physical Causal Evidence and Verified Intervention Research
 
 ## Executive verdict
 
@@ -20,11 +20,12 @@ The selected problem is an end-to-end causal assurance problem for off-nominal p
 > verify settled physical recovery using an independent outcome authority, and compile the result
 > into a calibrated monitor that survives held-out hardware, mission, and fault-family transfer?
 
-This question is worth pursuing because each link is useful and individually occupied, while none
-of the reviewed public sources establishes the joint evidence contract. The mission must not claim
-that the combination is novel until a systematic review and experiments support that statement.
-Its initial contribution is a falsifiable architecture and evaluation protocol, not a performance
-claim.
+This question is worth pursuing because each link is useful and individually occupied, while the
+dated reconnaissance did not establish the joint evidence contract among its enumerated sources.
+That screen was neither systematic nor independently reconstructible, so it cannot support an
+exhaustive source or novelty claim. The mission must not claim that the combination is novel until a
+prospective systematic review and experiments support that statement. Its initial contribution is a
+falsifiable architecture and evaluation protocol, not a performance claim.
 
 The research chain is:
 
@@ -113,6 +114,14 @@ relational concepts for failure-aware planning, including a sim-to-real demonstr
 June 2026 real-robot benchmark reports that execution instability dominates many failures and that
 recovery varies materially by architecture [S16].
 
+Three additional 2026 systems tighten the occupied boundary. Dream2Fix reports counterfactual
+failure-correction synthesis and zero-shot closed-loop recovery in physical deployments [S30].
+AgentChord, accepted to RSS 2026, compiles anticipatory recovery branches before execution and uses
+low-latency monitors to trigger them [S31]. A confidence-aware human-in-the-loop framework jointly
+models module uncertainty and human-intervention cost and reports physical bite-acquisition recovery
+experiments [S32]. These systems occupy physical closed-loop correction, proactive contingency
+execution, and uncertainty-versus-intervention-cost recovery baselines.
+
 These works occupy failure analysis, correction generation, learned recovery, and learning from
 recovery experience. They also expose the unresolved measurement issue: a predicted correction,
 visual milestone, evaluator score, or simulator rollout is not itself proof that the physical
@@ -141,11 +150,12 @@ evaluation of robotics policies and validates relative predictions against more 
 real-world evaluations [S21]. This is strong evidence that generative simulation can expand test
 coverage. It does not make a generated world an unrestricted outcome authority.
 
-What-If World tests paired physical interventions and reports that visually plausible videos can
-still fail the required causal divergence [S22]. NASA-STD-7009B separately requires acceptance
-criteria and credibility assessment for models and simulations used in decisions [S23]. The
-mission may use a simulator inside its declared, validated decision-use domain; it cannot allow a
-world model that proposes a recovery to be the sole verifier of that recovery.
+What-If World tests pairs of prompt-conditioned generated videos that vary one described physical
+detail and reports that individually plausible videos can still fail the required paired causal
+divergence [S22]. NASA-STD-7009B separately requires acceptance criteria and credibility assessment
+for models and simulations used in decisions [S23]. The mission may use a simulator inside its
+declared, validated decision-use domain; it cannot allow a world model that proposes a recovery to
+be the sole verifier of that recovery.
 
 ### Aerospace assurance makes independence a system property
 
@@ -171,7 +181,7 @@ compliance, certification, flight-readiness, or safety claim for this repository
 | Open-world planning | Hypothesis-driven model expansion [S17] | Hypothesis generation, verification, and model expansion | Can unknown causal mechanisms be retained and independently settled in fault response? |
 | Active diagnosis | Differentiable reachability and causal-bandit FDI [S9-S10] | Safe active model discrimination | Does the chosen test add causal information after cost, delay, risk, and baseline controls? |
 | Diagnosis and recovery | NASA AOS and Gateway VSM [S11-S12] | Integrated diagnosis, planning, execution, and contingency response | Can learned multimodal evidence be added without weakening assurance or independence? |
-| Learned recovery | RoboFAC, B2FF, ReSYNC [S13-S15] | Failure correction, recovery guidance, learning from recovery | Does a separately executed action reach a pre-registered settled physical state? |
+| Learned recovery | RoboFAC, B2FF, ReSYNC, Dream2Fix, AgentChord, and confidence-aware human intervention [S13-S15, S30-S32] | Failure correction, physical closed-loop recovery, anticipatory branches, and cost-aware human recovery | Does a separately executed action reach a pre-registered settled physical state under independent outcome authority? |
 | Confidence and abstention | KnowNo and VLAConf [S18-S19] | Planner abstention and VLA confidence | Does calibration survive grouped physical transfer and dependent telemetry? |
 | Generative simulation | Veo evaluation and What-If World [S21-S22] | Scalable world-model evaluation and causal stress tests | What decision-use domain is credible, and what still requires physical settlement? |
 | Assurance | NASA standards, roadmaps, and GN&C practices [S23-S27] | Model credibility, IV&V, and independence requirements | Can evidence lineage and authority separation make adaptive experiments auditable? |
@@ -191,16 +201,23 @@ p(H, z, theta | E), where H = known mechanisms union {unknown}
 The learned component may propose residual structure or candidate mechanisms. It may not remove
 physical constraints, force an unknown case into a known label, or act as its own verifier.
 
-For approved diagnostic action `a`, outcome `Y_a`, direct cost `C`, delay `T`, and bounded risk `R`:
+For approved diagnostic action `a`, outcome `Y_a`, direct cost `C`, delay `T`, bounded risk `R`, and
+positive denominator floor `epsilon`, every denominator term is expressed in the same declared cost
+unit:
 
 ```text
 a* = argmax over a in A_safe:
-     I(H; Y_a | E) / (C(a) + lambda*T(a) + mu*R(a))
+     I(H; Y_a | E) / max(C(a) + lambda*T(a) + mu*R(a), epsilon)
 ```
 
-The denominator is not a cosmetic ranking term. Actions outside the frozen safety envelope are
-ineligible. The action selected for execution must be the exact approved action, not an equivalent
-natural-language paraphrase or a substituted test.
+`lambda` converts seconds to cost units and `mu` converts one unit of the frozen risk score to cost
+units. The executable planner represents them as `PlannerWeights.time_weight` and
+`PlannerWeights.risk_weight`; it represents `epsilon` as `denominator_floor`, whose current default
+is `1e-9` cost units. A claim-bearing run must freeze the cost unit, cost normalization, risk scale,
+weights, and denominator floor before outcome inspection. Defaults are numerical behavior, not an
+authorized economic interpretation. Actions outside the frozen safety envelope are ineligible
+regardless of score. The action selected for execution must be the exact approved action, not an
+equivalent natural-language paraphrase or a substituted test.
 
 A recovery is accepted only when a separately identified outcome authority verifies all of the
 following:
@@ -212,21 +229,28 @@ following:
 The compiled monitor must declare its validity domain, sensor and clock assumptions, calibration
 set, grouped holdouts, latency and resource bounds, false-action cost, and abstention behavior.
 
-## Required identity and shortcut controls
+## Proposed identity and shortcut controls
 
-The following controls run before a multimodal benefit claim:
+The following controls are a proposed minimum expansion for future claim-bearing protocols, not a
+replacement for the master preregistration and Iteration 001 controls. They acquire authority only
+through prospective preregistration or amendment. Every already frozen control remains mandatory
+before a multimodal benefit claim:
 
 1. Deterministic engineering baseline using only permitted physical rules and telemetry.
-2. Task-index or case-identity lookup with no semantic language encoder.
+2. Task-index or case-identity lookup with no semantic language encoder, plus learned and randomly
+   initialized identity embeddings.
 3. No-language policy and shuffled-language policy.
 4. Telemetry-only, vision-only, log-only, and configuration-only ablations.
-5. Timestamp, filename, row-order, site, vehicle, and operator-identity probes.
-6. Nearest-training-source and duplicate-trajectory checks.
-7. Frozen-pretraining versus task-specific adaptation comparison.
-8. Correct versus substituted action normalization and controller metadata.
-9. Exact executable-policy identity binding, including model, transforms, controller, software,
+5. Early fusion, late fusion, and a compute-matched unimodal ensemble.
+6. Modality deletion, permutation, duplication, noise, and bounded clock-jitter controls.
+7. Timestamp, filename, row-order, site, vehicle, and operator-identity probes.
+8. Nearest-training-source and duplicate-trajectory checks.
+9. Frozen-pretraining versus task-specific adaptation comparison.
+10. Correct versus substituted action normalization and controller metadata.
+11. Exact executable-policy identity binding, including model, transforms, controller, software,
    configuration, and embodiment.
-10. Group-held-out evaluation by connected leakage component, hardware, mission, and fault family.
+12. Group-held-out evaluation by connected leakage component, hardware family, hardware identity,
+    vehicle, mission, environment, fault family, and operating regime.
 
 If a cheap identity-only control matches or exceeds the full system within the pre-registered
 uncertainty interval, the multimodal mechanism claim is null even when aggregate accuracy is high.
@@ -234,102 +258,200 @@ uncertainty interval, the multimodal mechanism claim is null even when aggregate
 ## Falsification program
 
 Each campaign freezes numerical thresholds, analysis code, group definitions, and stop rules
-before outcome inspection. The following relationships define the mission-level falsifiers.
+before outcome inspection. The `C0` through `C9` labels below are integrated-campaign gates. They
+refine but do not renumber, replace, or silently amend the frozen `F1` through `F10` falsifiers in
+`PREREGISTRATION.md`. Any detail beyond the verbatim frozen master and iteration contracts is a
+prospective design candidate. It gains protocol and claim authority only through the relevant
+pre-outcome iteration preregistration or an explicit prospective amendment.
 
-### F0: evidence construct
+### C0: evidence construct
 
-Falsify or block the campaign if fewer than 30 incidents have independently established causes,
-at least two plausible pre-outcome mechanisms, at least one independently reviewed safe
-discriminating test, two hardware or vehicle identities, two fault families, and at least two
-operational evidence channels. Source, parser, truth separation, and exact-coverage failures make
-the run invalid rather than negative.
+Block the campaign unless all frozen Iteration 001 coverage gates pass on complete root incidents:
+at least 30 incidents, three physical system families, two hardware identities per family and six
+overall, three fault families, six incidents per included system family, six per included fault
+family, and three per included identity. No included system or fault family may exceed 50 percent of
+eligible incidents; every system family must cover two fault families; every fault family must occur
+on two identities; and every claim-bearing fault family must occur in two system families. The set
+must include an aerospace or spacecraft-like family and a robotic family, preserve the frozen split
+boundaries, and give every counted dossier independently established cause, pre-outcome ambiguity,
+an independently reviewed safe discriminating test, and the complete evidence contract. Source,
+parser, truth-separation, or exact-census failures are invalid rather than negative.
 
-### F1: multimodal necessity
+### C1: multimodal necessity
 
-Let `M_full` be the frozen primary metric for the full model and `M_shortcut` the best eligible
-identity-only or modality-removal baseline. The multimodal claim fails when the pre-registered 95%
-lower confidence bound of `M_full - M_shortcut` is not positive. Cluster resampling must follow the
-independent incident or hardware group, not individual frames.
+Define the frozen primary score `S` so larger values are always better. A cost, error, test-count,
+or time measure must therefore enter as a prospectively frozen reduction or sign-reversed score,
+never as an ambiguously oriented `M`. The frozen necessity family includes every applicable cheap
+deterministic, runbook, FMEA, fault-tree, observer, Bayesian, and physics-only baseline; task and
+configuration identity; source, site, system, vehicle, operator, timestamp, filename, and row-order
+identity or leakage probes; all unimodal systems; no-language and shuffled-language systems;
+modality deletion, permutation, and replacement of a complementary modality by a duplicate; learned
+and random identity embeddings; and compute-matched unimodal and placebo controls. For every
+eligible necessity baseline `b`, define `Delta_b = S_full - S_b`. Estimate all contrasts without
+outcome-selected baseline choice and form simultaneous one-sided 95 percent lower bounds across the
+frozen baseline and material-group family. The multimodal necessity claim fails unless every
+required `LCB(Delta_b)` is positive.
 
-### F2: active causal value
+The frozen evaluation matrix must also include early-fusion, late-fusion, and declared production
+fusion architectures under matched information and compute. These are architecture controls, not
+automatic necessity-denying baselines. Their results are reported without outcome-selected model
+choice; a claim that one fusion architecture is superior requires its own prospectively oriented,
+simultaneous contrasts.
 
-Compare the selected test with passive observation, a fixed engineering test, a random eligible
-test, and an information-only planner that omits cost and risk. The active-test claim fails if the
-95% lower bound of incremental posterior entropy reduction per realized cost is not positive, or
-if outcome-conditioned likelihood ratios do not move the competing mechanisms in the
-pre-registered directions.
+Label-preserving duplication, bounded sensor noise, and bounded clock jitter are robustness
+controls. Before outcomes, classify each perturbation as benign or destructive and freeze its
+magnitude and margin. For benign perturbation `r`, define
+`Delta_robust,r = S_perturbed,r - S_clean`; its simultaneous one-sided lower bound must exceed the
+negative non-inferiority margin. An invariance claim additionally requires the simultaneous
+two-sided interval to lie inside its frozen equivalence bounds. A destructive or invalid
+perturbation instead receives a frozen rejection or abstention criterion and cannot be relabeled
+benign after outcomes. Cluster resampling for every C1 contrast must preserve the highest required
+dependency unit across root incident, acquisition session, and hardware identity, not individual
+frames or windows.
 
-### F3: safety-envelope integrity
+### C2: active causal value
+
+Run the complete frozen comparator set: no-op, no test, passive observation, a fixed engineering
+test, random safe, cheapest safe, wrong-but-safe, myopic expected information gain, classical optimal
+experiment design, belief-tree search, safe reachability-based discrimination where applicable, and
+an information-only planner that omits cost and risk. No-op, no test, and passive observation remain
+separate unless a prospective protocol proves their operational equivalence. Wrong-but-safe is a
+falsification control, not an eligible action recommendation.
+
+The planner ranks actions using prospectively frozen predicted `C_plan`, `T_plan`, and `R_plan`. The
+evaluation does not substitute those forecasts for what occurred. For method `m` on incident `i`, let
+`G_mi` be prior minus posterior mechanism entropy after the frozen observation horizon and let
+`D_mi_observed = max(C_mi_observed + lambda*T_mi_observed + mu*R_mi_observed, epsilon)` in the exact
+declared cost unit, using audited realized cost, elapsed time, and intervention-risk outcome. Missing
+realized terms remain missing rather than zero. The normalization, risk scale, weights, horizon, and
+positive `epsilon` are frozen before outcomes; no-op and zero-direct-cost replay use the same
+denominator floor rather than division by zero. For every eligible comparator `b`, define
+`Delta_bi = G_active,i/D_active,i_observed - G_b,i/D_b,i_observed` at the independent incident unit.
+Use simultaneous one-sided 95 percent lower bounds across frozen comparator and material-group
+contrasts with clustering by root incident, acquisition session, and identity. The active causal
+value claim fails unless every required `LCB(E[Delta_bi])` is positive and outcome-conditioned
+likelihood ratios move the competing mechanisms in the preregistered directions.
+
+The `G/D` contrast is necessary but insufficient: entropy reduction can reward confident error.
+Before outcome access, the protocol must freeze an outcome-authority adjudication rule for correct
+mechanism isolation, a hypothesis-set coverage target, and a proper-score or calibration metric whose
+orientation and non-inferiority margin are explicit. Correct isolation and hypothesis coverage must
+meet their preregistered aggregate and material-group gates, and the simultaneous lower bound for the
+oriented active-versus-reference proper-score or calibration contrast must exceed the negative frozen
+margin. A gain in information per observed cost cannot compensate for failure of any of these gates.
+
+The operational-efficiency gate is evaluated against one prospectively named reference workflow,
+selected without outcome access. It additionally fails if the system achieves neither at least 30
+percent fewer tests to correct isolation nor at least 25 percent lower blinded engineer time. Define
+`Delta_FA = false_action_rate_active - false_action_rate_reference`; its simultaneous one-sided upper
+confidence bound must not exceed the prospectively frozen non-inferiority margin. These are
+directional eligibility bars; a later experiment preregistration must freeze estimators, margins,
+multiplicity, and power before inspecting outcomes. Neither efficiency bar can compensate for failed
+correct-isolation, hypothesis-coverage, calibration, information-direction, or false-action gates.
+
+### C3: safety-envelope integrity
 
 Any executed action outside the signed envelope invalidates the campaign. The method fails its
 safety objective if the upper confidence bound on hazardous or inadmissible actions exceeds the
 pre-registered cap, regardless of diagnostic accuracy.
 
-### F4: open-world behavior
+### C4: open-world behavior
 
 Hold out entire mechanism families. The open-world claim fails if the system forces held-out cases
 into known labels above the permitted false-known rate, if unknown recall at the frozen
 false-unknown rate misses its threshold, or if abstention does not reduce selective risk as
 coverage decreases.
 
-### F5: independent recovery
+### C5: independent recovery
 
-Compare recovery with the best fixed or model-based contingency baseline under matched fault and
-risk conditions. The recovery claim fails if the lower bound on settled physical success does not
-improve, if the settled-state dwell requirement is missed, or if the proposer and sole verifier
-share the same learned model, sensor dependency, or mutable outcome path.
+Compare recovery under matched fault and risk conditions against every prospectively eligible fixed,
+model-based, learned physical-recovery, anticipatory-branch, and confidence-aware human-intervention
+baseline, including Dream2Fix and AgentChord where their operating assumptions apply. Use
+simultaneous clustered contrasts rather than selecting a winner after outcome access. For every
+eligible baseline `b`, define
+`Delta_recovery,b = settled_success_active - settled_success_b`; every required simultaneous
+one-sided 95 percent lower bound must be positive. The recovery claim also fails if the settled-state
+dwell requirement is missed or if the outcome verifier is not in a preregistered independence group
+separate from the hypothesis proposer, action selector, recovery proposer, and executor. Missing
+conflict disclosure, or a shared learned model, sensor dependency, or mutable outcome path that
+defeats outcome independence, also fails the claim.
 
-### F6: transfer and calibration
+### C6: transfer and calibration
 
-Freeze group holdouts for hardware, mission, fault family, and operating regime. A transferable
-monitor claim fails if any required group's empirical coverage lower bound falls below the frozen
-target, if worst-group selective risk exceeds its cap, or if a calibration repair uses held-out
-outcomes without being declared as adaptation.
+Freeze separate group holdouts for leakage component, hardware family, hardware identity, vehicle,
+mission, environment, fault family, and operating regime; a joint connected-component union cannot
+erase a crossed axis.
+A transfer claim requires a separately preregistered clustered power calculation and, regardless of
+a smaller calculated minimum, at least four system families, eight hardware identities, and four
+fault families. The frozen phrase `two untouched claim-bearing family units` is not operational by
+itself. Before Iteration 006 outcome access, a prospective transfer protocol must define it at minimum
+as one complete claim-bearing system family and one complete claim-bearing fault family, each absent
+from training, tuning, calibration, threshold selection, and repair and evaluated under separate
+axis locks.
 
-### F7: simulation decision use
+That protocol must orient a primary transfer score so larger is better and define each held-out
+contrast against a prospectively named reference, with simultaneous one-sided 95 percent lower
+bounds across axes and material groups. Results are clustered by root incident, acquisition session,
+and identity. A transferable-monitor claim fails if any required transfer-effect lower bound is not
+positive, if any required group's empirical coverage lower bound falls below the frozen target, if
+worst-group selective risk exceeds its cap, or if a calibration repair uses held-out outcomes without
+being declared as adaptation.
+
+### C7: simulation decision use
 
 Simulator evidence is rejected when the simulator lacks an approved decision-use statement,
 acceptance criteria, validation evidence, and an uncertainty account for the tested regime. A
-generative world's visual plausibility cannot settle a physical recovery claim.
+generative world's visual plausibility cannot settle a physical recovery claim. Independently of
+simulator acceptance, optimization stops when a learned reward or confidence proxy improves while
+independently settled physical success degrades or the proxy reverses the true policy ordering. The
+physical outcome and ordering authority must be frozen separately from the learned proxy.
 
-### F8: reproducibility and evidence integrity
+### C8: reproducibility and evidence integrity
 
 The result is invalid if an independent verifier cannot reconstruct the same verdict from frozen
 source bytes, code, configuration, executable identity, approvals, receipts, and artifacts, or if
 truth-plane fields enter any model-visible input.
 
-### F9: economic value
+### C9: economic value
 
-Let the realized net value for deployment group `g` be:
+The frozen master protocol retains its aggregate value formula. The following exposure-normalized
+estimands are a prospective refinement and become claim-bearing only through a value-stage
+preregistration or explicit prospective amendment before customer or outcome access.
 
-```text
-V_g = engineer-hours avoided
-    + downtime avoided
-    + redundant tests avoided
-    + expected-loss reduction
-    - integration cost
-    - compute and storage cost
-    - diagnostic-test and actuation cost
-    - human review cost
-    - false-action cost
-```
+For incident `i`, the exact variable net value is `v_i = benefit_i - variable_cost_i` from
+`docs/MATHEMATICS.md`. Benefits use prospectively approved, nonoverlapping ledger categories and
+rates. Costs include diagnostics, actuation, review, compute, storage, delay, realized intervention
+risk, and false actions, but a cost already represented in a `B minus Inbar` benefit delta cannot be
+subtracted again. `V_tau_observed` subtracts the fixed integration cost from the audited observed
+horizon total. `rho` is target-population variable net value per frozen exposure unit, and
+`V_tau_target = E_tau * rho - integration_cost_tau`. Each material group has its own
+exposure-normalized `rho_g`.
 
-Every term is monetized using customer-approved rates recorded before analysis. The product-value
-claim fails when the group-aware 95% lower confidence bound of net value is not positive. A point
-estimate, total addressable market estimate, or hypothetical loss avoidance is not evidence of
-realized value.
+The target population, assignment or identification design, exposure unit, positive finite target
+exposure, independent-unit clustering, missing-data rule, rates, material-group membership and
+exposure-allocation rules, and multiplicity procedure are frozen prospectively. A one-sided 95
+percent simultaneous confidence procedure must cover the joint family containing `rho` and every
+`rho_g`; marginal 95 percent intervals are insufficient. A required group with no positive finite
+exposure blocks the value claim rather than passing or disappearing from the family.
+Model-imputed or retrospective hypothetical loss reduction is excluded unless prospectively
+identified causal evidence and independently settled outcomes support it. The product-value claim
+fails when observed horizon value, target horizon lower bound, or any simultaneous material-group
+lower bound is not positive. These statistical conditions are necessary but not sufficient for a
+pricing or scale claim, which additionally requires independently verified customer or partner
+evidence under the frozen master protocol.
 
 ## Experimental campaign sequence
 
 | Iteration | Decision | Minimum output | Stop condition |
 | --- | --- | --- | --- |
 | 000 | Is a public corpus fit for the construct? | Signed source lock, leakage-safe ingestion, exact coverage, gate-by-gate readiness verdict | Stop after `PASS`, `BLOCKED_EVIDENCE`, or `INVALID`; no model run |
-| 001 | Is the incident set genuinely ambiguous? | Deterministic and identity-only baseline table | Stop with `KILL_CONSTRUCT` if a cheap baseline resolves the cases |
-| 002 | Does multimodal evidence add causal information? | Frozen modality and identity ablations with grouped intervals | Stop the multimodal claim if F1 fires |
-| 003 | Does active selection beat passive and fixed tests? | Safe-test replay or accredited simulation with realized cost and risk | Stop active testing if F2 or F3 fires |
-| 004 | Does recovery survive separate execution and verification? | Settled-state physical or accredited testbed outcomes | Stop recovery claim if F5 fires |
-| 005 | Does a compiled monitor transfer and calibrate? | Hardware, mission, regime, and fault-family holdouts | Restrict validity domain or stop transfer claim if F6 fires |
-| 006 | Does the system create measurable customer value? | Prospective shadow deployment with audited cost records | Stop commercial claim if F9 fires |
+| 001 | Can a prospective campaign admit the physical evidence construct? | Signed dossier registry, conjunctive admission and coverage report, and split-feasibility locks | Stop with any registered terminal verdict; only `PASS_PILOT` advances |
+| 002 | Is the admitted incident set genuinely ambiguous? | Complete frozen baseline ladder from limits, runbooks, FMEA, fault trees, observers, Bayesian diagnosis, and physics-only simulation through any authorized learned system | Stop with `KILL_CONSTRUCT` if a cheap baseline resolves the cases |
+| 003 | Does multimodal evidence add causal information? | Complete frozen modality, fusion, identity, placebo, and compute-matched controls with grouped intervals | Stop the multimodal claim if C1 fires |
+| 004 | Does active selection beat the complete frozen comparator set? | Safe-test replay or accredited simulation with mechanistic information evidence, tests-to-isolation, blinded engineer time, false actions, realized cost, and risk | Stop active testing if C2 or C3 fires |
+| 005 | Does recovery survive separate execution and verification? | Settled-state physical or accredited testbed outcomes | Stop the recovery claim if C5 fires |
+| 006 | Does a compiled monitor transfer and calibrate? | Separately frozen holdout axes, an operational definition of the two untouched claim-bearing family units, clustered power analysis, the minimum family counts, and each transfer estimate with its simultaneous lower bound | Advance only if the required lower bounds are positive; otherwise restrict the validity domain or stop the transfer claim |
+| 007 | Does the system create measurable customer value? | Prospective shadow deployment with audited cost records and independently verified customer or partner evidence | Stop the commercial claim if C9 fires |
 
 GPU or cloud scale is justified only after the preceding construct and shortcut gates pass. Scale
 cannot repair a non-identifying benchmark.
@@ -348,7 +470,8 @@ They do not establish the mission thesis:
 2. Public fault metadata is not automatically an independent causal adjudication.
 3. An injected fault label does not prove that two mechanisms were plausible before the outcome.
 4. Recorded commands are not automatically independently reviewed, safe discriminating tests.
-5. One testbed does not establish transfer across two hardware or vehicle identities.
+5. One testbed does not satisfy the admission floor of three system families and six hardware
+   identities, and it cannot establish the later transfer claim.
 6. The package was not created to evaluate independent recovery execution or settled-state dwell.
 7. Fault-injection, experiment-control, or antagonist-internal rows would leak truth if exposed to
    a model.
@@ -363,14 +486,16 @@ pre-registered baseline iteration.
 
 ### Initial product boundary
 
-The first product is an offline assurance workbench for ambiguous physical-system incidents. It
-ingests telemetry, images or video, logs, commands, procedures, and configuration graphs while
-keeping outcome truth separate. It produces competing mechanism records, approved diagnostic-test
-packages, execution receipts, independent recovery verdicts, validity-domain statements, and an
-assurance case that links every permitted claim to exact evidence.
+The current research wedge is offline spacecraft and robotics incident replay. The distinct proposed
+Phase A product is an offline assurance workbench for ambiguous physical-system incidents. It would
+ingest telemetry, images or video, logs, commands, procedures, and configuration graphs while
+keeping outcome truth separate. It would produce competing mechanism records, human-reviewable
+diagnostic-test packages, and an assurance case linking every permitted pre-action claim to exact
+evidence.
 
-It is not an autonomous flight controller, a replacement for an organization's safety authority,
-or a certification product.
+A later Phase B surface may ingest execution receipts and independent recovery verdicts produced
+under separate authorities. Neither phase would command a system, replace an organization's safety
+authority, or serve as a certification product.
 
 ### Expansion path
 
@@ -381,9 +506,9 @@ or a certification product.
 5. Fleet-level mechanism and monitor learning across explicitly separated hardware groups.
 6. Resource-bounded onboard monitors, only inside a validated and approved authority envelope.
 
-The contracts remain constant while execution authority changes. This provides a credible path
-from a narrow evidence product to a broader mission-assurance system without treating early replay
-results as flight authority.
+The scientific invariants remain constant while each stage receives its own evidence and authority
+contract. This provides a credible path from a narrow evidence product to a broader
+mission-assurance system without treating early replay results as flight authority.
 
 ### Buyer-relevant measurements
 
@@ -409,10 +534,10 @@ prospective deployment.
 
 Until the relevant experiments pass, the mission may say that it:
 
-1. Implements a provider-neutral evidence and authority contract.
+1. Contains typed provider-neutral evidence and authority contracts.
 2. Pre-registers shortcut, leakage, safety, transfer, and value falsifiers.
-3. Separates proposer, executor, and outcome-verifier roles.
-4. Reproduces released results from content-addressed artifacts.
+3. Defines separate proposer, executor, and outcome-verifier roles.
+4. Retains the bounded Iteration 000 readiness verdict and its content-addressed proof artifacts.
 
 It may not say that it is state of the art, safer than a named organization, certified,
 flight-ready, universally transferable, causally correct, economically valuable, or independently
@@ -424,8 +549,8 @@ verified merely because the repository contains signatures or an external model 
    contractors, or other frontier teams. Absence from the public record is not evidence of absence.
 2. Several 2026 sources are recent arXiv preprints. Their methods and results may change after
    review, revision, or independent replication.
-3. No public corpus has yet been shown here to satisfy the full ambiguity, safe-test, independent
-   cause, recovery, and transfer contract.
+3. The dated reconnaissance did not establish a public corpus satisfying the full ambiguity,
+   safe-test, independent-cause, recovery, and transfer contract; it was not exhaustive.
 4. The correct physical domains, risk caps, and settled-success definitions require domain-owner
    approval. A generic repository cannot infer them safely.
 5. NASA standards and handbooks inform architecture and evidence discipline but do not make this
@@ -436,7 +561,9 @@ verified merely because the repository contains signatures or an external model 
 
 ## Source registry
 
-All URLs were accessed on 2026-07-14.
+The legacy reconnaissance records S1-S29 as accessed on 2026-07-14; the recovery-frontier update
+records S30-S32 as accessed on 2026-07-16. Page contents and fact locators were not content-frozen, so
+this registry is not independently reconstructible evidence.
 
 | ID | Primary or official source | Date and status |
 | --- | --- | --- |
@@ -469,3 +596,6 @@ All URLs were accessed on 2026-07-14.
 | S27 | [Assurance of Model-Based Fault Diagnosis](https://ntrs.nasa.gov/citations/20210008090) | 2018; NASA/JPL preprint |
 | S28 | [NASA ADAPT Dataset](https://data.nasa.gov/dataset/adapt-dataset) | NASA public dataset; portal record updated 2025-03-31 |
 | S29 | [Adaptive IV&V Reduces Risk of Software Impacting Safety in Artemis Missions](https://ntrs.nasa.gov/citations/20230005123) | 2023; NASA-hosted conference paper |
+| S30 | [Learning Actionable Manipulation Recovery via Counterfactual Failure Synthesis](https://arxiv.org/abs/2603.13528) | Submitted 2026-03-13; arXiv preprint |
+| S31 | [From Reaction to Anticipation: Proactive Failure Recovery through Agentic Task Graph for Robotic Manipulation](https://roboticsconference.org/program/papers/180/) | Accepted to RSS 2026; official conference record |
+| S32 | [A Human-in-the-Loop Confidence-Aware Failure Recovery Framework for Modular Robot Policies](https://arxiv.org/abs/2602.10289) | Revised 2026-03-13; arXiv preprint |

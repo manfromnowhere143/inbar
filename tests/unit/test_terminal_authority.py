@@ -590,14 +590,16 @@ def test_snapshot_rejects_casefold_collisions_before_hashing(
         snapshot_acquisition_input(root)
 
 
-def test_snapshot_rejects_non_utf8_filesystem_names_as_authority_errors(tmp_path: Path) -> None:
+def test_platform_or_snapshot_rejects_non_utf8_filesystem_names(tmp_path: Path) -> None:
     root = tmp_path / "input"
     root.mkdir()
     raw_path = os.fsencode(root) + b"/invalid-\xff.bin"
     try:
         descriptor = os.open(raw_path, os.O_WRONLY | os.O_CREAT, 0o600)
     except OSError:
-        pytest.skip("filesystem rejects non-UTF-8 names before snapshotting")
+        assert not os.path.lexists(raw_path)
+        assert not tuple(root.iterdir())
+        return
     try:
         os.write(descriptor, b"evidence")
     finally:

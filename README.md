@@ -2,10 +2,11 @@
 
 Physical Causal Evidence and Verified Intervention Research
 
-Inbar is a research system for determining whether multimodal autonomy remains correct when its
-claims meet physical reality. It turns asynchronous incident evidence into competing causal
-hypotheses, selects safe and informative tests, and separates proposal authority from execution,
-truth, and outcome authority.
+Inbar is a pre-release research system for testing whether multimodal autonomy remains correct when
+its claims meet physical reality. It defines typed contracts for turning asynchronous incident
+evidence into competing causal hypotheses, ranking approved tests, and separating proposal authority
+from execution, truth, and outcome authority. The complete evidence-to-intervention chain remains a
+research target, not a validated capability.
 
 The objective is not another benchmark score. The objective is a defensible chain from evidence to
 mechanism, from mechanism to intervention, and from intervention to independently settled physical
@@ -15,21 +16,28 @@ outcome.
 
 Can an open world multimodal system identify physical mechanisms from incomplete incident evidence,
 choose a cost and risk normalized action that separates competing explanations, recover under
-independent execution, and retain calibrated performance on unseen hardware and fault families?
+separately governed execution and independent outcome verification, and retain calibrated
+performance on unseen hardware and fault families?
 
 ## Current state
 
-Inbar is in Iteration 001 corpus qualification. No training run or cloud job has been authorized.
-No diagnosis, recovery, safety, transfer, product readiness, state of the art, or economic value
-claim is active.
+Inbar is in Iteration 001 corpus qualification. No training run, GPU run, GCP scientific job, or
+paid-provider mission run has been authorized. Private hosted CI is engineering validation rather
+than mission compute, and its time and cost are not fully metered. No diagnosis, recovery, safety,
+transfer, product readiness, state of the art, or economic value claim is active.
 
-The source role audit rejected the available public substrate for the complete experiment. Public
-corpora remain useful as parser, simulator, distribution shift, and shortcut controls, but none of
-the screened sources contains the full same incident chain required by the protocol. Qualifying
-physical evidence must therefore be acquired prospectively through reviewed testbed work.
+The dated reconnaissance did not establish a qualifying source among its enumerated public set.
+Those corpora remain useful as parser, simulator, distribution-shift, and shortcut controls, but the
+screen was not a frozen systematic review and its external evidence is not independently
+reconstructible. The current protocol therefore blocks the present public-source-only route.
+Qualifying physical evidence may come from prospectively approved testbed work or from existing
+real-world evidence that already contains every required field and permits independent audit.
 
-The first product boundary is deliberately narrower: an offline and shadow mode evidence dossier
-compiler with ranked, human reviewable safe test recommendations. It has no command authority.
+The current research wedge is offline spacecraft and robotics incident replay. The distinct proposed
+first product is a pre-action, offline and shadow-mode evidence dossier compiler with ranked,
+human-reviewable safe-test recommendations. A later post-action assurance stage may ingest receipts
+and outcomes produced under separate authorities; neither product stage would execute commands. No
+product or command authority is active.
 
 ## Authority model
 
@@ -51,10 +59,14 @@ tests, and deployment authority remain forbidden.
 
 1. Model visible evidence and adjudication truth are separate artifacts.
 2. Every claim bearing gate must reject a deliberately broken or placebo control.
-3. All artifacts, approvals, transitions, and verdict inputs are content addressed.
-4. Recovery proposers cannot serve as their sole outcome verifier.
+3. Claim-bearing implemented paths bind their artifacts, approvals, and verdict inputs by content;
+   a general evidence-backed authority for every lifecycle transition remains prospective.
+4. Outcome verification remains in a disclosed independence group separate from the hypothesis
+   proposer, action selector, recovery proposer, and executor.
 5. Unknown mechanisms and calibrated abstention are first class outcomes.
-6. Evaluation holds out connected hardware, mission, and fault groups rather than random windows.
+6. Evaluation freezes separate leakage-component, hardware, vehicle, mission, environment,
+   fault-family, and operating-regime holdouts and clusters uncertainty by root incident, acquisition
+   session, and identity rather than random windows.
 7. Null, blocked, invalid, interrupted, and corrected results retain evidentiary weight.
 8. A signed report is not scientific authority unless a verifier can reconstruct it from sealed
    inputs.
@@ -63,9 +75,10 @@ tests, and deployment authority remain forbidden.
 ## Admission status
 
 Iteration 001 is preregistered and its bootstrap admission implementation has executable positive,
-negative, and placebo controls. CI enforces at least 90 percent branch aware coverage on the quality
-plane and runs the test suite on Python 3.11 through 3.14 across Linux and macOS. Exact checkpoint
-metrics belong in the append only research ledger rather than in this overview.
+negative, and placebo controls. CI enforces at least 90.01 percent branch-aware coverage in the
+Ubuntu 24.04 and Python 3.12 quality job. Uninstrumented compatibility jobs run the full test suite on
+Ubuntu 24.04 with Python 3.11, 3.13, and 3.14 and on macOS 15 with Python 3.12 and 3.14. Exact
+checkpoint metrics belong in the append-only research ledger rather than in this overview.
 
 Canonical admission remains blocked. The control authority is intentionally marked `bootstrap`, no
 production receipt exists, and no pilot verdict has been issued. Release requires executable
@@ -76,13 +89,13 @@ primitives, but it grants no data access, target release, execution, result, sea
 authority. Its current boundaries are recorded in
 [the implementation checkpoint](docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md).
 
-The committed control launcher now runs control execution, manifest and receipt assembly, fixture-key
-access, signing, and no-replace publication in a fresh child built from a clean committed source
-snapshot. The child checks an exact snapshot census, locked distribution inventory, complete source
-closure, Git identity, committed contract, preregistration ancestry and bytes, and fixed filesystem
-boundaries before fixture-key access. The launcher imports no signing surface, receives no key
-material, and accepts only a bounded canonical response tied to the selected commit, tree, request,
-and exact durable receipt bytes.
+The committed control launcher starts a fresh child, built from a clean committed source snapshot,
+that performs control execution, manifest and receipt assembly, fixture-key access, signing, and
+no-replace publication. The child checks an exact snapshot census, locked distribution inventory,
+complete source closure, Git identity, committed contract, preregistration ancestry and bytes, and
+fixed filesystem boundaries before fixture-key access. The launcher imports no signing surface,
+receives no key material, and accepts only a bounded canonical response tied to the selected commit,
+tree, request, and exact durable receipt bytes.
 
 This is a fresh-process integrity property under the unmodified committed launcher, not a hostile
 same-user isolation claim. A process that controls child arguments or the prepared dependency tree
@@ -113,8 +126,9 @@ reports the exact registered blocker set and no additional failure.
 ```bash
 uv sync --link-mode copy --reinstall --group dev --frozen
 uv run ruff check .
+uv run ruff format --check .
 uv run mypy src
-uv run pytest
+uv run pytest --cov --cov-report=term-missing
 uv run inbar schemas check
 uv run inbar memory verify
 uv run inbar mission validate --expect-failure iter001-acquisition-contract
@@ -122,11 +136,29 @@ uv run inbar handoff check
 ```
 
 The mission validator must report exactly the registered acquisition-contract blocker until
-canonical authority is sealed. The handoff check deterministically reconstructs the recovery
-document from the checked-out tree and detects drift. Its renderer and transitive verification
-sources belong to that candidate tree, so the result is an internal consistency check rather than
-an independent or base-controlled attestation. An unexpected mission pass, any additional failure,
-or stale recovery state makes CI fail.
+canonical authority is sealed. The handoff renderer builds a private, no-hardlink clone of the
+selected committed tree. Every materialized recovery file must match that tree's exact eligible
+regular-file paths, content hashes, sizes, and executable modes; ignored, untracked, dirty, linked,
+and special-file inputs fail closed. Only the descriptor-verified current memory ledger is overlaid
+before a fresh interpreter runs against a fixed authority-source manifest. The parent verifies the
+framed response and rechecks the selected Git and recovery inputs before accepting the rendered
+bytes.
+
+A checkpoint that reports engineering validation must bind an exact implementation commit and tree
+to a separately committed, canonical receipt. The handoff verifier recomputes that receipt's
+implementation-to-evidence lineage, final evidence-to-recovery lineage, complete artifact set,
+command plan, JUnit counts with zero skipped cases, passed results for every registered credibility
+control recorded in JUnit evidence, complete committed Python source coverage inventory,
+statement-plus-branch coverage, and mission blocker inventory from committed bytes. Final checking
+requires the exact clean two-file recovery commit, a strict byte-prefix append of the evidence
+parent's memory, and regular nonexecutable Git blobs; prospective rendering at the evidence commit
+is not final acceptance. This is a same-operator
+engineering observation and candidate-tree consistency check, not independent or base-controlled
+attestation and not scientific evidence. An unexpected mission pass, any additional failure, omitted
+source or control, substituted artifact, later unvalidated change, or stale recovery state makes the
+check fail. Content hashes, nonempty logs, and self-recorded exit codes do not prove that a command
+ran; base-controlled CI must independently execute its applicable contract and quality checks on the
+exact candidate head.
 
 ## Repository map
 
@@ -145,6 +177,6 @@ The internal `fieldtrue` namespace is retained because signed historical evidenc
 identifiers bind it. Inbar is the mission and repository identity. Historical proof is never
 rewritten for a cosmetic migration.
 
-Start with [the architecture](docs/ARCHITECTURE.md),
+Start with [the architecture](docs/ARCHITECTURE.md), [the roadmap](docs/ROADMAP.md),
 [the Iteration 001 hypothesis](experiments/iter001_physical_causal_evidence_acquisition/HYPOTHESIS.md),
 and [the claim boundaries](docs/CLAIM_BOUNDARIES.md).

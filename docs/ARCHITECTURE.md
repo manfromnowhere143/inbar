@@ -59,7 +59,10 @@ bound as both proposer and sole outcome authority.
 
 ## Evidence state
 
-Every transition emits a signed, hash-chained receipt binding:
+Implemented scientific proof and controlled-execution paths that issue authority receipts use
+signed, hash-chained records. The engineering-validation receipt described below is unsigned and
+relies on exact Git lineage and content hashes. Across a complete authorized scientific run, the
+applicable signed receipt set must bind:
 
 - predecessor and run identity;
 - source, dataset, case, code, Git tree, environment, model, and configuration hashes;
@@ -70,9 +73,56 @@ Every transition emits a signed, hash-chained receipt binding:
 - latency, compute, monetary cost, retries, and failure disposition;
 - claim IDs and permitted/forbidden wording.
 
+A general signed authority for every mission-stage transition is not implemented. The current
+mission validator checks the registered stage and selected special transitions, but that is not a
+complete evidence-backed lifecycle state machine. Inbar must add reconstructible transition receipts
+before advancing beyond corpus qualification.
+
 Local Ed25519 signatures prove key possession, not historical immutability by themselves. Strong
 authorship requires an external timestamp or governed key anchor. Verification must state which
 trust level is present.
+
+## Recovery rendering
+
+Generated recovery state is rendered from a private, no-hardlink clone of the selected committed
+tree, not from ambient imported package objects. The parent overlays only descriptor-verified current
+recovery inputs and starts a fresh interpreter against an exact authority-source manifest under a
+bounded environment. The child emits a framed, hashed response. The parent validates the frame's
+contract and integrity and rechecks the selected commit, recovery manifest, and current memory
+record before accepting the rendered bytes.
+
+This construction isolates the render from ambient import order and detects changes to every
+descriptor-bound working-tree input during rendering. It does not create an independent custody
+boundary or protect against a hostile process with the same operating-system identity that can
+replace the launcher, interpreter, Git binary, or prepared dependency bytes. The result is an
+internal candidate-tree consistency property whose source still requires review.
+
+## Engineering validation evidence
+
+Engineering validation is recorded separately from the implementation it tests. A canonical receipt
+binds the exact subject commit and tree, ordered command plan, environment description, timestamps,
+exit observations, stdout and stderr, structured JUnit and coverage artifacts, mission checks, and
+unknown resource fields. Unknown cost or compute is never rewritten as zero.
+
+The recovery verifier accepts a current receipt only when its commit is the single-parent child of
+the implementation subject and changes only the receipt and its named artifacts. A final clean
+recovery commit must in turn be the single-parent child of that evidence commit and change exactly
+the memory ledger and generated handoff. The memory blob must strictly append its evidence parent,
+and both final paths must remain regular nonexecutable blobs. The verifier re-parses every bound
+artifact, binds coverage to the complete committed Python source inventory, requires zero skipped
+tests and every registered credibility-control node to appear as a passed JUnit case, and recomputes
+the test counts, combined statement-plus-branch coverage, exact mission check inventory, and expected blocker.
+Prospective rendering is permitted at the evidence commit, but final checking requires the exact
+clean recovery child. The receipt declares same-operator observation without independent
+attestation, scientific result, or authority effect. Bound logs and self-recorded exit codes are not
+execution attestation; base-controlled CI must independently run its applicable contract and quality
+checks on the candidate head.
+
+Recovery materialization accepts exactly the eligible regular files in the selected committed tree,
+with path, content, size, and executable-mode parity. Ignored or visible untracked files, dirty
+tracked bytes, symbolic or hard links, and special files cannot enter the private snapshot. The
+current memory ledger remains the only descriptor-verified overlay needed to render a prospective
+recovery commit.
 
 ## Control production
 
@@ -154,6 +204,7 @@ an end-to-end receipt and artifact-integrity test.
 
 ## Product evolution
 
-The same contracts support offline incident replay, live shadow recommendations, approved test
-stands, fleet learning, recovery synthesis, and onboard monitor generation. Moving between those
-stages changes authority and evidence requirements, not scientific semantics.
+The target contracts are intended to support offline incident replay, live shadow recommendations,
+approved test stands, fleet learning, recovery synthesis, and onboard monitor generation. These are
+planned stages, not current validated capabilities. Moving between them changes authority and
+evidence requirements, not scientific semantics.

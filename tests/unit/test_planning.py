@@ -67,13 +67,39 @@ def test_denominator_floor_handles_free_replay() -> None:
     candidate = informative_test().model_copy(
         update={"cost_units": 0.0, "duration_seconds": 0.0, "risk": 0.0}
     )
-    selected = select_discriminating_test(
+    default_selected = select_discriminating_test(
+        hypotheses(),
+        (candidate,),
+        envelope(candidate.test_id),
+    )
+    custom_selected = select_discriminating_test(
         hypotheses(),
         (candidate,),
         envelope(candidate.test_id),
         weights=PlannerWeights(time_weight=0, risk_weight=0, denominator_floor=0.01),
     )
-    assert selected.denominator == 0.01
+    assert default_selected.denominator == PlannerWeights().denominator_floor
+    assert custom_selected.denominator == 0.01
+
+
+def test_planner_denominator_includes_cost_time_and_risk_terms() -> None:
+    candidate = informative_test().model_copy(
+        update={"cost_units": 2.0, "duration_seconds": 3.0, "risk": 0.1}
+    )
+    weights = PlannerWeights(time_weight=0.5, risk_weight=7.0, denominator_floor=1e-9)
+
+    selected = select_discriminating_test(
+        hypotheses(),
+        (candidate,),
+        envelope(candidate.test_id, max_risk=0.2),
+        weights=weights,
+    )
+
+    expected_denominator = 2.0 + 0.5 * 3.0 + 7.0 * 0.1
+    assert selected.denominator == pytest.approx(expected_denominator)
+    assert selected.utility == pytest.approx(
+        selected.expected_information_gain_bits / expected_denominator
+    )
 
 
 def test_probability_and_model_mismatches_fail_closed() -> None:

@@ -1057,7 +1057,7 @@ def test_control_sidecar_rejects_unbounded_or_unsafe_files(
         path.symlink_to(target)
     else:
         if not hasattr(os, "mkfifo"):
-            pytest.skip("FIFO creation requires POSIX")
+            pytest.fail("validation platform does not provide POSIX FIFOs", pytrace=False)
         os.mkfifo(path)
 
     with pytest.raises(ControlAuthorityError, match="bounded stable regular file"):

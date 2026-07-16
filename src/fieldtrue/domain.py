@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from pathlib import PurePosixPath
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
@@ -32,6 +33,15 @@ PositiveFloat = Annotated[float, Field(gt=0.0)]
 SecretReference = Annotated[
     str,
     StringConstraints(pattern=r"^secret://[A-Za-z0-9][A-Za-z0-9._/-]{1,255}@[A-Za-z0-9._-]+$"),
+]
+RepositoryEvidencePath = Annotated[
+    str,
+    StringConstraints(
+        pattern=(
+            r"^(?:[^./\\][^/\\]*|\.[^./\\][^/\\]*|\.\.[^/\\]+)"
+            r"(?:/(?:[^./\\][^/\\]*|\.[^./\\][^/\\]*|\.\.[^/\\]+))*$"
+        )
+    ),
 ]
 
 READINESS_AUTHORIZED_NEXT_ACTIONS = {
@@ -491,15 +501,277 @@ class JobSpec(FrozenModel):
         return self
 
 
+class EngineeringValidationArtifact(FrozenModel):
+    path: RepositoryEvidencePath
+    sha256: Sha256
+    bytes: int = Field(ge=0)
+    media_type: str = Field(min_length=1)
+
+    @field_validator("path")
+    @classmethod
+    def path_is_normalized_repository_evidence(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if (
+            not value
+            or "://" in value
+            or "\\" in value
+            or path.is_absolute()
+            or not path.parts
+            or "." in path.parts
+            or ".." in path.parts
+            or path.as_posix() != value
+        ):
+            raise ValueError("validation artifacts must use normalized repository paths")
+        return value
+
+
+class EngineeringValidationStep(FrozenModel):
+    step_id: Identifier
+    argv: tuple[str, ...] = Field(min_length=1)
+    working_directory: Literal["."]
+    started_at: datetime
+    finished_at: datetime
+    duration_ms: int = Field(ge=0)
+    expected_exit_code: int
+    observed_exit_code: int
+    result: Literal["pass", "fail"]
+    stdout: EngineeringValidationArtifact
+    stderr: EngineeringValidationArtifact
+
+    @model_validator(mode="after")
+    def result_is_derived_from_the_observation(self) -> Self:
+        for value in (self.started_at, self.finished_at):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("validation step timestamps must be timezone-aware")
+        if self.finished_at < self.started_at:
+            raise ValueError("validation step cannot finish before it starts")
+        elapsed = self.finished_at - self.started_at
+        elapsed_microseconds = (
+            elapsed.days * 86_400 + elapsed.seconds
+        ) * 1_000_000 + elapsed.microseconds
+        if abs(elapsed_microseconds - self.duration_ms * 1_000) > 1_000:
+            raise ValueError("validation step duration differs from its timestamps")
+        if not self.argv[0] or any("\x00" in argument for argument in self.argv):
+            raise ValueError("validation step argv is invalid")
+        expected_result = "pass" if self.observed_exit_code == self.expected_exit_code else "fail"
+        if self.result != expected_result:
+            raise ValueError("validation step result does not follow from its exit codes")
+        if self.stdout.path == self.stderr.path:
+            raise ValueError("validation stdout and stderr artifacts must differ")
+        return self
+
+
+def engineering_validation_plan_sha256(
+    steps: tuple[EngineeringValidationStep, ...],
+) -> str:
+    return sha256_value(
+        {
+            "domain": "inbar.engineering-validation-plan.v1",
+            "steps": [
+                {
+                    "argv": list(step.argv),
+                    "expected_exit_code": step.expected_exit_code,
+                    "step_id": step.step_id,
+                    "working_directory": step.working_directory,
+                }
+                for step in steps
+            ],
+        }
+    )
+
+
+class EngineeringValidationEnvironment(FrozenModel):
+    platform: str = Field(min_length=1)
+    machine: str = Field(min_length=1)
+    python_version: str = Field(min_length=1)
+    uv_version: str = Field(min_length=1)
+
+
+class EngineeringValidationPytestObservation(FrozenModel):
+    step_id: Literal["pytest-cov"]
+    junit_xml: EngineeringValidationArtifact
+    coverage_json: EngineeringValidationArtifact
+    tests_passed: int = Field(gt=0)
+    tests_failed: int = Field(ge=0)
+    tests_errors: int = Field(ge=0)
+    tests_skipped: Literal[0]
+    covered_lines: int = Field(ge=0)
+    num_statements: int = Field(gt=0)
+    covered_branches: int = Field(ge=0)
+    num_branches: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def observations_are_bounded(self) -> Self:
+        if self.covered_lines > self.num_statements:
+            raise ValueError("covered lines cannot exceed the statement count")
+        if self.covered_branches > self.num_branches:
+            raise ValueError("covered branches cannot exceed the branch count")
+        covered = self.covered_lines + self.covered_branches
+        coverable = self.num_statements + self.num_branches
+        if covered * 10_000 < coverable * 9_001:
+            raise ValueError(
+                "statement-plus-branch coverage must meet the 90.01 percent receipt floor"
+            )
+        if self.junit_xml.path == self.coverage_json.path:
+            raise ValueError("pytest structured artifacts must differ")
+        return self
+
+
+class EngineeringValidationMissionObservation(FrozenModel):
+    step_id: Literal["mission-validate"]
+    mission_check_ids: tuple[Identifier, ...] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True},
+    )
+    expected_blockers: tuple[Identifier, ...] = Field(json_schema_extra={"uniqueItems": True})
+    observed_blockers: tuple[Identifier, ...] = Field(json_schema_extra={"uniqueItems": True})
+    missing_expected_blockers: tuple[Identifier, ...] = Field(
+        json_schema_extra={"uniqueItems": True}
+    )
+    unexpected_blockers: tuple[Identifier, ...] = Field(json_schema_extra={"uniqueItems": True})
+
+    @model_validator(mode="after")
+    def check_sets_are_unambiguous(self) -> Self:
+        for label, values in (
+            ("mission check IDs", self.mission_check_ids),
+            ("expected blockers", self.expected_blockers),
+            ("observed blockers", self.observed_blockers),
+            ("missing expected blockers", self.missing_expected_blockers),
+            ("unexpected blockers", self.unexpected_blockers),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError(f"validation {label} must be unique")
+        if self.expected_blockers != ("iter001-acquisition-contract",):
+            raise ValueError("core validation must preserve the registered acquisition blocker")
+        check_ids = set(self.mission_check_ids)
+        expected = set(self.expected_blockers)
+        observed = set(self.observed_blockers)
+        if not expected.issubset(check_ids) or not observed.issubset(check_ids):
+            raise ValueError("validation blockers must name registered mission checks")
+        if self.missing_expected_blockers != tuple(sorted(expected - observed)):
+            raise ValueError("missing expected blockers do not follow from observed mission checks")
+        if self.unexpected_blockers != tuple(sorted(observed - expected)):
+            raise ValueError("unexpected blockers do not follow from observed mission checks")
+        return self
+
+
+class EngineeringValidationResourceAccounting(FrozenModel):
+    measurement_status: Literal["not_metered"]
+    direct_cost_usd: None
+    gpu_seconds: None
+    cloud_jobs: None
+    paid_calls: None
+
+
+class EngineeringValidationReceipt(FrozenModel):
+    schema_version: Literal["inbar.engineering-validation-receipt.v1"]
+    receipt_id: Identifier
+    mission_id: Literal["inbar"]
+    subject_commit: GitObjectId
+    subject_tree: GitObjectId
+    plan_id: Literal["inbar.core-engineering-validation.v1"]
+    plan_sha256: Sha256
+    started_at: datetime
+    finished_at: datetime
+    producer_actor_id: Identifier
+    assurance_scope: Literal["same-operator-engineering-observation-no-independent-attestation"]
+    independent_attestation: Literal[False]
+    environment: EngineeringValidationEnvironment
+    steps: tuple[EngineeringValidationStep, ...] = Field(min_length=1)
+    pytest_observation: EngineeringValidationPytestObservation
+    mission_observation: EngineeringValidationMissionObservation
+    resource_accounting: EngineeringValidationResourceAccounting
+    scientific_result: Literal["not_evaluated"]
+    authority_effect: Literal["none"]
+    result: Literal["pass", "fail"]
+
+    @model_validator(mode="after")
+    def receipt_is_derived_and_self_consistent(self) -> Self:
+        for value in (self.started_at, self.finished_at):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("validation receipt timestamps must be timezone-aware")
+        if self.finished_at < self.started_at:
+            raise ValueError("validation receipt cannot finish before it starts")
+
+        step_ids = tuple(step.step_id for step in self.steps)
+        if len(step_ids) != len(set(step_ids)):
+            raise ValueError("validation step IDs must be unique")
+        known_steps = set(step_ids)
+        if {
+            self.pytest_observation.step_id,
+            self.mission_observation.step_id,
+        } - known_steps:
+            raise ValueError("validation observations must reference recorded steps")
+        if any(
+            step.started_at < self.started_at or step.finished_at > self.finished_at
+            for step in self.steps
+        ):
+            raise ValueError("validation steps must fall inside the receipt time window")
+
+        artifacts = [artifact for step in self.steps for artifact in (step.stdout, step.stderr)]
+        artifacts.extend(
+            (
+                self.pytest_observation.junit_xml,
+                self.pytest_observation.coverage_json,
+            )
+        )
+        artifact_paths = tuple(artifact.path for artifact in artifacts)
+        if len(artifact_paths) != len(set(artifact_paths)):
+            raise ValueError("validation artifact paths must be unique")
+        required_prefix = f"evidence/validation/{self.receipt_id}/"
+        if any(not path.startswith(required_prefix) for path in artifact_paths):
+            raise ValueError("validation artifacts must be scoped to the receipt directory")
+
+        if self.plan_sha256 != engineering_validation_plan_sha256(self.steps):
+            raise ValueError("validation plan hash does not match the ordered command plan")
+        expected_result = (
+            "pass"
+            if all(step.result == "pass" for step in self.steps)
+            and self.pytest_observation.tests_passed > 0
+            and self.pytest_observation.tests_failed == 0
+            and self.pytest_observation.tests_errors == 0
+            and self.pytest_observation.tests_skipped == 0
+            and not self.mission_observation.missing_expected_blockers
+            and not self.mission_observation.unexpected_blockers
+            else "fail"
+        )
+        if self.result != expected_result:
+            raise ValueError("validation receipt result does not follow from its observations")
+        return self
+
+
 class ClaimRecord(FrozenModel):
     claim_id: Identifier
     status: ClaimStatus
     wording: str = Field(min_length=1)
     scope: str = Field(min_length=1)
-    evidence_refs: tuple[str, ...]
+    evidence_refs: tuple[RepositoryEvidencePath, ...] = Field(
+        min_length=1,
+        json_schema_extra={"uniqueItems": True},
+    )
     permitted_wording: str = Field(min_length=1)
     forbidden_wording: str = Field(min_length=1)
     next_falsifier: str = Field(min_length=1)
+    supersedes_claim_id: Identifier | None = None
+
+    @field_validator("evidence_refs")
+    @classmethod
+    def evidence_refs_are_unique_repository_paths(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(value) != len(set(value)):
+            raise ValueError("claim evidence references must be unique")
+        for reference in value:
+            path = PurePosixPath(reference)
+            if (
+                not reference
+                or "://" in reference
+                or "\\" in reference
+                or path.is_absolute()
+                or not path.parts
+                or ".." in path.parts
+                or path.as_posix() != reference
+            ):
+                raise ValueError("claim evidence references must be normalized repository paths")
+        return value
 
 
 class GateResult(FrozenModel):

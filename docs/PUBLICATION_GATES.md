@@ -6,8 +6,8 @@ Publication is a scientific lifecycle stage, not a repository release task. A pa
 a polished manuscript, or an available preprint server does not establish novelty, significance,
 venue fit, or referee readiness.
 
-The mission is currently `NO_GO` for manuscript submission. Iteration 000 qualifies a public
-corpus; it does not test the mission's central scientific claim.
+The mission is currently `NO_GO` for manuscript submission. Iteration 000 adjudicated public-corpus
+readiness and returned `BLOCKED_EVIDENCE`; it did not test the mission's central scientific claim.
 
 ## Scientific maturity
 

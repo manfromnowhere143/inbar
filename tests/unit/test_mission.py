@@ -15,7 +15,8 @@ import pytest
 from nacl.signing import SigningKey
 
 import fieldtrue.mission as mission_module
-from fieldtrue.canonical import canonical_json_pretty, sha256_bytes, sha256_value
+from fieldtrue.canonical import canonical_json, canonical_json_pretty, sha256_bytes, sha256_value
+from fieldtrue.domain import ClaimRecord
 from fieldtrue.memory import (
     AccessClass,
     EpistemicPhase,
@@ -29,8 +30,10 @@ from fieldtrue.memory import (
 from fieldtrue.mission import (
     _adapt_tls_source_is_verified,
     _certifi_dependency_is_locked,
+    _claim_registry_valid,
     _claims,
     _control_node_is_substantive,
+    _expected_credibility_gate_control_registry,
     _first_commit_files,
     _gate_control_runner_is_unchanged,
     _gate_control_set_hash,
@@ -41,6 +44,7 @@ from fieldtrue.mission import (
     _pytest_node_exists,
     _root_preregistration_bytes,
     _verified_tls_runtime_active,
+    _verify_credibility_gate_control_registry,
     _verify_gate_control_registry,
     _verify_iteration_amendment_001,
     _verify_memory_git_anchors,
@@ -132,6 +136,127 @@ def _historical_attempt_repo(tmp_path: Path) -> Path:
     _git(source, "clone", "--quiet", "--no-hardlinks", source.as_posix(), repo.as_posix())
     _git(repo, "config", "user.name", "Historical Test")
     _git(repo, "config", "user.email", "historical@example.invalid")
+    return repo
+
+
+def _claim_contract_repo(
+    tmp_path: Path,
+) -> tuple[Path, dict[str, str], dict[str, str], str]:
+    repo = tmp_path / "claim-contract-repo"
+    repo.mkdir()
+    _git(repo, "init", "--quiet")
+    _git(repo, "config", "user.name", "Claim Contract Test")
+    _git(repo, "config", "user.email", "claims@example.invalid")
+    evidence_path = repo / "evidence" / "source.json"
+    evidence_path.parent.mkdir()
+    evidence_path.write_bytes(b'{"verdict":"blocked"}\n')
+    common = {
+        "wording": "Fixture claim.",
+        "scope": "Fixture scope.",
+        "evidence_refs": ("evidence/source.json",),
+        "permitted_wording": "fixture",
+        "forbidden_wording": "wider claim",
+        "next_falsifier": "Fixture falsifier.",
+    }
+    claims = (
+        ClaimRecord(
+            claim_id="scope.integrated-loop.v1",
+            status="corrected",
+            **common,
+        ),
+        ClaimRecord(
+            claim_id="scope.integrated-loop.v2",
+            status="untested",
+            supersedes_claim_id="scope.integrated-loop.v1",
+            **common,
+        ),
+    )
+    registry = repo / "claims" / "registry.jsonl"
+    registry.parent.mkdir()
+    registry.write_bytes(
+        b"\n".join(
+            canonical_json(claim.model_dump(mode="json", exclude_none=True)) for claim in claims
+        )
+        + b"\n"
+    )
+    _git(repo, "add", "claims/registry.jsonl", "evidence/source.json")
+    _git(repo, "commit", "--quiet", "-m", "freeze claim contracts")
+    digests = {
+        claim.claim_id: sha256_value(claim.model_dump(mode="json", exclude_none=True))
+        for claim in claims
+    }
+    evidence_digests = {"evidence/source.json": sha256_bytes(evidence_path.read_bytes())}
+    return repo, digests, evidence_digests, sha256_bytes(registry.read_bytes())
+
+
+def _install_claim_contract(
+    monkeypatch: pytest.MonkeyPatch,
+    claim_digests: dict[str, str],
+    evidence_digests: dict[str, str],
+    registry_digest: str,
+) -> None:
+    monkeypatch.setattr(mission_module, "_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS", claim_digests)
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS",
+        evidence_digests,
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_REGISTRY_SHA256",
+        registry_digest,
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_CLAIM_STATUSES",
+        {
+            "scope.integrated-loop.v1": mission_module.ClaimStatus.CORRECTED,
+            "scope.integrated-loop.v2": mission_module.ClaimStatus.UNTESTED,
+        },
+    )
+
+
+def _credibility_control_repo(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Path:
+    repo = tmp_path / "credibility-control-repo"
+    repo.mkdir()
+    _git(repo, "init", "--quiet")
+    _git(repo, "config", "user.name", "Credibility Control Test")
+    _git(repo, "config", "user.email", "credibility@example.invalid")
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS",
+        {claim.claim_id: "0" * 64 for claim in _claims(_repo() / "claims" / "registry.jsonl")},
+    )
+    registry = _expected_credibility_gate_control_registry()
+    nodes_by_path: dict[str, set[str]] = {}
+    for control in registry["controls"]:
+        for role in ("positive_control", "negative_control", "placebo_control"):
+            relative, function_name = control[role].split("::")
+            nodes_by_path.setdefault(relative, set()).add(function_name)
+    for relative, function_names in nodes_by_path.items():
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n\n".join(
+                f"def {function_name}():\n    assert True"
+                for function_name in sorted(function_names)
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    registry_path = repo / mission_module._CREDIBILITY_GATE_CONTROL_PATH
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_bytes(canonical_json_pretty(registry))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "--quiet", "-m", "freeze credibility controls")
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS",
+        {relative: sha256_bytes((repo / relative).read_bytes()) for relative in nodes_by_path},
+    )
     return repo
 
 
@@ -1477,6 +1602,123 @@ def test_pytest_control_node_rejects_unreadable_or_invalid_modules(tmp_path: Pat
     assert not _pytest_node_exists(tmp_path, "tests/invalid.py::test_control")
 
 
+def test_current_credibility_registry_binds_exact_claims_and_control_nodes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _credibility_control_repo(tmp_path, monkeypatch)
+
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+
+    assert passed
+    assert detail == (
+        "Current credibility registry binds 4 gates, "
+        f"{len(mission_module._REQUIRED_BOOTSTRAP_CLAIM_DIGESTS)} claims, "
+        "and 12 control roles to committed tests."
+    )
+
+
+def test_current_credibility_registry_rejects_dirty_or_noncanonical_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _credibility_control_repo(tmp_path, monkeypatch)
+    registry = repo / mission_module._CREDIBILITY_GATE_CONTROL_PATH
+    original = registry.read_bytes()
+    registry.write_bytes(original + b" ")
+
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+
+    assert not passed
+    assert detail == "Current credibility-control registry is not committed at HEAD."
+
+    registry.write_bytes(b" " + original)
+    _git(repo, "add", mission_module._CREDIBILITY_GATE_CONTROL_PATH)
+    _git(repo, "commit", "--quiet", "-m", "make registry noncanonical")
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+    assert not passed
+    assert detail == "Current credibility-control registry differs from its exact contract."
+
+
+def test_current_credibility_registry_rejects_uncommitted_or_substituted_test(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _credibility_control_repo(tmp_path, monkeypatch)
+    relative = "tests/unit/test_mission.py"
+    test_module = repo / relative
+    original = test_module.read_bytes()
+    test_module.write_bytes(original + b"\n")
+
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+
+    assert not passed
+    assert detail == f"Current credibility-control tests are not committed at HEAD: {relative}."
+
+    test_module.write_bytes(original.replace(b"assert True", b"assert 1 == 1", 1))
+    _git(repo, "add", relative)
+    _git(repo, "commit", "--quiet", "-m", "substitute credibility test")
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+    assert not passed
+    assert detail == f"Current credibility-control tests differ from reviewed evidence: {relative}."
+
+
+def test_current_credibility_registry_rejects_unresolved_control_node(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _credibility_control_repo(tmp_path, monkeypatch)
+    relative = "tests/unit/test_handoff.py"
+    test_module = repo / relative
+    target = b"def test_checkpoint_v2_rejects_current_artifact_drift():\n    assert True\n"
+    assert target in test_module.read_bytes()
+    test_module.write_bytes(test_module.read_bytes().replace(target, b"", 1))
+    _git(repo, "add", relative)
+    _git(repo, "commit", "--quiet", "-m", "remove credibility control node")
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS",
+        {
+            **mission_module._REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS,
+            relative: sha256_bytes(test_module.read_bytes()),
+        },
+    )
+
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+
+    assert not passed
+    assert detail == "Current credibility controls do not resolve three distinct tests."
+
+
+def test_current_credibility_registry_rejects_decorated_control_node(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _credibility_control_repo(tmp_path, monkeypatch)
+    relative = "tests/unit/test_mission.py"
+    test_module = repo / relative
+    target = b"def test_current_credibility_registry_binds_exact_claims_and_control_nodes():\n"
+    assert target in test_module.read_bytes()
+    test_module.write_bytes(
+        test_module.read_bytes().replace(target, b"@staticmethod\n" + target, 1)
+    )
+    _git(repo, "add", relative)
+    _git(repo, "commit", "--quiet", "-m", "decorate credibility control node")
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS",
+        {
+            **mission_module._REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS,
+            relative: sha256_bytes(test_module.read_bytes()),
+        },
+    )
+
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+
+    assert not passed
+    assert detail == "Current credibility controls do not resolve three distinct tests."
+
+
 def test_root_commit_contains_only_the_frozen_hypothesis() -> None:
     repo = _repo()
     relative = "experiments/iter000_nasa_adapt_corpus_readiness/HYPOTHESIS.md"
@@ -1497,6 +1739,191 @@ def test_json_and_claim_loaders_fail_with_precise_context(tmp_path: Path) -> Non
 
     valid_claims = _claims(_repo() / "claims" / "registry.jsonl")
     assert valid_claims
+
+
+def test_claim_registry_binds_exact_contracts_registry_and_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, digests, evidence_digests, registry_digest = _claim_contract_repo(tmp_path)
+    _install_claim_contract(monkeypatch, digests, evidence_digests, registry_digest)
+
+    passed, detail = _claim_registry_valid(repo)
+
+    assert passed
+    assert detail == (
+        "Claim registry binds 2 exact claim contracts and 1 evidence file to Git HEAD."
+    )
+
+    registry = repo / "claims" / "registry.jsonl"
+    registry.write_bytes(registry.read_bytes().replace(b"Fixture claim", b"Changed claim", 1))
+    passed, detail = _claim_registry_valid(repo)
+    assert not passed
+    assert detail == "Claim registry is not committed at HEAD."
+
+
+def test_claim_registry_rejects_committed_semantic_substitution_and_extra_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, digests, evidence_digests, registry_digest = _claim_contract_repo(tmp_path)
+    _install_claim_contract(monkeypatch, digests, evidence_digests, registry_digest)
+    registry = repo / "claims" / "registry.jsonl"
+    lines = registry.read_text(encoding="utf-8").splitlines()
+    substituted = json.loads(lines[0])
+    substituted["wording"] = "Arbitrary supported claim."
+    lines[0] = canonical_json(substituted).decode("utf-8")
+    registry.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _git(repo, "add", "claims/registry.jsonl")
+    _git(repo, "commit", "--quiet", "-m", "substitute claim semantics")
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_REGISTRY_SHA256",
+        sha256_bytes(registry.read_bytes()),
+    )
+
+    passed, detail = _claim_registry_valid(repo)
+
+    assert not passed
+    assert "differ from reviewed contracts" in detail
+
+    extra = {
+        **substituted,
+        "claim_id": "claim.unreviewed.v1",
+        "status": "blocked",
+    }
+    with registry.open("a", encoding="utf-8") as handle:
+        handle.write(canonical_json(extra).decode("utf-8") + "\n")
+    _git(repo, "add", "claims/registry.jsonl")
+    _git(repo, "commit", "--quiet", "-m", "append unreviewed claim")
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_REGISTRY_SHA256",
+        sha256_bytes(registry.read_bytes()),
+    )
+    passed, detail = _claim_registry_valid(repo)
+    assert not passed
+    assert detail == "Claim registry IDs differ from the reviewed bootstrap claim set."
+
+
+def test_claim_registry_rejects_dirty_evidence_and_head_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, digests, evidence_digests, registry_digest = _claim_contract_repo(tmp_path)
+    _install_claim_contract(monkeypatch, digests, evidence_digests, registry_digest)
+    evidence = repo / "evidence" / "source.json"
+    original = evidence.read_bytes()
+    evidence.write_bytes(b'{"verdict":"substituted"}\n')
+
+    passed, detail = _claim_registry_valid(repo)
+
+    assert not passed
+    assert detail == "Claim evidence is not committed at HEAD: evidence/source.json."
+    evidence.write_bytes(original)
+
+    original_run = mission_module.subprocess.run
+    head_reads = 0
+
+    def changing_head(*args: object, **kwargs: object) -> object:
+        nonlocal head_reads
+        result = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and command[1:4] == [
+            "rev-parse",
+            "--verify",
+            "HEAD^{commit}",
+        ]:
+            head_reads += 1
+            if head_reads == 2:
+                return SimpleNamespace(stdout="0" * 40 + "\n", returncode=0)
+        return result
+
+    monkeypatch.setattr(mission_module.subprocess, "run", changing_head)
+    passed, detail = _claim_registry_valid(repo)
+    assert not passed
+    assert detail == "Claim registry Git HEAD changed during verification."
+
+
+def test_claim_registry_rejects_committed_evidence_content_substitution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, digests, evidence_digests, registry_digest = _claim_contract_repo(tmp_path)
+    _install_claim_contract(monkeypatch, digests, evidence_digests, registry_digest)
+    evidence = repo / "evidence" / "source.json"
+    evidence.write_bytes(b'{"verdict":"opposite"}\n')
+    _git(repo, "add", "evidence/source.json")
+    _git(repo, "commit", "--quiet", "-m", "substitute committed evidence")
+
+    passed, detail = _claim_registry_valid(repo)
+
+    assert not passed
+    assert detail == "Claim evidence differs from reviewed content: evidence/source.json."
+
+
+def test_claim_registry_preserves_bootstrap_status_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, digests, evidence_digests, registry_digest = _claim_contract_repo(tmp_path)
+    _install_claim_contract(monkeypatch, digests, evidence_digests, registry_digest)
+    registry = repo / "claims" / "registry.jsonl"
+    lines = registry.read_text(encoding="utf-8").splitlines()
+    promoted = ClaimRecord.model_validate_json(lines[1]).model_copy(
+        update={"status": mission_module.ClaimStatus.SUPPORTED}
+    )
+    lines[1] = canonical_json(promoted.model_dump(mode="json", exclude_none=True)).decode("utf-8")
+    registry.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _git(repo, "add", "claims/registry.jsonl")
+    _git(repo, "commit", "--quiet", "-m", "promote bootstrap claim")
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS",
+        {**digests, promoted.claim_id: sha256_value(promoted.model_dump(mode="json"))},
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_REQUIRED_BOOTSTRAP_REGISTRY_SHA256",
+        sha256_bytes(registry.read_bytes()),
+    )
+
+    passed, detail = _claim_registry_valid(repo)
+
+    assert not passed
+    assert detail == (
+        "Claim statuses violate the bootstrap result boundary: scope.integrated-loop.v2"
+    )
+
+
+def test_claim_registry_rejects_incomplete_correction_lineage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, digests, evidence_digests, _registry_digest = _claim_contract_repo(tmp_path)
+    registry = repo / "claims" / "registry.jsonl"
+    lines = registry.read_text(encoding="utf-8").splitlines()
+    successor = ClaimRecord.model_validate_json(lines[1]).model_copy(
+        update={"supersedes_claim_id": None}
+    )
+    lines[1] = canonical_json(successor.model_dump(mode="json", exclude_none=True)).decode("utf-8")
+    registry.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _git(repo, "add", "claims/registry.jsonl")
+    _git(repo, "commit", "--quiet", "-m", "remove correction lineage")
+    _install_claim_contract(
+        monkeypatch,
+        {
+            **digests,
+            successor.claim_id: sha256_value(successor.model_dump(mode="json", exclude_none=True)),
+        },
+        evidence_digests,
+        sha256_bytes(registry.read_bytes()),
+    )
+
+    passed, detail = _claim_registry_valid(repo)
+
+    assert not passed
+    assert detail == "Claim correction lineage is invalid."
 
 
 def test_research_memory_git_anchors_use_historical_blob_bytes(tmp_path: Path) -> None:
@@ -1699,3 +2126,616 @@ def test_gate_control_report_rejects_missing_malformed_or_nonpassing_results(
         tmp_path,
         ["tests/unit/test_gate.py::test_expected"],
     )
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        (b"", "LF-terminated framing"),
+        (b"\xff\n", "valid UTF-8"),
+        (b"{}\n\n", "blank records"),
+        (b'{"claim_id":"a","claim_id":"b"}\n', "line 1"),
+    ],
+)
+def test_claim_parser_rejects_ambiguous_or_noncanonical_framing(
+    data: bytes,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        mission_module._claims_bytes(data)
+
+
+def test_git_guards_reject_malformed_identifiers_and_paths_without_spawning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected_spawn(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("invalid Git inputs must be rejected before process creation")
+
+    monkeypatch.setattr(mission_module.subprocess, "run", unexpected_spawn)
+    invalid = "not-an-object-id"
+    valid = "1" * 40
+
+    assert not mission_module._git_commit_resolves(tmp_path, "git", invalid)
+    assert mission_module._git_blob_at_path(tmp_path, "git", invalid, "file.txt") is None
+    assert mission_module._git_blob_at_path(tmp_path, "git", valid, "../file.txt") is None
+    assert not mission_module._git_is_ancestor(tmp_path, "git", invalid, valid)
+    assert mission_module._git_object_type(tmp_path, "git", invalid) is None
+    assert mission_module._git_tree_id(tmp_path, "git", invalid) is None
+    assert mission_module._git_path_object_id(tmp_path, "git", valid, "../tree") is None
+    assert mission_module._safe_relative_path(None) is None
+
+    monkeypatch.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+    monkeypatch.setattr(
+        mission_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(stdout="invalid\n"),
+    )
+    with pytest.raises(ValueError, match="invalid root commit"):
+        mission_module._root_commit(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "tree_entry",
+    [
+        b"\xff blob " + b"1" * 40 + b"\tfile.txt\0",
+        b"100644 blob " + b"1" * 40 + b"\t\xff\0",
+        b"100644 blob " + b"1" * 40 + b" file.txt\0",
+        b"040000 tree " + b"1" * 40 + b"\tfile.txt\0",
+        b"100644 blob short\tfile.txt\0",
+    ],
+)
+def test_git_blob_reader_rejects_malformed_tree_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tree_entry: bytes,
+) -> None:
+    monkeypatch.setattr(
+        mission_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout=tree_entry),
+    )
+
+    assert mission_module._git_blob_at_path(tmp_path, "git", "1" * 40, "file.txt") is None
+
+
+@pytest.mark.parametrize(
+    ("returncode", "stdout"),
+    [
+        (1, b""),
+        (0, b"\xff\0"),
+        (0, b"outside/file.py\0"),
+        (0, b"src/fieldtrue/../escape.py\0"),
+    ],
+)
+def test_git_tree_census_rejects_failed_or_unsafe_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    returncode: int,
+    stdout: bytes,
+) -> None:
+    monkeypatch.setattr(
+        mission_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=returncode, stdout=stdout),
+    )
+
+    assert (
+        mission_module._git_tree_paths(
+            tmp_path,
+            "git",
+            "1" * 40,
+            "src/fieldtrue",
+        )
+        is None
+    )
+
+
+def test_working_source_census_rejects_links_cache_payloads_and_special_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    missing_repo = tmp_path / "missing"
+    missing_repo.mkdir()
+    assert mission_module._working_source_paths(missing_repo) is None
+
+    linked_repo = tmp_path / "linked"
+    linked_repo.mkdir()
+    linked_target = tmp_path / "linked-target"
+    linked_target.mkdir()
+    (linked_repo / "src").mkdir()
+    (linked_repo / "src" / "fieldtrue").symlink_to(linked_target, target_is_directory=True)
+    assert mission_module._working_source_paths(linked_repo) is None
+
+    candidate_repo = tmp_path / "candidate"
+    source_root = candidate_repo / "src" / "fieldtrue"
+    source_root.mkdir(parents=True)
+    external = tmp_path / "external.py"
+    external.write_text("VALUE = 1\n", encoding="utf-8")
+    (source_root / "linked.py").symlink_to(external)
+    assert mission_module._working_source_paths(candidate_repo) is None
+
+    cache_repo = tmp_path / "cache"
+    cache_root = cache_repo / "src" / "fieldtrue" / "__pycache__"
+    cache_root.mkdir(parents=True)
+    (cache_root / "payload.txt").write_text("not bytecode\n", encoding="utf-8")
+    assert mission_module._working_source_paths(cache_repo) is None
+
+    valid_repo = tmp_path / "valid"
+    valid_root = valid_repo / "src" / "fieldtrue"
+    (valid_root / "__pycache__").mkdir(parents=True)
+    (valid_root / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (valid_root / "__pycache__" / "module.pyc").write_bytes(b"fixture")
+    assert mission_module._working_source_paths(valid_repo) == {"src/fieldtrue/module.py"}
+
+    special_repo = tmp_path / "special"
+    special_root = special_repo / "src" / "fieldtrue"
+    special_root.mkdir(parents=True)
+    mission_module.os.mkfifo(special_root / "source.pipe")
+    assert mission_module._working_source_paths(special_repo) is None
+
+    unreadable_repo = tmp_path / "unreadable"
+    unreadable_root = unreadable_repo / "src" / "fieldtrue"
+    unreadable_root.mkdir(parents=True)
+    original_rglob = Path.rglob
+
+    def unreadable_rglob(path: Path, pattern: str) -> object:
+        if path == unreadable_root:
+            raise OSError("fixture traversal failure")
+        return original_rglob(path, pattern)
+
+    monkeypatch.setattr(Path, "rglob", unreadable_rglob)
+    assert mission_module._working_source_paths(unreadable_repo) is None
+
+
+def test_regular_repository_reader_rejects_unsafe_nonregular_oversize_and_racing_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ValueError, match="path is unsafe"):
+        mission_module._read_repo_regular_file(tmp_path, "../outside")
+
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    with pytest.raises(ValueError, match="must be regular"):
+        mission_module._read_repo_regular_file(tmp_path, "directory")
+
+    oversized = tmp_path / "oversized.bin"
+    with oversized.open("wb") as handle:
+        handle.truncate(mission_module._MAX_PUBLICATION_TRUST_INPUT_BYTES + 1)
+    with pytest.raises(ValueError, match="size limit"):
+        mission_module._read_repo_regular_file(tmp_path, "oversized.bin")
+
+    stable = tmp_path / "stable.bin"
+    stable.write_bytes(b"stable")
+    original_fstat = mission_module.os.fstat
+    calls = 0
+
+    def changed_fstat(file_descriptor: int) -> object:
+        nonlocal calls
+        observed = original_fstat(file_descriptor)
+        calls += 1
+        if calls != 2:
+            return observed
+        return SimpleNamespace(
+            st_mode=observed.st_mode,
+            st_dev=observed.st_dev,
+            st_ino=observed.st_ino,
+            st_size=observed.st_size,
+            st_mtime_ns=observed.st_mtime_ns + 1,
+            st_ctime_ns=observed.st_ctime_ns,
+        )
+
+    monkeypatch.setattr(mission_module.os, "fstat", changed_fstat)
+    with pytest.raises(ValueError, match="changed while being read"):
+        mission_module._read_repo_regular_file(tmp_path, "stable.bin")
+
+
+def test_memory_anchor_verifier_rejects_initial_and_final_git_identity_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    memory_path = tmp_path / "memory.jsonl"
+    monkeypatch.setattr(mission_module, "load_memory_records", lambda _path: [])
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module,
+            "_trusted_git",
+            lambda _repo: (_ for _ in ()).throw(ValueError("untrusted")),
+        )
+        passed, detail = _verify_memory_git_anchors(tmp_path, memory_path)
+        assert not passed
+        assert "Git trust failed" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("unavailable")),
+        )
+        passed, detail = _verify_memory_git_anchors(tmp_path, memory_path)
+        assert not passed
+        assert "HEAD cannot be captured" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: SimpleNamespace(stdout="invalid\n"),
+        )
+        passed, detail = _verify_memory_git_anchors(tmp_path, memory_path)
+        assert not passed
+        assert "invalid object identity" in detail
+
+    trust_reads = 0
+
+    def changing_trust(_repo: Path) -> str:
+        nonlocal trust_reads
+        trust_reads += 1
+        if trust_reads == 2:
+            raise ValueError("changed")
+        return "git"
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_trusted_git", changing_trust)
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: SimpleNamespace(stdout="1" * 40 + "\n"),
+        )
+        passed, detail = _verify_memory_git_anchors(tmp_path, memory_path)
+        assert not passed
+        assert "trust changed" in detail
+
+    head_reads = iter(("1" * 40 + "\n", "2" * 40 + "\n"))
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: SimpleNamespace(stdout=next(head_reads)),
+        )
+        passed, detail = _verify_memory_git_anchors(tmp_path, memory_path)
+        assert not passed
+        assert "HEAD changed" in detail
+
+
+def test_memory_anchor_verifier_ignores_external_evidence_uris(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    record = SimpleNamespace(
+        event_id="event-1",
+        source_commit="1" * 40,
+        evidence=(
+            SimpleNamespace(
+                uri="https://example.invalid/evidence",
+                git_commit=None,
+                sha256=None,
+            ),
+        ),
+    )
+    monkeypatch.setattr(mission_module, "load_memory_records", lambda _path: [record])
+    monkeypatch.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+    monkeypatch.setattr(mission_module, "_git_commit_resolves", lambda *_args: True)
+    monkeypatch.setattr(mission_module, "_git_is_ancestor", lambda *_args: True)
+    monkeypatch.setattr(
+        mission_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(stdout="1" * 40 + "\n"),
+    )
+
+    passed, detail = _verify_memory_git_anchors(tmp_path, tmp_path / "memory.jsonl")
+
+    assert passed
+    assert detail == "Research memory Git anchors verify (1 event)."
+
+
+def test_iteration_history_reports_each_git_integrity_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clean_replacements = SimpleNamespace(returncode=0, stdout="")
+    expected_trees = {
+        mission_module._ITER000_ATTEMPT_001_EXECUTION_COMMIT: (
+            mission_module._ITER000_ATTEMPT_001_EXECUTION_TREE
+        ),
+        mission_module._ITER000_PROOF_COMMIT: mission_module._ITER000_PROOF_COMMIT_TREE,
+        mission_module._ITER000_VERIFICATION_CONTRACT_COMMIT: (
+            mission_module._ITER000_VERIFICATION_CONTRACT_TREE
+        ),
+        mission_module._ITER000_VERIFICATION_CORRECTION_COMMIT: (
+            mission_module._ITER000_VERIFICATION_CORRECTION_TREE
+        ),
+    }
+    head = "f" * 40
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout=""),
+        )
+        passed, detail = mission_module._verify_iter000_history(tmp_path, "git", head)
+        assert not passed
+        assert "replacement objects" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: clean_replacements,
+        )
+        scoped.setattr(mission_module, "_git_object_type", lambda *_args: None)
+        passed, detail = mission_module._verify_iter000_history(tmp_path, "git", head)
+        assert not passed
+        assert "historical commit is unavailable" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: clean_replacements,
+        )
+        scoped.setattr(mission_module, "_git_object_type", lambda *_args: "commit")
+        scoped.setattr(mission_module, "_git_tree_id", lambda *_args: None)
+        passed, detail = mission_module._verify_iter000_history(tmp_path, "git", head)
+        assert not passed
+        assert "commit tree differs" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: clean_replacements,
+        )
+        scoped.setattr(mission_module, "_git_object_type", lambda *_args: "commit")
+        scoped.setattr(
+            mission_module,
+            "_git_tree_id",
+            lambda _repo, _git, commit: expected_trees.get(commit),
+        )
+        scoped.setattr(mission_module, "_git_is_ancestor", lambda *_args: False)
+        passed, detail = mission_module._verify_iter000_history(tmp_path, "git", head)
+        assert not passed
+        assert "ancestry chain" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: clean_replacements,
+        )
+        scoped.setattr(mission_module, "_git_object_type", lambda *_args: "commit")
+        scoped.setattr(
+            mission_module,
+            "_git_tree_id",
+            lambda _repo, _git, commit: expected_trees.get(commit),
+        )
+        scoped.setattr(
+            mission_module,
+            "_git_is_ancestor",
+            lambda _repo, _git, _ancestor, descendant: descendant != head,
+        )
+        passed, detail = mission_module._verify_iter000_history(tmp_path, "git", head)
+        assert not passed
+        assert "not an ancestor of HEAD" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: clean_replacements,
+        )
+        scoped.setattr(mission_module, "_git_object_type", lambda *_args: "commit")
+        scoped.setattr(
+            mission_module,
+            "_git_tree_id",
+            lambda _repo, _git, commit: expected_trees.get(commit),
+        )
+        scoped.setattr(mission_module, "_git_is_ancestor", lambda *_args: True)
+        scoped.setattr(mission_module, "_git_path_object_id", lambda *_args: None)
+        passed, detail = mission_module._verify_iter000_history(tmp_path, "git", head)
+        assert not passed
+        assert "execution source tree differs" in detail
+
+
+def test_current_credibility_registry_rejects_invalid_head_coverage_and_races(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _credibility_control_repo(tmp_path, monkeypatch)
+    registry_path = repo / mission_module._CREDIBILITY_GATE_CONTROL_PATH
+    document = json.loads(registry_path.read_bytes())
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: SimpleNamespace(stdout="invalid\n"),
+        )
+        passed, detail = _verify_credibility_gate_control_registry(repo)
+        assert not passed
+        assert "valid Git HEAD" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module,
+            "_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS",
+            {**mission_module._REQUIRED_BOOTSTRAP_CLAIM_DIGESTS, "uncovered.claim": "0" * 64},
+        )
+        scoped.setattr(
+            mission_module,
+            "_expected_credibility_gate_control_registry",
+            lambda: document,
+        )
+        passed, detail = _verify_credibility_gate_control_registry(repo)
+        assert not passed
+        assert "do not cover the exact bootstrap claims" in detail
+
+    original_run = mission_module.subprocess.run
+    head_reads = 0
+
+    def changing_head(*args: object, **kwargs: object) -> object:
+        nonlocal head_reads
+        result = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and command[1:4] == [
+            "rev-parse",
+            "--verify",
+            "HEAD^{commit}",
+        ]:
+            head_reads += 1
+            if head_reads == 2:
+                return SimpleNamespace(stdout="0" * 40 + "\n", returncode=0)
+        return result
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module.subprocess, "run", changing_head)
+        passed, detail = _verify_credibility_gate_control_registry(repo)
+        assert not passed
+        assert "Git HEAD changed" in detail
+
+    original_read = mission_module._read_repo_regular_file
+    registry_reads = 0
+
+    def changing_registry(repo_root: Path, relative: str) -> bytes:
+        nonlocal registry_reads
+        value = original_read(repo_root, relative)
+        if relative == mission_module._CREDIBILITY_GATE_CONTROL_PATH:
+            registry_reads += 1
+            if registry_reads == 2:
+                return value + b" "
+        return value
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_read_repo_regular_file", changing_registry)
+        passed, detail = _verify_credibility_gate_control_registry(repo)
+        assert not passed
+        assert "registry changed" in detail
+
+    target_test = document["controls"][0]["positive_control"].split("::", maxsplit=1)[0]
+    test_reads = 0
+
+    def changing_test(repo_root: Path, relative: str) -> bytes:
+        nonlocal test_reads
+        value = original_read(repo_root, relative)
+        if relative == target_test:
+            test_reads += 1
+            if test_reads == 2:
+                return value + b"\n"
+        return value
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_read_repo_regular_file", changing_test)
+        passed, detail = _verify_credibility_gate_control_registry(repo)
+        assert not passed
+        assert "test changed" in detail
+
+
+def test_claim_registry_rejects_invalid_head_lineage_evidence_sets_and_races(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, digests, evidence_digests, registry_digest = _claim_contract_repo(tmp_path)
+    _install_claim_contract(monkeypatch, digests, evidence_digests, registry_digest)
+    registry_path = repo / "claims" / "registry.jsonl"
+    claims = _claims(registry_path)
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+        scoped.setattr(
+            mission_module.subprocess,
+            "run",
+            lambda *_args, **_kwargs: SimpleNamespace(stdout="invalid\n"),
+        )
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "valid Git HEAD" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_REQUIRED_BOOTSTRAP_REGISTRY_SHA256", "0" * 64)
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "registry bytes differ" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_claims_bytes", lambda _data: [claims[0], claims[0]])
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "nonempty, typed, and unique" in detail
+
+    invalid_successor = claims[1].model_copy(update={"supersedes_claim_id": claims[1].claim_id})
+    invalid_claims = [claims[0], invalid_successor]
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_claims_bytes", lambda _data: invalid_claims)
+        scoped.setattr(
+            mission_module,
+            "_REQUIRED_BOOTSTRAP_CLAIM_DIGESTS",
+            {
+                claim.claim_id: sha256_value(claim.model_dump(mode="json", exclude_none=True))
+                for claim in invalid_claims
+            },
+        )
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "correction lineage is invalid" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module,
+            "_REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS",
+            {**evidence_digests, "evidence/unreviewed.json": "0" * 64},
+        )
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "evidence paths differ" in detail
+
+    original_read = mission_module._read_repo_regular_file
+    registry_reads = 0
+
+    def changing_registry(repo_root: Path, relative: str) -> bytes:
+        nonlocal registry_reads
+        value = original_read(repo_root, relative)
+        if relative == "claims/registry.jsonl":
+            registry_reads += 1
+            if registry_reads == 2:
+                return value + b" "
+        return value
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_read_repo_regular_file", changing_registry)
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "registry changed" in detail
+
+    evidence_reads = 0
+
+    def changing_evidence(repo_root: Path, relative: str) -> bytes:
+        nonlocal evidence_reads
+        value = original_read(repo_root, relative)
+        if relative == "evidence/source.json":
+            evidence_reads += 1
+            if evidence_reads == 2:
+                return value + b" "
+        return value
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(mission_module, "_read_repo_regular_file", changing_evidence)
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "evidence changed" in detail
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(
+            mission_module,
+            "_trusted_git",
+            lambda _repo: (_ for _ in ()).throw(ValueError("untrusted")),
+        )
+        passed, detail = _claim_registry_valid(repo)
+        assert not passed
+        assert "cannot be reconstructed" in detail

@@ -73,7 +73,7 @@ exclude = ["/.gitignore"]
 link-mode = "copy"
 
 [tool.pytest.ini_options]
-addopts = "-q --strict-markers --strict-config"
+addopts = "-q --strict-markers --strict-config --runxfail"
 testpaths = ["tests"]
 
 [tool.coverage.run]
@@ -81,7 +81,8 @@ branch = true
 source = ["fieldtrue"]
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 90.01
+precision = 2
 show_missing = true
 
 [tool.ruff]

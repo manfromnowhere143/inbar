@@ -2,17 +2,38 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import re
 import shutil
+import subprocess
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
 import fieldtrue.handoff as handoff_module
+from fieldtrue.canonical import canonical_json, canonical_json_pretty, sha256_bytes
+from fieldtrue.domain import (
+    EngineeringValidationArtifact,
+    EngineeringValidationEnvironment,
+    EngineeringValidationMissionObservation,
+    EngineeringValidationPytestObservation,
+    EngineeringValidationReceipt,
+    EngineeringValidationResourceAccounting,
+    EngineeringValidationStep,
+    engineering_validation_plan_sha256,
+)
 from fieldtrue.handoff import HandoffError, check_handoff, render_handoff, write_handoff
-from fieldtrue.memory import MemoryStatus, ResearchMemoryRecord, load_memory_records
+from fieldtrue.memory import (
+    AccessClass,
+    LabelAccess,
+    MemoryEvidenceRef,
+    MemoryStatus,
+    ResearchMemoryRecord,
+    load_memory_records,
+)
 from fieldtrue.mission import MissionValidation, ValidationCheck
 
 _LEGACY_CHECKPOINT_EVENT_ID = "iter001-shortcut-v2-implementation-checkpoint-v1"
@@ -23,13 +44,125 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _legacy_recovery_memory(
+    records: tuple[ResearchMemoryRecord, ...],
+) -> tuple[ResearchMemoryRecord, ...]:
+    legacy_handoff = next(
+        record for record in records if record.event_id == _LEGACY_HANDOFF_EVENT_ID
+    )
+    engine_boundary = next(
+        record
+        for record in records
+        if record.event_id == "future-research-engine-shortcut-v2-lessons-v1"
+    )
+    cutoff = max(legacy_handoff.sequence, engine_boundary.sequence)
+    return tuple(record for record in records if record.sequence <= cutoff)
+
+
+def _legacy_recovery_memory_bytes(records: tuple[ResearchMemoryRecord, ...]) -> bytes:
+    return b"".join(canonical_json(record) + b"\n" for record in _legacy_recovery_memory(records))
+
+
 @pytest.fixture(scope="module")
 def memory_records() -> tuple[ResearchMemoryRecord, ...]:
-    return load_memory_records(_project_root() / "memory" / "research_engine_extraction.jsonl")
+    records = load_memory_records(_project_root() / "memory" / "research_engine_extraction.jsonl")
+    # Legacy renderer tests require an immutable V1 seed. V2 tests append their own explicit tail.
+    return _legacy_recovery_memory(records)
 
 
-@pytest.fixture
-def handoff_repo(tmp_path: Path) -> Path:
+def _git(repo: Path, *arguments: str) -> str:
+    return subprocess.run(  # noqa: S603 - tests use fixed Git arguments and repository paths
+        [str(handoff_module.TRUSTED_GIT_PATH), *arguments],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        env=handoff_module.git_environment(),
+        text=True,
+    ).stdout.strip()
+
+
+@pytest.fixture(scope="module")
+def committed_worker_repo(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    ambient_source = _project_root()
+    fixture_root = tmp_path_factory.mktemp("handoff-worker")
+    source = fixture_root / "source"
+    destination = fixture_root / "repository"
+    clone_environment = handoff_module.git_environment()
+    clone_environment["GIT_ALLOW_PROTOCOL"] = "file"
+    subprocess.run(  # noqa: S603 - fixed trusted Git and local test paths
+        [
+            str(handoff_module.TRUSTED_GIT_PATH),
+            "clone",
+            "--quiet",
+            "--no-hardlinks",
+            "--",
+            str(ambient_source),
+            str(source),
+        ],
+        cwd=fixture_root,
+        check=True,
+        capture_output=True,
+        env=clone_environment,
+        timeout=60,
+    )
+    _git(source, "config", "user.name", "Inbar Handoff Test")
+    _git(source, "config", "user.email", "handoff@example.invalid")
+
+    ambient_manifest = handoff_module._recovery_manifest(ambient_source)
+    ambient_memory, ambient_memory_metadata = handoff_module._read_regular_file_snapshot(
+        ambient_source,
+        handoff_module._MEMORY_PATH,
+        handoff_module._MEMORY_PATH,
+    )
+    legacy_memory = _legacy_recovery_memory_bytes(
+        load_memory_records(_project_root() / handoff_module._MEMORY_PATH)
+    )
+    assert ambient_memory.startswith(legacy_memory)
+    handoff_module._clear_snapshot_worktree(source)
+    for item in ambient_manifest.files:
+        data, metadata = handoff_module._read_regular_file_snapshot(
+            ambient_source,
+            item.path,
+            f"worker fixture source {item.path}",
+        )
+        assert metadata == item.metadata
+        assert len(data) == item.size
+        assert sha256_bytes(data) == item.sha256
+        handoff_module._write_snapshot_file(source, item.path, data, metadata)
+    handoff_module._write_snapshot_file(
+        source,
+        handoff_module._MEMORY_PATH,
+        legacy_memory,
+        ambient_memory_metadata,
+    )
+    _git(source, "add", "-f", "-A")
+    _git(source, "commit", "--quiet", "--allow-empty", "-m", "freeze worker source")
+
+    git = handoff_module.trusted_repository_git(source, handoff_module.TRUSTED_GIT_PATH)
+    head = handoff_module._git_head(source, git)
+    recovery_manifest = handoff_module._recovery_manifest(source)
+    memory_bytes, memory_metadata = handoff_module._read_regular_file_snapshot(
+        source,
+        handoff_module._MEMORY_PATH,
+        handoff_module._MEMORY_PATH,
+    )
+    handoff_module._materialize_repository_snapshot(
+        source,
+        destination,
+        git=git,
+        head=head,
+        recovery_manifest=recovery_manifest,
+        memory_bytes=memory_bytes,
+        memory_metadata=memory_metadata,
+    )
+    _git(destination, "config", "user.name", "Inbar Handoff Test")
+    _git(destination, "config", "user.email", "handoff@example.invalid")
+    _git(destination, "add", "-A")
+    _git(destination, "commit", "--quiet", "--allow-empty", "-m", "freeze worker fixture")
+    return destination
+
+
+def _build_handoff_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "mission-clone"
     inputs: dict[str, dict[str, object]] = {
         "mission/contract.json": {
@@ -66,6 +199,11 @@ def handoff_repo(tmp_path: Path) -> Path:
         source_path = repo / binding.repository_path
         source_path.parent.mkdir(parents=True, exist_ok=True)
         source_path.write_bytes(binding.imported_bytes)
+    for module_name in sorted(handoff_module._HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES):
+        relative = Path("src", *module_name.split(".")).with_suffix(".py")
+        source_path = repo / relative
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_bytes((_project_root() / relative).read_bytes())
     source_root = repo / "src" / "fieldtrue"
     (source_root / "second.py").write_text("VALUE = 2\n", encoding="utf-8")
     schema_root = repo / "protocol" / "schemas"
@@ -77,6 +215,12 @@ def handoff_repo(tmp_path: Path) -> Path:
         "README.md": b"# Fixture mission\n",
         "claims/registry.jsonl": b'{"claim":"blocked"}\n',
         "docs/ARCHITECTURE.md": b"# Architecture\n",
+        "docs/research/ITER001_SOURCE_ROLE_AUDIT.md": (
+            b"# Iteration 001 Source Role Audit\n\nBounded fixture audit.\n"
+        ),
+        "protocol/gate_controls/credibility_v1.json": (
+            _project_root() / "protocol/gate_controls/credibility_v1.json"
+        ).read_bytes(),
         "proofs/authority.txt": b"no authority\n",
         "scripts/verify.py": b"VALUE = 'verify'\n",
         "tests/test_fixture.py": b"def test_fixture(): pass\n",
@@ -86,6 +230,11 @@ def handoff_repo(tmp_path: Path) -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
     return repo
+
+
+@pytest.fixture
+def handoff_repo(tmp_path: Path) -> Path:
+    return _build_handoff_repo(tmp_path)
 
 
 def _mission_report(
@@ -126,6 +275,11 @@ def _install_verified_dependencies(
     report: MissionValidation | None = None,
     schema_errors: list[str] | None = None,
 ) -> None:
+    monkeypatch.setattr(
+        handoff_module,
+        "_render_snapshot_bound",
+        handoff_module._render_in_process,
+    )
     monkeypatch.setattr(handoff_module, "load_memory_records_bytes", lambda _data: memory_records)
     monkeypatch.setattr(
         handoff_module,
@@ -185,21 +339,6 @@ def _selected_recovery_records(
     return checkpoint, handoff
 
 
-def _legacy_recovery_memory(
-    records: tuple[ResearchMemoryRecord, ...],
-) -> tuple[ResearchMemoryRecord, ...]:
-    legacy_handoff = next(
-        record for record in records if record.event_id == _LEGACY_HANDOFF_EVENT_ID
-    )
-    engine_boundary = next(
-        record
-        for record in records
-        if record.event_id == "future-research-engine-shortcut-v2-lessons-v1"
-    )
-    cutoff = max(legacy_handoff.sequence, engine_boundary.sequence)
-    return tuple(record for record in records if record.sequence <= cutoff)
-
-
 def _versioned_recovery_records(
     records: tuple[ResearchMemoryRecord, ...],
 ) -> tuple[ResearchMemoryRecord, ResearchMemoryRecord]:
@@ -245,6 +384,1219 @@ def _versioned_recovery_records(
     return checkpoint, handoff
 
 
+def _write_validation_artifact(
+    repo: Path,
+    relative: str,
+    data: bytes,
+    media_type: str,
+) -> EngineeringValidationArtifact:
+    path = repo / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return EngineeringValidationArtifact(
+        path=relative,
+        sha256=sha256_bytes(data),
+        bytes=len(data),
+        media_type=media_type,
+    )
+
+
+def _validation_coverage_bytes(
+    paths: tuple[str, ...] = ("src/fieldtrue/fixture.py",),
+) -> bytes:
+    file_summary = {
+        "covered_lines": 10,
+        "num_statements": 10,
+        "percent_covered": 95.0,
+        "percent_covered_display": "95",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "num_branches": 10,
+        "num_partial_branches": 0,
+        "covered_branches": 9,
+        "missing_branches": 1,
+    }
+    count = len(paths)
+    totals = {
+        **file_summary,
+        "covered_lines": 10 * count,
+        "num_statements": 10 * count,
+        "missing_lines": 0,
+        "covered_branches": 9 * count,
+        "num_branches": 10 * count,
+        "missing_branches": count,
+    }
+    return canonical_json_pretty(
+        {
+            "meta": {
+                "branch_coverage": True,
+                "format": 3,
+                "show_contexts": False,
+                "timestamp": "2026-07-16T10:00:00",
+                "version": "7.15.1",
+            },
+            "files": {
+                path: {
+                    "executed_lines": list(range(1, 11)),
+                    "missing_lines": [],
+                    "excluded_lines": [],
+                    "executed_branches": [[line, line + 1] for line in range(1, 10)],
+                    "missing_branches": [[10, 11]],
+                    "summary": file_summary,
+                }
+                for path in paths
+            },
+            "totals": totals,
+        }
+    )
+
+
+def _fixture_credibility_nodes() -> tuple[str, ...]:
+    registry = json.loads(
+        (_project_root() / "protocol/gate_controls/credibility_v1.json").read_text(encoding="utf-8")
+    )
+    return tuple(
+        sorted(
+            {
+                control[role]
+                for control in registry["controls"]
+                for role in handoff_module._CREDIBILITY_GATE_CONTROL_ROLES
+            }
+        )
+    )
+
+
+def _validation_junit_bytes() -> bytes:
+    cases = []
+    for node_id in _fixture_credibility_nodes():
+        relative, function_name = node_id.split("::")
+        classname = ".".join(Path(relative).with_suffix("").parts)
+        cases.append(f'<testcase classname="{classname}" name="{function_name}" time="0.1" />')
+    tests = len(cases)
+    duration = f"{tests / 10:.1f}"
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        f'<testsuites tests="{tests}" failures="0" errors="0" skipped="0" time="{duration}">'
+        f'<testsuite name="pytest" tests="{tests}" failures="0" errors="0" skipped="0" '
+        f'time="{duration}">' + "".join(cases) + "</testsuite></testsuites>"
+    ).encode("utf-8")
+
+
+def _v2_validation_context(
+    repo: Path,
+    records: tuple[ResearchMemoryRecord, ...],
+    *,
+    actor_id: str | None = None,
+    coverage_observation: tuple[int, int, int, int] | None = None,
+    coverage_paths_override: tuple[str, ...] | None = None,
+    empty_step_logs: bool = False,
+    executable_artifact: bool = False,
+    executable_source: bool = False,
+    extra_evidence_path: str | None = None,
+    insert_parent_commit: bool = False,
+    mission_check_ids: tuple[str, ...] | None = None,
+    noncanonical_receipt: bool = False,
+    overlap_steps: bool = False,
+    plan_override: tuple[str, tuple[str, ...]] | None = None,
+    preexisting_validation_file: bool = False,
+    pytest_counts: tuple[int, int, int, int] = (11, 0, 0, 0),
+) -> SimpleNamespace:
+    _git(repo, "init", "--quiet", "--initial-branch=main")
+    _git(repo, "config", "user.name", "Inbar Validation Test")
+    _git(repo, "config", "user.email", "validation@example.invalid")
+    if preexisting_validation_file:
+        preexisting = (
+            repo / "evidence/validation/validation.fixture.v2/preexisting-unlisted-artifact.txt"
+        )
+        preexisting.parent.mkdir(parents=True, exist_ok=True)
+        preexisting.write_text("pre-existing and unlisted\n", encoding="utf-8")
+    if executable_source:
+        (repo / "src/fieldtrue/second.py").chmod(0o755)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "--quiet", "-m", "implementation subject")
+    subject_commit = _git(repo, "rev-parse", "HEAD")
+    subject_tree = _git(repo, "rev-parse", "HEAD^{tree}")
+    subject_python_paths = tuple(
+        path
+        for path in _git(
+            repo,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            subject_commit,
+            "--",
+            "src/fieldtrue",
+        ).splitlines()
+        if path.endswith(".py")
+    )
+    coverage_paths = coverage_paths_override or subject_python_paths
+    if insert_parent_commit:
+        intermediate = repo / "intermediate-parent.txt"
+        intermediate.write_text("unexpected parent\n", encoding="utf-8")
+        _git(repo, "add", intermediate.name)
+        _git(repo, "commit", "--quiet", "-m", "intermediate parent")
+
+    receipt_id = "validation.fixture.v2"
+    evidence_root = f"evidence/validation/{receipt_id}"
+    expected_plan = list(handoff_module._expected_validation_plan(receipt_id))
+    if plan_override is not None:
+        target_step, target_argv = plan_override
+        expected_plan = [
+            (step_id, target_argv if step_id == target_step else argv)
+            for step_id, argv in expected_plan
+        ]
+    base_time = datetime(2026, 7, 16, 10, 0, tzinfo=UTC)
+    steps: list[EngineeringValidationStep] = []
+    for index, (step_id, argv) in enumerate(expected_plan):
+        stdout = _write_validation_artifact(
+            repo,
+            f"{evidence_root}/{step_id}.stdout.txt",
+            b"" if empty_step_logs else f"{step_id}: pass\n".encode(),
+            handoff_module._VALIDATION_LOG_MEDIA_TYPE,
+        )
+        stderr = _write_validation_artifact(
+            repo,
+            f"{evidence_root}/{step_id}.stderr.txt",
+            b"",
+            handoff_module._VALIDATION_LOG_MEDIA_TYPE,
+        )
+        started_at = base_time + timedelta(seconds=index * 2)
+        if overlap_steps and index == 1:
+            started_at = base_time + timedelta(milliseconds=500)
+        steps.append(
+            EngineeringValidationStep(
+                step_id=step_id,
+                argv=argv,
+                working_directory=".",
+                started_at=started_at,
+                finished_at=started_at + timedelta(seconds=1),
+                duration_ms=1_000,
+                expected_exit_code=0,
+                observed_exit_code=0,
+                result="pass",
+                stdout=stdout,
+                stderr=stderr,
+            )
+        )
+    junit = _write_validation_artifact(
+        repo,
+        f"{evidence_root}/pytest.junit.xml",
+        _validation_junit_bytes(),
+        handoff_module._VALIDATION_JUNIT_MEDIA_TYPE,
+    )
+    coverage = _write_validation_artifact(
+        repo,
+        f"{evidence_root}/coverage.json",
+        _validation_coverage_bytes(coverage_paths),
+        handoff_module._VALIDATION_COVERAGE_MEDIA_TYPE,
+    )
+    checkpoint_template, handoff_template = _selected_recovery_records(records)
+    producer_actor_id = actor_id or checkpoint_template.actor.actor_id
+    mission_ids = mission_check_ids or handoff_module._EXPECTED_MISSION_CHECK_IDS
+    tests_passed, tests_failed, tests_errors, tests_skipped = pytest_counts
+    observed_coverage = coverage_observation or (
+        10 * len(coverage_paths),
+        10 * len(coverage_paths),
+        9 * len(coverage_paths),
+        10 * len(coverage_paths),
+    )
+    covered_lines, num_statements, covered_branches, num_branches = observed_coverage
+    receipt = EngineeringValidationReceipt(
+        schema_version="inbar.engineering-validation-receipt.v1",
+        receipt_id=receipt_id,
+        mission_id="inbar",
+        subject_commit=subject_commit,
+        subject_tree=subject_tree,
+        plan_id="inbar.core-engineering-validation.v1",
+        plan_sha256=engineering_validation_plan_sha256(tuple(steps)),
+        started_at=base_time - timedelta(seconds=1),
+        finished_at=base_time + timedelta(seconds=16),
+        producer_actor_id=producer_actor_id,
+        assurance_scope="same-operator-engineering-observation-no-independent-attestation",
+        independent_attestation=False,
+        environment=EngineeringValidationEnvironment(
+            platform="test-platform",
+            machine="test-machine",
+            python_version="3.12.13",
+            uv_version="0.11.28",
+        ),
+        steps=tuple(steps),
+        pytest_observation=EngineeringValidationPytestObservation(
+            step_id="pytest-cov",
+            junit_xml=junit,
+            coverage_json=coverage,
+            tests_passed=tests_passed,
+            tests_failed=tests_failed,
+            tests_errors=tests_errors,
+            tests_skipped=tests_skipped,
+            covered_lines=covered_lines,
+            num_statements=num_statements,
+            covered_branches=covered_branches,
+            num_branches=num_branches,
+        ),
+        mission_observation=EngineeringValidationMissionObservation(
+            step_id="mission-validate",
+            mission_check_ids=mission_ids,
+            expected_blockers=("iter001-acquisition-contract",),
+            observed_blockers=("iter001-acquisition-contract",),
+            missing_expected_blockers=(),
+            unexpected_blockers=(),
+        ),
+        resource_accounting=EngineeringValidationResourceAccounting(
+            measurement_status="not_metered",
+            direct_cost_usd=None,
+            gpu_seconds=None,
+            cloud_jobs=None,
+            paid_calls=None,
+        ),
+        scientific_result="not_evaluated",
+        authority_effect="none",
+        result="pass",
+    )
+    receipt_path = repo / evidence_root / "receipt.json"
+    if noncanonical_receipt:
+        receipt_path.write_text(
+            json.dumps(receipt.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
+        )
+    else:
+        receipt_path.write_bytes(canonical_json_pretty(receipt))
+    if executable_artifact:
+        (repo / evidence_root / "ruff-check.stdout.txt").chmod(0o755)
+    if extra_evidence_path is not None:
+        extra = repo / extra_evidence_path
+        extra.parent.mkdir(parents=True, exist_ok=True)
+        extra.write_text("not listed by the receipt\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "--quiet", "-m", "validation evidence")
+    evidence_commit = _git(repo, "rev-parse", "HEAD")
+
+    source_path = handoff_module._CURRENT_SOURCE_AUDIT_PATH
+    source_sha = sha256_bytes((repo / source_path).read_bytes())
+    source_ref = MemoryEvidenceRef(
+        role="source",
+        uri=source_path,
+        sha256=source_sha,
+        git_commit=subject_commit,
+        media_type="text/markdown",
+        access=AccessClass.INTERNAL,
+        label_access=LabelAccess.NONE,
+    )
+    receipt_bytes = receipt_path.read_bytes()
+    verifier_ref = MemoryEvidenceRef(
+        role="verifier",
+        uri=receipt_path.relative_to(repo).as_posix(),
+        sha256=sha256_bytes(receipt_bytes),
+        git_commit=evidence_commit,
+        media_type=handoff_module._VALIDATION_RECEIPT_MEDIA_TYPE,
+        access=AccessClass.INTERNAL,
+        label_access=LabelAccess.NONE,
+    )
+    sequence = records[-1].sequence
+    legacy_source = next(
+        record for record in records if record.event_id == "iter001-public-substrate-verdict-v1"
+    )
+    current_source = legacy_source.model_copy(
+        update={
+            "schema_version": "daniel.research-memory.v2",
+            "mission_id": "inbar",
+            "sequence": sequence + 1,
+            "event_id": "fixture-current-source-verdict",
+            "source_commit": subject_commit,
+            "evidence": (source_ref,),
+            "links": {
+                handoff_module._CURRENT_SOURCE_CORRECTION_LINK: (
+                    handoff_module._SOURCE_VERDICT_EVENT_ID
+                )
+            },
+            "summary": handoff_module._CURRENT_SOURCE_SUMMARY,
+            "payload": {
+                **legacy_source.payload,
+                "compute_consequence": handoff_module._CURRENT_SOURCE_COMPUTE_CONSEQUENCE,
+                "finding": handoff_module._CURRENT_SOURCE_FINDING,
+                "product_wedge": handoff_module._CURRENT_SOURCE_PRODUCT_WEDGE,
+                "reconnaissance_scope": handoff_module._CURRENT_SOURCE_RECONNAISSANCE_SCOPE,
+                "external_evidence_status": (
+                    handoff_module._CURRENT_SOURCE_EXTERNAL_EVIDENCE_STATUS
+                ),
+                "admissibility_boundary": handoff_module._CURRENT_SOURCE_ADMISSIBILITY_BOUNDARY,
+                "source_architecture": list(handoff_module._CURRENT_SOURCE_ARCHITECTURE),
+            },
+        }
+    )
+    checkpoint = checkpoint_template.model_copy(
+        update={
+            "sequence": sequence + 2,
+            "event_id": "fixture-v2-checkpoint",
+            "stage": handoff_module._RECOVERY_STAGE,
+            "source_commit": subject_commit,
+            "evidence": (source_ref, verifier_ref),
+            "payload": {
+                "action": handoff_module.RECOVERY_CHECKPOINT_ACTION,
+                "authority_effect": handoff_module.RECOVERY_CHECKPOINT_AUTHORITY_EFFECT,
+                "handoff_contract": handoff_module._RECOVERY_CHECKPOINT_CONTRACT_V2,
+                "implementation_commit": subject_commit,
+                "outcome": handoff_module.RECOVERY_CHECKPOINT_OUTCOME,
+                "validation_receipt": {
+                    "receipt_id": receipt_id,
+                    "path": receipt_path.relative_to(repo).as_posix(),
+                    "git_commit": evidence_commit,
+                    "sha256": sha256_bytes(receipt_bytes),
+                    "bytes": len(receipt_bytes),
+                    "media_type": handoff_module._VALIDATION_RECEIPT_MEDIA_TYPE,
+                },
+            },
+        }
+    )
+    handoff = handoff_template.model_copy(
+        update={
+            "sequence": sequence + 3,
+            "event_id": "fixture-v2-handoff",
+            "stage": handoff_module._RECOVERY_STAGE,
+            "source_commit": subject_commit,
+            "evidence": (source_ref,),
+            "links": {
+                "checkpoint": checkpoint.event_id,
+                "engine_boundary": handoff_module._ENGINE_BOUNDARY_EVENT_ID,
+                "source_verdict": current_source.event_id,
+            },
+            "payload": {
+                "forbidden_until_activation": list(handoff_module._CANONICAL_FORBIDDEN_ACTIONS),
+                "handoff_contract": handoff_module._RECOVERY_HANDOFF_CONTRACT,
+                "next_action": handoff_module.RECOVERY_HANDOFF_NEXT_ACTION,
+                "remaining_gates": list(handoff_module._CANONICAL_REMAINING_GATES),
+                "state": handoff_module.RECOVERY_HANDOFF_STATE,
+            },
+        }
+    )
+    checkpoint_payload = handoff_module._parse_payload(
+        handoff_module._CheckpointPayload,
+        checkpoint.payload,
+        "implementation checkpoint",
+    )
+    assert isinstance(checkpoint_payload, handoff_module._CheckpointPayload)
+    return SimpleNamespace(
+        checkpoint=checkpoint,
+        checkpoint_payload=checkpoint_payload,
+        current_source=current_source,
+        evidence_commit=evidence_commit,
+        handoff=handoff,
+        receipt=receipt,
+        receipt_path=receipt_path,
+        records=(*records, current_source, checkpoint, handoff),
+        subject_commit=subject_commit,
+    )
+
+
+def _verify_v2_context(
+    repo: Path,
+    context: SimpleNamespace,
+    report: MissionValidation | None = None,
+) -> handoff_module._VerifiedValidationReceipt:
+    handoff_payload = handoff_module._parse_payload(
+        handoff_module._HandoffPayload,
+        context.handoff.payload,
+        "handoff",
+    )
+    assert isinstance(handoff_payload, handoff_module._HandoffPayload)
+    handoff_module._validate_recovery_contract(
+        context.handoff,
+        context.checkpoint,
+        handoff_payload,
+        context.checkpoint_payload,
+    )
+    return handoff_module._verify_checkpoint_v2_receipt(
+        repo,
+        context.checkpoint,
+        context.checkpoint_payload,
+        report or _mission_report(),
+    )
+
+
+def test_checkpoint_v2_recomputes_committed_validation_and_renders_same_operator_scope(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+
+    verified = _verify_v2_context(handoff_repo, context)
+    assert verified.receipt.receipt_id == "validation.fixture.v2"
+    assert verified.evidence_commit == context.evidence_commit
+    assert len(verified.artifact_bindings) == 18
+
+    _install_verified_dependencies(monkeypatch, context.records)
+    document = render_handoff(handoff_repo).decode("utf-8")
+    assert "## Same-operator engineering validation" in document
+    assert "11 passed, 0 failed, 0 errors, 0 skipped" in document
+    assert "Recomputed statement-plus-branch coverage: 95.00 percent" in document
+    assert "Independent attestation: `false`" in document
+    assert "Scientific result: `not_evaluated`" in document
+    assert "Authority effect: `none`" in document
+    assert "Bundle integrity does not prove command execution." in document
+    assert "Reconnaissance scope: `dated_enumerated_non_systematic`" in document
+    assert "External evidence status: `not_independently_reconstructible`" in document
+    assert handoff_module._CURRENT_SOURCE_ADMISSIBILITY_BOUNDARY in document
+
+
+def test_frozen_pytest_plan_executes_xfail_cases_normally(tmp_path: Path) -> None:
+    plan = dict(handoff_module._expected_validation_plan("validation.fixture.v2"))
+    assert "--runxfail" in plan["pytest-cov"]
+
+    test_file = tmp_path / "test_xfail_mask.py"
+    test_file.write_text(
+        "import pytest\n\n"
+        "pytestmark = pytest.mark.xfail(strict=False)\n\n"
+        "def test_masked_failure():\n"
+        "    assert False\n\n"
+        "def test_masked_pass():\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+    environment = {
+        key: value for key, value in os.environ.items() if not key.startswith("COV_CORE_")
+    }
+    environment.pop("PYTEST_ADDOPTS", None)
+    result = subprocess.run(  # noqa: S603 - test launches the current pinned interpreter
+        [sys.executable, "-m", "pytest", "-q", "--runxfail", str(test_file)],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        env=environment,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 1
+    assert "1 failed, 1 passed" in result.stdout
+
+
+def test_legacy_recovery_seed_is_stable_when_an_explicit_v2_tail_is_latest(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    checkpoint, handoff = _selected_recovery_records(context.records)
+
+    assert checkpoint.event_id == context.checkpoint.event_id
+    assert handoff.event_id == context.handoff.event_id
+    assert checkpoint.payload["handoff_contract"] == handoff_module._RECOVERY_CHECKPOINT_CONTRACT_V2
+    assert "validation" not in checkpoint.payload
+    assert _legacy_recovery_memory(context.records) == memory_records
+
+
+def test_checkpoint_v2_rejects_self_report_and_lineage_counterexamples(
+    tmp_path: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    counterexamples = (
+        (
+            {"plan_override": ("uv-lock-check", ("uv", "lock"))},
+            "command plan differs",
+        ),
+        ({"overlap_steps": True}, "overlap or are chronologically reordered"),
+        ({"executable_artifact": True}, "tree entry is invalid"),
+        (
+            {"extra_evidence_path": "evidence/validation/validation.fixture.v2/unlisted.txt"},
+            "directory contains an unlisted artifact",
+        ),
+        ({"extra_evidence_path": "unexpected-validation-commit-path.txt"}, "paths outside"),
+        ({"preexisting_validation_file": True}, "directory contains an unlisted artifact"),
+        ({"insert_parent_commit": True}, "single-parent child"),
+        ({"noncanonical_receipt": True}, "not canonical JSON"),
+        ({"pytest_counts": (3, 0, 0, 0)}, "test counts do not follow"),
+        ({"coverage_observation": (10, 10, 10, 10)}, "coverage counts do not follow"),
+        (
+            {"coverage_paths_override": ("src/fieldtrue/second.py",)},
+            "coverage file inventory differs",
+        ),
+        ({"empty_step_logs": True}, "validation step has no recorded output"),
+        ({"executable_source": True}, "not a regular 100644 blob"),
+        ({"actor_id": "different-producer"}, "same-operator binding is invalid"),
+        (
+            {"mission_check_ids": handoff_module._EXPECTED_MISSION_CHECK_IDS[:-1]},
+            "mission observation differs",
+        ),
+    )
+    for index, (context_options, message) in enumerate(counterexamples):
+        repo = _build_handoff_repo(tmp_path / f"counterexample-{index}")
+        context = _v2_validation_context(repo, memory_records, **context_options)
+        with pytest.raises(HandoffError, match=message):
+            _verify_v2_context(repo, context)
+
+
+def test_checkpoint_v2_rejects_current_artifact_drift(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    artifact = handoff_repo / "evidence/validation/validation.fixture.v2/ruff-check.stdout.txt"
+    artifact.write_bytes(artifact.read_bytes() + b"changed after commit\n")
+
+    with pytest.raises(HandoffError, match="differs from its receipt binding"):
+        _verify_v2_context(handoff_repo, context)
+
+
+def _commit_v2_finalization(
+    repo: Path,
+    *,
+    executable_path: str | None = None,
+    extra_path: str | None = None,
+    rewrite_memory: bool = False,
+) -> str:
+    memory_path = repo / handoff_module._MEMORY_PATH
+    if rewrite_memory:
+        memory_path.write_text("rewritten final memory\n", encoding="utf-8")
+    else:
+        memory_path.write_bytes(memory_path.read_bytes() + b"final memory\n")
+    (repo / handoff_module._HANDOFF_PATH).write_text("# Final handoff\n", encoding="utf-8")
+    if extra_path is not None:
+        (repo / extra_path).write_text("unexpected finalization content\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    if executable_path is not None:
+        _git(repo, "update-index", "--chmod=+x", executable_path)
+    _git(repo, "commit", "--quiet", "-m", "finalize handoff")
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_checkpoint_v2_accepts_only_prospective_b_or_exact_final_c(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    git = handoff_module.trusted_repository_git(
+        handoff_repo,
+        handoff_module.TRUSTED_GIT_PATH,
+    )
+    assert handoff_module._verify_v2_finalization_topology(
+        handoff_repo, git, context.evidence_commit
+    )
+
+    _commit_v2_finalization(handoff_repo)
+
+    assert not handoff_module._verify_v2_finalization_topology(
+        handoff_repo, git, context.evidence_commit
+    )
+    _verify_v2_context(handoff_repo, context)
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"rewrite_memory": True}, "not a strict byte-prefix append"),
+        (
+            {"executable_path": handoff_module._MEMORY_PATH},
+            "tree entry is invalid",
+        ),
+        (
+            {"executable_path": handoff_module._HANDOFF_PATH},
+            "tree entry is invalid",
+        ),
+    ],
+)
+def test_checkpoint_v2_rejects_rewritten_or_executable_finalization(
+    tmp_path: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    options: dict[str, object],
+    message: str,
+) -> None:
+    repo = _build_handoff_repo(tmp_path / message.replace(" ", "-"))
+    context = _v2_validation_context(repo, memory_records)
+    _commit_v2_finalization(repo, **options)  # type: ignore[arg-type]
+
+    with pytest.raises(HandoffError, match=message):
+        _verify_v2_context(repo, context)
+
+
+def test_handoff_check_requires_exact_clean_v2_finalization(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    _install_verified_dependencies(monkeypatch, context.records)
+    monkeypatch.setattr(
+        handoff_module,
+        "_v2_evidence_commit_from_memory",
+        lambda _data: context.evidence_commit,
+    )
+    memory_path = handoff_repo / handoff_module._MEMORY_PATH
+    memory_path.write_bytes(memory_path.read_bytes() + b"finalized v2 memory\n")
+    write_handoff(handoff_repo)
+
+    with pytest.raises(HandoffError, match="final handoff commit has not been created"):
+        check_handoff(handoff_repo)
+
+    _git(
+        handoff_repo,
+        "add",
+        handoff_module._MEMORY_PATH,
+        handoff_module._HANDOFF_PATH,
+    )
+    _git(handoff_repo, "commit", "--quiet", "-m", "finalize v2 handoff")
+
+    check_handoff(handoff_repo)
+
+    original_head = handoff_module._git_head
+    head_reads = 0
+
+    def changing_head(repo: Path, git: str) -> str:
+        nonlocal head_reads
+        head_reads += 1
+        if head_reads == 3:
+            return "0" * 40
+        return original_head(repo, git)
+
+    monkeypatch.setattr(handoff_module, "_git_head", changing_head)
+    with pytest.raises(HandoffError):
+        check_handoff(handoff_repo)
+
+
+def test_checkpoint_v2_rejects_extra_finalization_content_and_later_source_commit(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    _commit_v2_finalization(handoff_repo, extra_path="later-source.txt")
+
+    with pytest.raises(HandoffError, match="does not contain exactly"):
+        _verify_v2_context(handoff_repo, context)
+
+    _git(handoff_repo, "reset", "--soft", "HEAD^")
+    _git(handoff_repo, "reset", "--", "later-source.txt")
+    (handoff_repo / "later-source.txt").unlink()
+    _git(handoff_repo, "commit", "--quiet", "-m", "finalize handoff")
+    (handoff_repo / "README.md").write_text("later source revision\n", encoding="utf-8")
+    _git(handoff_repo, "add", "README.md")
+    _git(handoff_repo, "commit", "--quiet", "-m", "later source commit")
+
+    with pytest.raises(HandoffError, match="not the single-parent child"):
+        _verify_v2_context(handoff_repo, context)
+
+
+def test_checkpoint_v2_checkout_requires_clean_c_and_bounds_prospective_changes(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    git = handoff_module.trusted_repository_git(
+        handoff_repo,
+        handoff_module.TRUSTED_GIT_PATH,
+    )
+    (handoff_repo / handoff_module._MEMORY_PATH).write_text(
+        "prospective final memory\n", encoding="utf-8"
+    )
+    handoff_module._verify_v2_checkout_state(handoff_repo, git, context.evidence_commit)
+    (handoff_repo / "unexpected.txt").write_text("unexpected\n", encoding="utf-8")
+    with pytest.raises(HandoffError, match="changes outside"):
+        handoff_module._verify_v2_checkout_state(handoff_repo, git, context.evidence_commit)
+
+    (handoff_repo / "unexpected.txt").unlink()
+    _commit_v2_finalization(handoff_repo)
+    handoff_module._verify_v2_checkout_state(handoff_repo, git, context.evidence_commit)
+    (handoff_repo / "README.md").write_text("dirty final checkout\n", encoding="utf-8")
+    with pytest.raises(HandoffError, match="checkout is not clean"):
+        handoff_module._verify_v2_checkout_state(handoff_repo, git, context.evidence_commit)
+
+
+def test_recovery_materialization_rejects_ignored_and_untracked_regular_files(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "tracked-recovery-source"
+    repo.mkdir()
+    (repo / ".gitignore").write_text("*.pyc\n", encoding="utf-8")
+    (repo / "README.md").write_text("# Tracked recovery fixture\n", encoding="utf-8")
+    package = repo / "src" / "fieldtrue"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text('"""Fixture package."""\n', encoding="utf-8")
+    memory = repo / handoff_module._MEMORY_PATH
+    memory.parent.mkdir(parents=True)
+    memory.write_text("fixture memory\n", encoding="utf-8")
+    _git(repo, "init", "--quiet", "--initial-branch=main")
+    _git(repo, "config", "user.name", "Recovery Binding Test")
+    _git(repo, "config", "user.email", "recovery-binding@example.invalid")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "--quiet", "-m", "freeze recovery source")
+
+    git = handoff_module.trusted_repository_git(repo, handoff_module.TRUSTED_GIT_PATH)
+    head = handoff_module._git_head(repo, git)
+    clean_manifest = handoff_module._recovery_manifest(repo)
+    handoff_module._verify_recovery_manifest_git_binding(repo, git, head, clean_manifest)
+    memory_bytes, memory_metadata = handoff_module._read_regular_file_snapshot(
+        repo,
+        handoff_module._MEMORY_PATH,
+        handoff_module._MEMORY_PATH,
+    )
+
+    ignored_bytecode = repo / "src" / "pydantic.pyc"
+    ignored_bytecode.write_bytes(b"ignored dependency shadow\n")
+    ignored_manifest = handoff_module._recovery_manifest(repo)
+    assert not handoff_module._git_worktree_changed_paths(repo, git)
+    assert any(item.path == "src/pydantic.pyc" for item in ignored_manifest.files)
+    with pytest.raises(HandoffError, match="differs from the selected committed tree"):
+        handoff_module._materialize_repository_snapshot(
+            repo,
+            tmp_path / "ignored-snapshot",
+            git=git,
+            head=head,
+            recovery_manifest=ignored_manifest,
+            memory_bytes=memory_bytes,
+            memory_metadata=memory_metadata,
+        )
+    assert not (tmp_path / "ignored-snapshot").exists()
+
+    ignored_bytecode.unlink()
+    untracked = repo / "untracked.txt"
+    untracked.write_text("untracked recovery input\n", encoding="utf-8")
+    untracked_manifest = handoff_module._recovery_manifest(repo)
+    assert handoff_module._git_worktree_changed_paths(repo, git) == frozenset({"untracked.txt"})
+    with pytest.raises(HandoffError, match="differs from the selected committed tree"):
+        handoff_module._verify_recovery_manifest_git_binding(
+            repo,
+            git,
+            head,
+            untracked_manifest,
+        )
+
+    untracked.unlink()
+    readme = repo / "README.md"
+    readme.write_bytes(readme.read_bytes() + b"dirty tracked bytes\n")
+    dirty_tracked_manifest = handoff_module._recovery_manifest(repo)
+    assert handoff_module._git_worktree_changed_paths(repo, git) == frozenset({"README.md"})
+    with pytest.raises(HandoffError, match="content differs from the selected committed tree"):
+        handoff_module._verify_recovery_manifest_git_binding(
+            repo,
+            git,
+            head,
+            dirty_tracked_manifest,
+        )
+
+
+def test_validation_lineage_path_inventory_disables_rename_detection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed_arguments: list[tuple[str, ...]] = []
+
+    def bounded_output(
+        _repo_root: Path,
+        _git: str,
+        arguments: tuple[str, ...],
+        *,
+        maximum_bytes: int,
+        label: str,
+    ) -> bytes:
+        assert maximum_bytes == handoff_module._MAX_GIT_METADATA_BYTES
+        assert label == "validation commit path inventory"
+        observed_arguments.append(arguments)
+        return b"new-name.txt\0old-name.txt\0"
+
+    monkeypatch.setattr(handoff_module, "_git_bounded_output", bounded_output)
+
+    assert handoff_module._git_changed_paths(
+        tmp_path,
+        str(handoff_module.TRUSTED_GIT_PATH),
+        "1" * 40,
+        "2" * 40,
+    ) == frozenset({"new-name.txt", "old-name.txt"})
+    assert observed_arguments == [
+        (
+            "diff-tree",
+            "--no-commit-id",
+            "--no-renames",
+            "--name-only",
+            "-r",
+            "-z",
+            "1" * 40,
+            "2" * 40,
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "summary",
+        "source_commit",
+        "correction_link",
+        "evidence_path",
+        "evidence_sha",
+        "evidence_access",
+    ],
+)
+def test_checkpoint_v2_rejects_unbounded_current_source_verdict(
+    mutation: str,
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    source_record = context.current_source
+    if mutation == "summary":
+        source_record = source_record.model_copy(update={"summary": "Unsafe broad verdict."})
+    elif mutation == "source_commit":
+        source_record = source_record.model_copy(update={"source_commit": context.evidence_commit})
+    elif mutation == "correction_link":
+        source_record = source_record.model_copy(update={"links": {}})
+    else:
+        if mutation == "evidence_path":
+            evidence_update: dict[str, object] = {"uri": "README.md"}
+        elif mutation == "evidence_sha":
+            evidence_update = {"sha256": "0" * 64}
+        else:
+            evidence_update = {"access": AccessClass.PUBLIC}
+        evidence = source_record.evidence[0].model_copy(update=evidence_update)
+        source_record = source_record.model_copy(update={"evidence": (evidence,)})
+    source = handoff_module._parse_source_payload(source_record.payload)
+    assert isinstance(source, handoff_module._CurrentSourceVerdictPayload)
+    records = {
+        record.event_id: record
+        for record in (*context.records[:-3], source_record, context.checkpoint, context.handoff)
+    }
+
+    with pytest.raises(HandoffError, match=r"exact bounded correction|content-valid"):
+        handoff_module._verify_current_source_verdict(
+            handoff_repo,
+            records,
+            source_record,
+            source,
+            context.checkpoint_payload,
+        )
+
+
+def test_checkpoint_v2_rejects_current_source_audit_worktree_drift(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    audit = handoff_repo / handoff_module._CURRENT_SOURCE_AUDIT_PATH
+    audit.write_bytes(audit.read_bytes() + b"uncommitted drift\n")
+    source = handoff_module._parse_source_payload(context.current_source.payload)
+    assert isinstance(source, handoff_module._CurrentSourceVerdictPayload)
+
+    with pytest.raises(HandoffError, match="not content-valid at A"):
+        handoff_module._verify_current_source_verdict(
+            handoff_repo,
+            {record.event_id: record for record in context.records},
+            context.current_source,
+            source,
+            context.checkpoint_payload,
+        )
+
+
+def test_checkpoint_v2_rejects_receipt_evidence_ref_substitution(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+    payload = {
+        **context.checkpoint.payload,
+        "validation_receipt": {
+            **context.checkpoint.payload["validation_receipt"],
+            "sha256": "0" * 64,
+        },
+    }
+    checkpoint = context.checkpoint.model_copy(update={"payload": payload})
+    parsed = handoff_module._parse_payload(
+        handoff_module._CheckpointPayload,
+        payload,
+        "implementation checkpoint",
+    )
+    assert isinstance(parsed, handoff_module._CheckpointPayload)
+
+    with pytest.raises(HandoffError, match="differs from its verifier evidence ref"):
+        handoff_module._verify_checkpoint_v2_receipt(
+            handoff_repo, checkpoint, parsed, _mission_report()
+        )
+
+
+def test_checkpoint_v2_rejects_live_mission_drift(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(handoff_repo, memory_records)
+
+    with pytest.raises(HandoffError, match="mission observation differs"):
+        _verify_v2_context(
+            handoff_repo,
+            context,
+            _mission_report(extra_failures=("unexpected-check",)),
+        )
+
+
+@pytest.mark.parametrize(
+    "junit",
+    [
+        (
+            b'<?xml version="1.0"?><!DOCTYPE testsuites [<!ENTITY x "x">]>'
+            b'<testsuites><testsuite tests="1" failures="0" errors="0" skipped="0">'
+            b'<testcase name="x">&x;</testcase></testsuite></testsuites>'
+        ),
+        (
+            '<?xml version="1.0" encoding="utf-16"?>'
+            '<!DOCTYPE testsuites [<!ENTITY x "tests.unit.test_control">]>'
+            '<testsuites tests="1" failures="0" errors="0" skipped="0">'
+            '<testsuite tests="1" failures="0" errors="0" skipped="0">'
+            '<testcase classname="&x;" name="test_control" />'
+            "</testsuite></testsuites>"
+        ).encode("utf-16"),
+        (
+            b'<testsuites><testsuite tests="2" failures="0" errors="0" skipped="0">'
+            b'<testcase name="x" /></testsuite></testsuites>'
+        ),
+        (
+            b'<testsuites><testsuite tests="1" failures="0" errors="0" skipped="0" '
+            b'time="nan"><testcase name="x" /></testsuite></testsuites>'
+        ),
+        (
+            b'<testsuites><testsuite tests="1" failures="0" errors="0" skipped="0">'
+            b'<testcase name="x"><failure /><failure /></testcase></testsuite></testsuites>'
+        ),
+    ],
+)
+def test_junit_recomputation_rejects_declarations_and_self_reported_totals(
+    junit: bytes,
+) -> None:
+    with pytest.raises(HandoffError):
+        handoff_module._recompute_junit(junit)
+
+
+def test_junit_recomputation_derives_failure_and_error_outcomes() -> None:
+    junit = (
+        b'<testsuites tests="3" failures="1" errors="1" skipped="0" time="0.3" '
+        b'disabled="0"><testsuite tests="3" failures="1" errors="1" skipped="0" '
+        b'time="0.3"><testcase classname="fixture" name="pass" time="0.1" assertions="1" />'
+        b'<testcase classname="fixture" name="fail" time="0.1"><failure /></testcase>'
+        b'<testcase classname="fixture" name="error" time="0.1"><error /></testcase>'
+        b"</testsuite></testsuites>"
+    )
+
+    assert handoff_module._recompute_junit(junit) == (1, 1, 1, 0)
+
+
+def test_junit_recomputation_binds_registered_control_execution() -> None:
+    nodes = _fixture_credibility_nodes()
+
+    assert handoff_module._recompute_junit(
+        _validation_junit_bytes(),
+        required_nodes=nodes,
+    ) == (11, 0, 0, 0)
+
+    with pytest.raises(HandoffError, match="was not executed successfully"):
+        handoff_module._recompute_junit(
+            _validation_junit_bytes(),
+            required_nodes=(*nodes, "tests/unit/test_missing.py::test_missing_control"),
+        )
+
+
+def test_junit_recomputation_rejects_skipped_registered_control_parameter() -> None:
+    node_id = "tests/unit/test_control.py::test_registered_control"
+    junit = (
+        b'<testsuites tests="2" failures="0" errors="0" skipped="1" time="0.2">'
+        b'<testsuite tests="2" failures="0" errors="0" skipped="1" time="0.2">'
+        b'<testcase classname="tests.unit.test_control" '
+        b'name="test_registered_control[positive]" time="0.1" />'
+        b'<testcase classname="tests.unit.test_control" '
+        b'name="test_registered_control[placebo]" time="0.1"><skipped /></testcase>'
+        b"</testsuite></testsuites>"
+    )
+
+    with pytest.raises(HandoffError, match="was not executed successfully"):
+        handoff_module._recompute_junit(junit, required_nodes=(node_id,))
+
+
+@pytest.mark.parametrize(
+    "junit",
+    [
+        b"not xml",
+        b"<testsuites />",
+        b'<testsuites><testsuite tests="0"><unknown /></testsuite></testsuites>',
+        (
+            b'<testsuites><testsuite tests="0" failures="0" errors="0" skipped="0">'
+            b"</testsuite></testsuites>"
+        ),
+        (
+            b'<testsuites><testsuite tests="1" failures="0" errors="0" skipped="0">'
+            b'<testcase name="x" time="not-a-number" /></testsuite></testsuites>'
+        ),
+        (
+            b'<testsuites><testsuite tests="-1" failures="0" errors="0" skipped="0">'
+            b'<testcase name="x" /></testsuite></testsuites>'
+        ),
+    ],
+)
+def test_junit_recomputation_rejects_malformed_structure_and_numerics(junit: bytes) -> None:
+    with pytest.raises(HandoffError):
+        handoff_module._recompute_junit(junit)
+
+
+@pytest.mark.parametrize(
+    "junit",
+    [
+        (
+            b'<testsuites><testsuite tests="1" failures="0" errors="0" skipped="0" '
+            b'time="0.1"><testsuite tests="1" failures="0" errors="0" skipped="0" '
+            b'time="0.1"><testcase classname="fixture" name="x" time="0.1" />'
+            b"</testsuite></testsuite></testsuites>"
+        ),
+        (
+            b'<testsuites><testsuite tests="2" failures="0" errors="0" skipped="0" '
+            b'time="0.2"><testcase classname="fixture" name="x" time="0.1" />'
+            b'<testcase classname="fixture" name="x" time="0.1" />'
+            b"</testsuite></testsuites>"
+        ),
+        (
+            b'<testsuites><testsuite tests="1" failures="0" errors="0" skipped="0" '
+            b'time="0.1"><testcase classname="" name="x" time="0.1" />'
+            b"</testsuite></testsuites>"
+        ),
+        (
+            b'<testsuites><testsuite tests="1" failures="0" errors="0" skipped="0" '
+            b'time="0.1"><testcase classname="fixture" name="x" />'
+            b"</testsuite></testsuites>"
+        ),
+    ],
+)
+def test_junit_recomputation_requires_flat_unique_timed_pytest_cases(junit: bytes) -> None:
+    with pytest.raises(HandoffError):
+        handoff_module._recompute_junit(junit)
+
+
+def test_coverage_recomputation_rejects_duplicate_and_self_reported_counts() -> None:
+    coverage = json.loads(_validation_coverage_bytes())
+    coverage["files"]["src/fieldtrue/fixture.py"]["executed_lines"].append(1)
+    with pytest.raises(HandoffError, match="contains duplicates"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = json.loads(_validation_coverage_bytes())
+    coverage["totals"]["covered_lines"] = 9
+    with pytest.raises(HandoffError, match="does not follow from raw observations"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+
+def test_coverage_recomputation_rejects_malformed_raw_evidence() -> None:
+    for malformed in (b"{", b"[]", b'{"meta":{},"meta":{}}'):
+        with pytest.raises(HandoffError):
+            handoff_module._recompute_coverage(malformed)
+
+    def document() -> dict[str, object]:
+        return json.loads(_validation_coverage_bytes())
+
+    coverage = document()
+    coverage["meta"]["branch_coverage"] = False
+    with pytest.raises(HandoffError, match="not branch-aware"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    coverage["files"] = {}
+    with pytest.raises(HandoffError, match="no file observations"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"].pop("src/fieldtrue/fixture.py")
+    coverage["files"][""] = file_observation
+    with pytest.raises(HandoffError, match="file observation is invalid"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"].pop("src/fieldtrue/fixture.py")
+    coverage["files"]["src/fieldtrue/../escape.py"] = file_observation
+    with pytest.raises(HandoffError, match="not a normalized repository path"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"]["src/fieldtrue/fixture.py"]
+    file_observation["executed_lines"] = "not-a-list"
+    with pytest.raises(HandoffError, match="executed_lines is invalid"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"]["src/fieldtrue/fixture.py"]
+    file_observation["missing_lines"].append(1)
+    with pytest.raises(HandoffError, match="line observations overlap"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"]["src/fieldtrue/fixture.py"]
+    file_observation["executed_branches"] = "not-a-list"
+    with pytest.raises(HandoffError, match="executed_branches is invalid"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"]["src/fieldtrue/fixture.py"]
+    file_observation["executed_branches"] = [[1]]
+    with pytest.raises(HandoffError, match="executed_branches is invalid"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"]["src/fieldtrue/fixture.py"]
+    file_observation["executed_branches"].append([1, 2])
+    with pytest.raises(HandoffError, match="executed_branches contains duplicates"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    file_observation = coverage["files"]["src/fieldtrue/fixture.py"]
+    file_observation["missing_branches"].append([1, 2])
+    with pytest.raises(HandoffError, match="branch observations overlap"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    coverage["totals"] = None
+    with pytest.raises(HandoffError, match="totals summary is invalid"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    coverage["totals"]["covered_lines"] = True
+    with pytest.raises(HandoffError, match="covered_lines is invalid"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    coverage["totals"]["percent_covered"] = "90"
+    with pytest.raises(HandoffError, match="percent_covered is invalid"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+    coverage = document()
+    coverage["totals"]["percent_covered"] = 91.0
+    with pytest.raises(HandoffError, match="percentage does not follow"):
+        handoff_module._recompute_coverage(canonical_json_pretty(coverage))
+
+
+def test_source_verdict_contract_preserves_legacy_and_freezes_current_limits(
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    legacy = next(
+        record
+        for record in memory_records
+        if record.event_id == handoff_module._SOURCE_VERDICT_EVENT_ID
+    )
+    assert isinstance(
+        handoff_module._parse_source_payload(legacy.payload),
+        handoff_module._LegacySourceVerdictPayload,
+    )
+    current = {
+        **legacy.payload,
+        "compute_consequence": handoff_module._CURRENT_SOURCE_COMPUTE_CONSEQUENCE,
+        "finding": handoff_module._CURRENT_SOURCE_FINDING,
+        "product_wedge": handoff_module._CURRENT_SOURCE_PRODUCT_WEDGE,
+        "reconnaissance_scope": handoff_module._CURRENT_SOURCE_RECONNAISSANCE_SCOPE,
+        "external_evidence_status": handoff_module._CURRENT_SOURCE_EXTERNAL_EVIDENCE_STATUS,
+        "admissibility_boundary": handoff_module._CURRENT_SOURCE_ADMISSIBILITY_BOUNDARY,
+        "source_architecture": list(handoff_module._CURRENT_SOURCE_ARCHITECTURE),
+    }
+    assert isinstance(
+        handoff_module._parse_source_payload(current),
+        handoff_module._CurrentSourceVerdictPayload,
+    )
+    for field, substitution in (
+        ("reconnaissance_scope", "systematic"),
+        ("external_evidence_status", "independently_verified"),
+        ("admissibility_boundary", "All existing evidence is admitted."),
+        ("compute_consequence", "GPU training is now authorized."),
+        ("product_wedge", "Live flight command product."),
+        ("source_architecture", ["one unsafe plane"]),
+    ):
+        with pytest.raises(HandoffError, match="payload violates its exact contract"):
+            handoff_module._parse_source_payload({**current, field: substitution})
+
+
 def test_versioned_recovery_text_is_exactly_frozen() -> None:
     assert handoff_module.RECOVERY_CHECKPOINT_ACTION == (
         "Hardened the deterministic Inbar recovery contract and verified its internal consistency."
@@ -261,8 +1613,8 @@ def test_versioned_recovery_text_is_exactly_frozen() -> None:
         "authority active."
     )
     assert handoff_module.RECOVERY_HANDOFF_NEXT_ACTION == (
-        "Complete and prospectively seal iter001-acquisition-contract before exercising any "
-        "denied authority."
+        "Complete and prospectively seal iter001-acquisition-contract before exercising any denied "
+        "authority."
     )
 
 
@@ -297,6 +1649,444 @@ def test_render_is_deterministic_clone_independent_and_self_reference_free(
     assert b"Git remotes" not in first
     assert b"github.com" not in first
     assert re.search(rb"\bHEAD\b", first) is None
+
+
+def test_authority_closure_is_independent_of_prior_import_order() -> None:
+    import_orders = (
+        "",
+        "import fieldtrue.cli\n",
+        "import fieldtrue.experiment\nimport fieldtrue.cli\n",
+        (
+            "import fieldtrue.control_producer\n"
+            "import fieldtrue.terminal_authority\n"
+            "import fieldtrue.cli\n"
+        ),
+        (
+            "import fieldtrue.cli\n"
+            "import fieldtrue.terminal_authority\n"
+            "import fieldtrue.control_producer\n"
+        ),
+        (
+            "import fieldtrue.adapters.local_replay\n"
+            "import fieldtrue.cli\n"
+            "import fieldtrue.control_launcher\n"
+            "import fieldtrue.control_producer\n"
+            "import fieldtrue.diagnosis\n"
+            "import fieldtrue.experiment\n"
+            "import fieldtrue.ports\n"
+        ),
+    )
+    expected = [
+        {
+            "name": item.name,
+            "path": item.repository_path,
+            "sha256": handoff_module.sha256_bytes(item.imported_bytes),
+        }
+        for item in handoff_module._BOUND_FIELDTRUE_MODULES
+    ]
+    for prior_imports in import_orders:
+        script = (
+            prior_imports
+            + "import json\n"
+            + "import fieldtrue.handoff as handoff\n"
+            + "from fieldtrue.canonical import sha256_bytes\n"
+            + "print(json.dumps({'closure': ["
+            + "{'name': item.name, 'path': item.repository_path, "
+            + "'sha256': sha256_bytes(item.imported_bytes)} "
+            + "for item in handoff._BOUND_FIELDTRUE_MODULES]}, "
+            + "sort_keys=True))\n"
+        )
+        result = subprocess.run(  # noqa: S603 - current interpreter and fixed test program
+            [sys.executable, "-c", script],
+            cwd=_project_root(),
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        observed = json.loads(result.stdout)
+        assert observed["closure"] == expected
+
+
+def test_authority_closure_matches_the_fixed_reviewed_contract() -> None:
+    assert tuple(item.name for item in handoff_module._BOUND_FIELDTRUE_MODULES) == (
+        "fieldtrue",
+        "fieldtrue.acquisition",
+        "fieldtrue.adapters",
+        "fieldtrue.adapters.adapt",
+        "fieldtrue.approvals",
+        "fieldtrue.canonical",
+        "fieldtrue.control_authority",
+        "fieldtrue.control_observation",
+        "fieldtrue.control_protocol",
+        "fieldtrue.domain",
+        "fieldtrue.git_trust",
+        "fieldtrue.handoff",
+        "fieldtrue.memory",
+        "fieldtrue.mission",
+        "fieldtrue.planning",
+        "fieldtrue.readiness",
+        "fieldtrue.receipts",
+        "fieldtrue.runner_trust",
+        "fieldtrue.runtime",
+        "fieldtrue.schemas",
+        "fieldtrue.shortcut_contracts",
+        "fieldtrue.shortcut_v2_crossfit",
+        "fieldtrue.shortcut_v2_hashing",
+        "fieldtrue.shortcut_v2_release",
+        "fieldtrue.shortcut_v2_tree",
+        "fieldtrue.splits",
+        "fieldtrue.terminal_authority",
+        "fieldtrue.verification",
+    )
+
+
+def test_preloaded_wrapper_allowlist_matches_the_fixed_reviewed_contract() -> None:
+    assert (
+        frozenset(
+            {
+                "fieldtrue.adapters.local_replay",
+                "fieldtrue.cli",
+                "fieldtrue.control_launcher",
+                "fieldtrue.control_producer",
+                "fieldtrue.diagnosis",
+                "fieldtrue.experiment",
+                "fieldtrue.ports",
+            }
+        )
+        == handoff_module._HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES
+    )
+
+
+def test_snapshot_worker_rejects_source_changed_after_authority_preload(
+    committed_worker_repo: Path,
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "fresh-source-worker"
+    clone_environment = handoff_module.git_environment()
+    clone_environment["GIT_ALLOW_PROTOCOL"] = "file"
+    subprocess.run(  # noqa: S603 - fixed trusted Git and local test paths
+        [
+            str(handoff_module.TRUSTED_GIT_PATH),
+            "clone",
+            "--quiet",
+            "--no-hardlinks",
+            "--",
+            str(committed_worker_repo),
+            str(repo),
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        env=clone_environment,
+        timeout=60,
+    )
+    _git(repo, "config", "user.name", "Inbar Handoff Test")
+    _git(repo, "config", "user.email", "handoff@example.invalid")
+    script = r"""
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve(strict=True)
+sys.path.insert(0, str(root / "src"))
+import fieldtrue.mission as stale_mission
+from fieldtrue.git_trust import TRUSTED_GIT_PATH, git_environment
+
+source_path = root / "src" / "fieldtrue" / "mission.py"
+source_path.write_bytes(
+    source_path.read_bytes()
+    + b'\n\ndef validate_mission(repo_root):\n'
+    + b'    from fieldtrue.handoff import HandoffError\n'
+    + b'    raise HandoffError("fresh-source-executed-sentinel")\n'
+)
+subprocess.run(
+    [str(TRUSTED_GIT_PATH), "add", "src/fieldtrue/mission.py"],
+    cwd=root,
+    check=True,
+    env=git_environment(),
+)
+subprocess.run(
+    [str(TRUSTED_GIT_PATH), "commit", "--quiet", "-m", "install fresh source sentinel"],
+    cwd=root,
+    check=True,
+    env=git_environment(),
+)
+import fieldtrue.handoff as handoff
+assert stale_mission.validate_mission.__code__.co_filename == str(source_path)
+try:
+    handoff.render_handoff(root)
+except handoff.HandoffError as error:
+    if str(error) != "fresh-source-executed-sentinel":
+        raise
+    print("FRESH_SOURCE_EXECUTED")
+else:
+    raise AssertionError("stale preloaded authority execution was accepted")
+""".strip()
+    result = subprocess.run(  # noqa: S603 - current interpreter and fixed adversarial program
+        [sys.executable, "-c", script, str(repo)],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    assert result.stdout == "FRESH_SOURCE_EXECUTED\n"
+    assert result.stderr == ""
+
+
+def test_snapshot_worker_isolated_from_parent_authority_monkeypatch(
+    committed_worker_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reject_parent_execution(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("parent authority function executed")
+
+    monkeypatch.setattr(handoff_module, "_render", reject_parent_execution)
+    monkeypatch.setattr(handoff_module, "validate_mission", reject_parent_execution)
+
+    first = render_handoff(committed_worker_repo)
+    second = render_handoff(committed_worker_repo)
+
+    assert first == second
+    assert first.startswith(b"# Inbar Mission Handoff\n")
+    assert b"Generated-input digest:" in first
+
+
+def test_snapshot_worker_envelope_round_trip_and_error() -> None:
+    document = b"# deterministic handoff\n"
+
+    assert (
+        handoff_module._decode_worker_output(handoff_module._worker_envelope(document)) == document
+    )
+    with pytest.raises(HandoffError, match="deliberate worker rejection"):
+        handoff_module._decode_worker_output(
+            handoff_module._worker_error_envelope(HandoffError("deliberate worker rejection"))
+        )
+
+
+@pytest.mark.parametrize(
+    ("output", "message"),
+    [
+        (b"", "invalid envelope"),
+        (b"{}", "invalid envelope"),
+        (b"not-json\n", "invalid envelope"),
+        (b'{"contract":"x","contract":"y"}\n', "invalid envelope"),
+        (b'{"contract":"wrong","status":"ok"}\n', "invalid envelope"),
+        (
+            (b'{"contract":"inbar.handoff-snapshot-worker.v1","error":"","status":"error"}\n'),
+            "invalid error",
+        ),
+        (
+            (
+                b'{"contract":"inbar.handoff-snapshot-worker.v1",'
+                b'"document_base64":3,"document_sha256":"x",'
+                b'"document_size":true,"status":"ok"}\n'
+            ),
+            "invalid document contract",
+        ),
+        (
+            (
+                b'{"contract":"inbar.handoff-snapshot-worker.v1",'
+                b'"document_base64":"!","document_sha256":"x",'
+                b'"document_size":1,"status":"ok"}\n'
+            ),
+            "invalid document bytes",
+        ),
+        (
+            (
+                b'{"contract":"inbar.handoff-snapshot-worker.v1",'
+                b'"document_base64":"YQ==","document_sha256":"'
+                + b"0" * 64
+                + b'","document_size":1,"status":"ok"}\n'
+            ),
+            "document integrity failed",
+        ),
+    ],
+)
+def test_snapshot_worker_envelope_rejects_malformed_output(
+    output: bytes,
+    message: str,
+) -> None:
+    with pytest.raises(HandoffError, match=message):
+        handoff_module._decode_worker_output(output)
+
+
+def test_launch_snapshot_worker_decodes_framed_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+
+    def completed(command: list[str], **kwargs: object) -> SimpleNamespace:
+        observed["command"] = command
+        observed["environment"] = kwargs["env"]
+        return SimpleNamespace(
+            returncode=0,
+            stderr=b"",
+            stdout=handoff_module._worker_envelope(b"worker document"),
+        )
+
+    monkeypatch.setattr(handoff_module.subprocess, "run", completed)
+
+    assert handoff_module._launch_snapshot_worker(tmp_path) == b"worker document"
+    command = observed["command"]
+    assert isinstance(command, list)
+    assert command[1:4] == ["-P", "-s", "-B"]
+    environment = observed["environment"]
+    assert isinstance(environment, dict)
+    assert environment["HOME"] == handoff_module.os.environ["HOME"]
+    assert environment["PATH"] == handoff_module.os.environ["PATH"]
+    assert environment["PYTHONHASHSEED"] == "0"
+    assert environment["PYTHONNOUSERSITE"] == "1"
+
+
+@pytest.mark.parametrize("failure", ["timeout", "os-error", "nonzero", "stderr"])
+def test_launch_snapshot_worker_fails_closed(
+    failure: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failed(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired("worker", 1)
+        if failure == "os-error":
+            raise OSError("worker unavailable")
+        return SimpleNamespace(
+            returncode=1 if failure == "nonzero" else 0,
+            stderr=b"unexpected" if failure == "stderr" else b"",
+            stdout=b"",
+        )
+
+    monkeypatch.setattr(handoff_module.subprocess, "run", failed)
+
+    with pytest.raises(HandoffError, match=r"timed out|could not start|worker failed"):
+        handoff_module._launch_snapshot_worker(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("final-git", "Git state changed"),
+        ("final-head", "Git state changed"),
+        ("final-manifest", "source manifest changed"),
+        ("final-memory", "research memory changed"),
+        ("worker-handoff", "deliberate worker error"),
+        ("worker-generic", "snapshot-bound handoff rendering failed"),
+        ("worker-none", "worker returned no result"),
+    ],
+)
+def test_snapshot_render_boundary_fails_closed_on_races_and_worker_failures(
+    failure: str,
+    message: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    manifest = handoff_module._RecoveryManifest((), (), 0, 0)
+    changed_manifest = handoff_module._RecoveryManifest((), (), 0, 1)
+    trust_calls = 0
+    head_calls = 0
+    manifest_calls = 0
+    memory_calls = 0
+
+    def trusted(*_args: object, **_kwargs: object) -> str:
+        nonlocal trust_calls
+        trust_calls += 1
+        return "/different/git" if failure == "final-git" and trust_calls == 2 else "/usr/bin/git"
+
+    def head(*_args: object, **_kwargs: object) -> str:
+        nonlocal head_calls
+        head_calls += 1
+        return "1" * 40 if failure == "final-head" and head_calls == 2 else "0" * 40
+
+    def recovery(*_args: object, **_kwargs: object) -> object:
+        nonlocal manifest_calls
+        manifest_calls += 1
+        if failure == "final-manifest" and manifest_calls == 2:
+            return changed_manifest
+        return manifest
+
+    def memory(*_args: object, **_kwargs: object) -> tuple[bytes, tuple[int, ...]]:
+        nonlocal memory_calls
+        memory_calls += 1
+        if failure == "final-memory" and memory_calls == 2:
+            return b"changed", (2,)
+        return b"memory", (1,)
+
+    def launch(_snapshot: Path) -> bytes | None:
+        if failure == "worker-handoff":
+            raise HandoffError("deliberate worker error")
+        if failure == "worker-generic":
+            raise RuntimeError("deliberate generic error")
+        return None if failure == "worker-none" else b"document"
+
+    monkeypatch.setattr(handoff_module, "trusted_repository_git", trusted)
+    monkeypatch.setattr(handoff_module, "_git_head", head)
+    monkeypatch.setattr(handoff_module, "_recovery_manifest", recovery)
+    monkeypatch.setattr(handoff_module, "_read_regular_file_snapshot", memory)
+    monkeypatch.setattr(handoff_module, "_v2_evidence_commit_from_memory", lambda _data: None)
+    monkeypatch.setattr(handoff_module, "_materialize_repository_snapshot", lambda *_a, **_k: None)
+    monkeypatch.setattr(handoff_module, "_launch_snapshot_worker", launch)
+
+    with pytest.raises(HandoffError, match=message):
+        handoff_module._render_snapshot_bound(root)
+
+
+def test_snapshot_render_boundary_returns_only_worker_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    manifest = handoff_module._RecoveryManifest((), (), 0, 0)
+    monkeypatch.setattr(
+        handoff_module,
+        "trusted_repository_git",
+        lambda *_args, **_kwargs: "/usr/bin/git",
+    )
+    monkeypatch.setattr(handoff_module, "_git_head", lambda *_args, **_kwargs: "0" * 40)
+    monkeypatch.setattr(handoff_module, "_recovery_manifest", lambda *_args: manifest)
+    monkeypatch.setattr(
+        handoff_module,
+        "_read_regular_file_snapshot",
+        lambda *_args: (b"memory", (1,)),
+    )
+    monkeypatch.setattr(handoff_module, "_v2_evidence_commit_from_memory", lambda _data: None)
+    monkeypatch.setattr(handoff_module, "_materialize_repository_snapshot", lambda *_a, **_k: None)
+    monkeypatch.setattr(handoff_module, "_launch_snapshot_worker", lambda _root: b"document")
+
+    assert handoff_module._render_snapshot_bound(root) == b"document"
+
+
+def test_render_rejects_unreviewed_preloaded_fieldtrue_module(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_verified_dependencies(monkeypatch, memory_records)
+    monkeypatch.setitem(
+        sys.modules,
+        "fieldtrue.ambient_non_authority_fixture",
+        ModuleType("fieldtrue.ambient_non_authority_fixture"),
+    )
+
+    with pytest.raises(HandoffError, match="unreviewed preloaded Fieldtrue modules"):
+        render_handoff(handoff_repo)
+
+
+def test_render_rejects_unbound_preloaded_wrapper_source(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_verified_dependencies(monkeypatch, memory_records)
+    monkeypatch.setitem(sys.modules, "fieldtrue.cli", ModuleType("fieldtrue.cli"))
+
+    with pytest.raises(HandoffError, match="preloaded Fieldtrue wrapper source cannot be bound"):
+        render_handoff(handoff_repo)
 
 
 def test_render_includes_current_memory_checkpoint_and_public_substrate_finding(
@@ -1272,6 +3062,11 @@ def test_render_rejects_invalid_or_empty_memory_snapshot(
     handoff_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        handoff_module,
+        "_render_snapshot_bound",
+        handoff_module._render_in_process,
+    )
     monkeypatch.setattr(handoff_module, "validate_mission", lambda _repo: _mission_report())
     if mode == "invalid":
         monkeypatch.setattr(
@@ -1463,6 +3258,11 @@ def test_render_wraps_unexpected_input_errors(
 ) -> None:
     monkeypatch.setattr(
         handoff_module,
+        "_render_snapshot_bound",
+        handoff_module._render_in_process,
+    )
+    monkeypatch.setattr(
+        handoff_module,
         "_render",
         lambda _repo: (_ for _ in ()).throw(OSError("fixture")),
     )
@@ -1484,7 +3284,9 @@ def test_render_rejects_nonfinite_json_source_value(
 
 
 def test_import_guard_rejects_unbound_fieldtrue_module_directly() -> None:
-    guard = handoff_module._RejectUnboundFieldtrueImports()
+    guard = handoff_module._RejectUnboundFieldtrueImports(
+        handoff_module._HANDOFF_AUTHORITY_MODULE_NAME_SET
+    )
 
     assert guard.find_spec("fieldtrue.handoff", None) is None
     with pytest.raises(HandoffError, match="unbound Fieldtrue module import"):
@@ -1494,7 +3296,7 @@ def test_import_guard_rejects_unbound_fieldtrue_module_directly() -> None:
 @pytest.mark.parametrize(
     ("mode", "message"),
     [
-        ("not-module", "has no module object"),
+        ("not-module", "configured Fieldtrue authority module is not loaded"),
         ("no-loader", "has no source-code loader"),
         ("outside-root", "outside the source root"),
         ("not-source", "is not Python source"),
@@ -1507,7 +3309,7 @@ def test_capture_bound_module_closure_rejects_malformed_population(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    name = "fieldtrue.000_adversarial_capture"
+    name = "fieldtrue.canonical"
     if mode == "not-module":
         monkeypatch.setitem(sys.modules, name, object())
     else:
@@ -1544,15 +3346,15 @@ def test_capture_bound_module_closure_requires_authority_members(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(sys, "modules", {})
-    with pytest.raises(RuntimeError, match="authority module closure could not be captured"):
+    with pytest.raises(RuntimeError, match="configured Fieldtrue authority module is not loaded"):
         handoff_module._capture_bound_fieldtrue_modules()
 
 
-def test_capture_bound_module_closure_requires_lazy_authority_modules(
+def test_capture_bound_module_closure_requires_verification_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(sys, "modules", {handoff_module.__name__: handoff_module})
-    with pytest.raises(RuntimeError, match="lazy mission authority modules were not captured"):
+    monkeypatch.delitem(sys.modules, "fieldtrue.verification")
+    with pytest.raises(RuntimeError, match="configured Fieldtrue authority module is not loaded"):
         handoff_module._capture_bound_fieldtrue_modules()
 
 
@@ -2014,11 +3816,34 @@ def test_module_population_rejects_bound_identity_substitution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     binding = handoff_module._BOUND_FIELDTRUE_MODULES[0]
-    initial_names = handoff_module._loaded_fieldtrue_module_names()
+    initial_modules = handoff_module._loaded_fieldtrue_modules()
     monkeypatch.setitem(sys.modules, binding.name, ModuleType(binding.name))
 
-    with pytest.raises(HandoffError, match="bound Fieldtrue module identity changed"):
-        handoff_module._verify_module_population(initial_names)
+    with pytest.raises(HandoffError, match="preloaded Fieldtrue module identity changed"):
+        handoff_module._verify_module_population(initial_modules)
+
+
+def test_module_population_rejects_ambient_identity_substitution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    name = "fieldtrue.preloaded_ambient_fixture"
+    monkeypatch.setitem(sys.modules, name, ModuleType(name))
+    initial_modules = handoff_module._loaded_fieldtrue_modules()
+    monkeypatch.setitem(sys.modules, name, ModuleType(name))
+
+    with pytest.raises(HandoffError, match="preloaded Fieldtrue module identity changed"):
+        handoff_module._verify_module_population(initial_modules)
+
+
+@pytest.mark.parametrize("invalid", [None, object()])
+def test_loaded_module_population_rejects_nonmodule_entries(
+    invalid: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(sys.modules, "fieldtrue.invalid_population_fixture", invalid)
+
+    with pytest.raises(HandoffError, match="invalid loaded Fieldtrue module entries"):
+        handoff_module._loaded_fieldtrue_modules()
 
 
 def test_json_and_required_string_accept_finite_scalar_and_reject_empty_value() -> None:
@@ -2115,7 +3940,10 @@ def test_render_rejects_final_renderer_compilation_substitution(
     _install_verified_dependencies(monkeypatch, memory_records)
     original_compile = compile
     calls = 0
-    bound_compilations = len(handoff_module._BOUND_FIELDTRUE_MODULES)
+    loaded_modules = handoff_module._loaded_fieldtrue_modules()
+    verified_module_compilations = len(handoff_module._BOUND_FIELDTRUE_MODULES) + len(
+        loaded_modules.keys() & handoff_module._HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES
+    )
 
     def substituted_compile(
         source: object,
@@ -2126,7 +3954,7 @@ def test_render_rejects_final_renderer_compilation_substitution(
     ) -> object:
         nonlocal calls
         calls += 1
-        if calls <= bound_compilations:
+        if calls <= verified_module_compilations:
             return original_compile(source, filename, compile_mode, *args, **kwargs)
         if mode == "compile-error":
             raise SyntaxError("fixture")
@@ -2139,6 +3967,32 @@ def test_render_rejects_final_renderer_compilation_substitution(
         match=r"renderer source cannot be compiled|renderer code differs",
     ):
         render_handoff(handoff_repo)
+
+
+def test_render_rejects_bound_source_map_change_at_terminal_boundary(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkpoint, handoff = _versioned_recovery_records(memory_records)
+    _install_verified_dependencies(monkeypatch, (*memory_records, checkpoint, handoff))
+    original = handoff_module._verify_bound_module_sources
+    calls = 0
+
+    def changed_final_map(repo_root: Path) -> dict[str, str]:
+        nonlocal calls
+        calls += 1
+        hashes = original(repo_root)
+        if calls == 2:
+            first = next(iter(hashes))
+            hashes[first] = "0" * 64
+        return hashes
+
+    monkeypatch.setattr(handoff_module, "_verify_bound_module_sources", changed_final_map)
+
+    with pytest.raises(HandoffError, match="module sources changed during handoff"):
+        render_handoff(handoff_repo)
+    assert calls == 2
 
 
 def test_versioned_render_rejects_mission_check_id_drift(
