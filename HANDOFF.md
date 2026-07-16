@@ -15,17 +15,20 @@ research memory. Do not hand-edit this file.
 
 - Iteration: `iter001_physical_causal_evidence_acquisition`
 - Lifecycle stage: `corpus_qualification`
-- Source-role verdict: `KILL_PUBLIC_SUBSTRATE`
-- Source verdict event: `iter001-public-substrate-verdict-v1`
-- Source verdict event hash: `e04bad2b2e053617127eb0a9c95953b22513d507a67ae059e152ff344bd9decd`
-- Source verdict summary: No screened public source supplied the complete same-incident physical causal contract.
+- Source-role verdict: `BLOCK_CURRENT_PUBLIC_SOURCE_ONLY_ROUTE`
+- Source verdict event: `iter001-current-public-source-route-verdict-v2`
+- Source verdict event hash: `a2dd0cdee7861f141e4e71badc6a86dc5cfda994f931458ecb77a8fd061a210a`
+- Source verdict summary: The current protocol blocks the present public-source-only route and requires prospective review before any physical evidence is admitted.
 - Source architecture: physical admission, causal laboratory, independent reality and controls
 - Compute consequence: GPU training remains blocked.
-- Product boundary: Offline and shadow-mode evidence dossier compiler with human-reviewed safe-test ranking; no command authority.
+- Product boundary: Proposed Phase A offline and shadow-mode pre-action evidence dossier compiler with ranked human-reviewable safe-test recommendations; no command or outcome-truth authority.
+- Reconnaissance scope: `dated_enumerated_non_systematic`
+- External evidence status: `not_independently_reconstructible`
+- Admissibility boundary: Existing real-world evidence remains admissible only after prospective review against every frozen field and independent-audit requirement.
 - Canonical control authority: `bootstrap`
 - Publication transition: `blocked`
-- Active handoff: `inbar-control-producer-handoff-v3` at sequence 136
-- Active handoff event hash: `f25e4215283cf71a4d316a375a7eb0c184b4fb87c2999936ce63a96279b55580`
+- Active handoff: `inbar-core-validation-handoff-v3` at sequence 152
+- Active handoff event hash: `61d4520e10baf3b8317600b43df7bb257195a825f20f6778a6d2640ec1e1c6d6`
 - Handoff status: `blocked`
 - State: Inbar remains in bootstrap with iter001-acquisition-contract blocked and no mission authority active.
 
@@ -33,37 +36,40 @@ research memory. Do not hand-edit this file.
 
 ## Linked checkpoint
 
-- Checkpoint event: `inbar-control-producer-checkpoint-v3`
-- Checkpoint event hash: `d65b15d180cdd1a94886cf23e354edfd56c6d4fdfb4ca43cf1a63400ad6d9127`
-- Implementation commit: `b241ad94424080aa91ccbb88c921d589fde69a1f`
+- Checkpoint event: `inbar-core-validation-checkpoint-v2`
+- Checkpoint event hash: `ecc2f8f9b738520827bc14b311842d414e1c3d6c0839d363a9e8888318fca5ea`
+- Implementation commit: `b360fe435d53b9c38c37ab1ffb0b307b3b4a16ec`
 - Action: Hardened the deterministic Inbar recovery contract and verified its internal consistency.
 - Outcome: Recovery inputs and the blocked mission state are reproducibly bound to committed evidence.
 - Authority effect: No authority was granted; iter001-acquisition-contract remains blocked.
 
-## Historical checkpoint validation
+## Same-operator engineering validation
 
-These are ledger-recorded validation assertions for implementation commit `b241ad94424080aa91ccbb88c921d589fde69a1f`. They are not live test results.
+These observations were recomputed from the exact committed receipt bundle. They are not an independent attestation or a scientific result.
+Bundle integrity does not prove command execution.
 
-- Tests: 1034 passed, 1 skipped
-- Branch-aware coverage: 90.25 percent
-- Ruff: `pass`
-- Strict mypy source files: 35
-- Reproducible package build: `pass`
-- Runtime dependency audit: no known vulnerabilities
-- Python 3.11 shortcut tests: 134
-- Python 3.14 shortcut tests: 134
+- Receipt: `inbar-core-validation-20260716-v2`
+- Evidence commit: `e4f99c2e0bf70e5329ee668fbf6a1281279ce7c7`
+- Assurance scope: `same-operator-engineering-observation-no-independent-attestation`
+- Independent attestation: `false`
+- Tests: 1159 passed, 0 failed, 0 errors, 0 skipped
+- Recomputed statement-plus-branch coverage: 90.47 percent
+- Mission check inventory: 22
+- Resource measurement: `not_metered`
+- Scientific result: `not_evaluated`
+- Authority effect: `none`
 
 ## Current verified recovery state
 
-- Generated schemas: 110
+- Generated schemas: 111
 - Mission checks: 21 passed, 1 registered blocker
-- Research-memory events: 137
-- Research-memory head: `f25e4215283cf71a4d316a375a7eb0c184b4fb87c2999936ce63a96279b55580`
-- Renderer contract: `inbar.generated-handoff.v3`
-- Renderer source SHA-256: `e9355c9aead692e8b0169589d7bddbc9c9ae33bb9d70be55c27ea2606dfa4ca3`
-- Generated-input digest: `587b4f1802e5aa07dcba1a8e608b5f203d80f1813397b6471ae8f21001770155`
+- Research-memory events: 153
+- Research-memory head: `61d4520e10baf3b8317600b43df7bb257195a825f20f6778a6d2640ec1e1c6d6`
+- Renderer contract: `inbar.generated-handoff.v5`
+- Renderer source SHA-256: `c01af1108a578351ddf8022654427fff99c565449d34c49955418c23b61ef87d`
+- Generated-input digest: `9b3a17b20b165b3859c5ec072289fe9b59afca45f55e614d59097ce07fc13eba`
 
-## Remaining activation gates
+## Remaining Iteration 001 acquisition-authority gates
 
 1. signed mechanism ontology and biconditional prediction-key mappings
 2. closed mechanism-target and target-subset schemas before affected truth access
