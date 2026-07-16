@@ -647,6 +647,21 @@ def test_frame_must_be_declared_incomplete() -> None:
         )
 
 
+def test_naive_report_time_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        CensusReport(
+            iteration_id="iter001_physical_causal_evidence_acquisition",
+            amendment_document_artifact_sha256=AMENDMENT_DOCUMENT_SHA256,
+            machine_proposal_artifact_sha256=MACHINE_PROPOSAL_SHA256,
+            owner_approval_receipt_hash=OWNER_APPROVAL_RECEIPT_HASH,
+            frame_scope="scope",
+            frame_declared_incomplete=True,
+            screenings=(),
+            verdict=CensusVerdict.NULL_WITHIN_FRAME,
+            produced_at=datetime(2026, 7, 16, 12, 0, 0),  # noqa: DTZ001
+        )
+
+
 def test_a_source_may_be_screened_at_most_once() -> None:
     screening = CandidateScreening(
         source_id="src",
