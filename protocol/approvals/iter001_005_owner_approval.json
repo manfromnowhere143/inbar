@@ -1,0 +1,18 @@
+{
+  "amendment_document_artifact_sha256": "0ff5916abc82a7b51c7f67adb25c5e18abbe1a3d95dfcb46f4e35783d126cf2b",
+  "approval_id": "iter001-method-campaign-owner-approval-005",
+  "decision": "approve_method_campaign_implementation_only",
+  "issued_at": "2026-07-17T14:11:16.001344Z",
+  "machine_proposal_artifact_sha256": "c0fe0c6447de04ed7e30f81fc6db12d96fc5cf7883729aeabb53d1577ed5a87d",
+  "nonce": "77ee58f500a7f65fd19c01470a1644bde796375245b62d7e53e9bb56e1a7277d",
+  "owner_actor_id": "daniel-wahnich",
+  "owner_ed25519_public_key": "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962",
+  "owner_key_trust_basis": "git-pinned-iter001-governance-ed25519-no-external-timestamp",
+  "owner_signer_anchor_artifact_sha256": "c5cf91b620ae3f34cc9ecebf936c4f48014f04cfa21e3fdc1cf0713f440b1804",
+  "owner_signing_key_id": "iter001-governance",
+  "previous_approval_receipt_sha256": "59a620b145bc8803e73bc34dcbd594dcfac7526a6ca313e3708ef2e3401db852",
+  "proposal_git_commit": "db509e67d4edac8b71f332c9fecb5a995d626585",
+  "receipt_hash": "e660be502da65893c03b0638376ea7a5d27b902f462eb89ad108633bb872fad4",
+  "schema_version": "inbar.owner-amendment-approval-receipt.v5",
+  "signature": "f21d20ca41a40b9259bb2fcd71d0f00959c29da00957fd0fd9b43796e95aef0c11d7a91172ab7a664dca1a31b1838d10f82337625801567125bad00c5a337701"
+}
