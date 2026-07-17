@@ -308,7 +308,7 @@ def produce_handoff_cycle(
             "resource_observation": resource_event_id,
             "source_verdict": source_verdict_event_id,
         },
-        source_commit=evidence_commit,
+        source_commit=implementation_commit,
     )
 
     _append_event(
@@ -338,7 +338,7 @@ def produce_handoff_cycle(
             "engine_boundary": _ENGINE_BOUNDARY_EVENT,
             "source_verdict": source_verdict_event_id,
         },
-        source_commit=evidence_commit,
+        source_commit=implementation_commit,
     )
 
     _run_inbar(root, "memory", "verify")

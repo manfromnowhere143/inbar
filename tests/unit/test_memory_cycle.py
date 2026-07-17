@@ -277,6 +277,11 @@ def test_cycle_appends_a_verifiable_hash_chain(
     assert resource["event_type"] == "resource"
     assert checkpoint["payload"]["implementation_commit"] == result["implementation_commit"]
     assert checkpoint["payload"]["validation_receipt"]["receipt_id"] == RECEIPT_ID
+    # The renderer requires the checkpoint and handoff events to bind the implementation
+    # commit while the resource event binds the evidence commit.
+    assert checkpoint["source_commit"] == result["implementation_commit"]
+    assert handoff["source_commit"] == result["implementation_commit"]
+    assert resource["source_commit"] == result["evidence_commit"]
     # The recovery pair is a frozen contract: the payload text must be the renderer's own.
     assert checkpoint["payload"]["action"] == RECOVERY_CHECKPOINT_ACTION
     assert handoff["links"]["engine_boundary"] == "future-research-engine-shortcut-v2-lessons-v1"
