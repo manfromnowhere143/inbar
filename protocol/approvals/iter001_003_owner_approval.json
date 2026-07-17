@@ -1,0 +1,18 @@
+{
+  "amendment_document_artifact_sha256": "df7a4eaba26b8099b0cf950d01cf1b853c65d44b5c9ff990e71593fdd5c41d72",
+  "approval_id": "iter001-census-execution-owner-approval-003",
+  "decision": "approve_census_execution_implementation_only",
+  "issued_at": "2026-07-17T02:55:54.255755Z",
+  "machine_proposal_artifact_sha256": "ad487087ed8905773839cbc9259fd26c5f92a4eda676cb4d5ec96593caa8e120",
+  "nonce": "0fb3c7f2cb13ac792b56237d3f7c2bfb770d3361b193f2484d8fad8d40b02293",
+  "owner_actor_id": "daniel-wahnich",
+  "owner_ed25519_public_key": "b0f514d7b91caa7c43ea58ffae42ebeea48164d24948723a8c805f780df38962",
+  "owner_key_trust_basis": "git-pinned-iter001-governance-ed25519-no-external-timestamp",
+  "owner_signer_anchor_artifact_sha256": "c5cf91b620ae3f34cc9ecebf936c4f48014f04cfa21e3fdc1cf0713f440b1804",
+  "owner_signing_key_id": "iter001-governance",
+  "previous_approval_receipt_sha256": "6be770e5b619c8a8a56c4718e3ceb10d52a23c93f92090fcd9a050eee9bf808d",
+  "proposal_git_commit": "7cbd3ad6aff0607552aa0cef270251b56126358f",
+  "receipt_hash": "2c0001fbb952ae1bff5d8b0fe0f7a04eeff7d2fd556a83006c42ae17428f7ec5",
+  "schema_version": "inbar.owner-amendment-approval-receipt.v3",
+  "signature": "deeb69fbf9e364f87171d10e32b2af45bdd7306089cfadcdc356029759d94c55f805922e1dae3e931e02a5eff7cdce61de81d8a4088488f222732cab99fd0005"
+}
