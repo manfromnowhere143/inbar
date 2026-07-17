@@ -19,3 +19,6 @@ data/derived/
 # Generated run material is promoted deliberately after review.
 runs/
 
+
+# Retrieved third-party census bytes are content-addressed locally, never committed.
+.local/census/

@@ -1,0 +1,69 @@
+{
+  "amendment_id": "iter001_003",
+  "entries": [
+    {
+      "domain_id": "ntsb_public_investigation_dockets_all_modes",
+      "entry_points": [
+        "https://data.ntsb.gov/carol-main-public/basic-search"
+      ],
+      "enumeration_method": "CAROL public docket search by mode and date"
+    },
+    {
+      "domain_id": "us_chemical_safety_board_completed_investigations",
+      "entry_points": [
+        "https://www.csb.gov/investigations/completed-investigations/"
+      ],
+      "enumeration_method": "CSB completed investigations index"
+    },
+    {
+      "domain_id": "nrc_licensee_event_reports_and_information_notices",
+      "entry_points": [
+        "https://lersearch.inl.gov/LERSearchCriteria.aspx"
+      ],
+      "enumeration_method": "NRC LER search and information notices"
+    },
+    {
+      "domain_id": "nasa_lessons_learned_and_unrestricted_anomaly_reporting_surfaces",
+      "entry_points": [
+        "https://llis.nasa.gov/"
+      ],
+      "enumeration_method": "NASA public lessons-learned entry"
+    },
+    {
+      "domain_id": "gidep_alert_and_safe_alert_publications",
+      "entry_points": [
+        "https://www.gidep.org/"
+      ],
+      "enumeration_method": "GIDEP public ALERT and SAFE-ALERT surface"
+    },
+    {
+      "domain_id": "faa_service_difficulty_reports_and_airworthiness_directive_cited_material",
+      "entry_points": [
+        "https://sdrs.faa.gov/"
+      ],
+      "enumeration_method": "FAA SDRS query"
+    },
+    {
+      "domain_id": "easa_and_esa_unrestricted_published_anomaly_and_safety_investigations",
+      "entry_points": [
+        "https://www.easa.europa.eu/en/domains/safety-management/safety-reporting"
+      ],
+      "enumeration_method": "EASA/ESA published safety records"
+    },
+    {
+      "domain_id": "osha_robotic_and_automated_machinery_accident_investigations",
+      "entry_points": [
+        "https://www.osha.gov/ords/imis/accidentsearch.html"
+      ],
+      "enumeration_method": "OSHA accident investigation search"
+    },
+    {
+      "domain_id": "doi_issuing_repositories_by_stated_query",
+      "entry_points": [
+        "https://zenodo.org/search"
+      ],
+      "enumeration_method": "Zenodo/Dryad/IEEE DataPort by fault-investigation query"
+    }
+  ],
+  "schema_version": "inbar.iter001.census-frame-registry.v1"
+}

@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "Bound into every executed census report: which lease and frame produced it.",
+  "properties": {
+    "frame_registry_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Frame Registry Artifact Sha256",
+      "type": "string"
+    },
+    "lease_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Lease Hash",
+      "type": "string"
+    },
+    "retrieval_count": {
+      "minimum": 0,
+      "title": "Retrieval Count",
+      "type": "integer"
+    },
+    "retrieved_bytes": {
+      "minimum": 0,
+      "title": "Retrieved Bytes",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.census-execution-binding.v1",
+      "default": "inbar.iter001.census-execution-binding.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "lease_hash",
+    "frame_registry_artifact_sha256",
+    "retrieval_count",
+    "retrieved_bytes"
+  ],
+  "title": "CensusExecutionBinding",
+  "type": "object"
+}

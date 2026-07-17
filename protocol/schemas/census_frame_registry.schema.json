@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "FrameRegistryEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "domain_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Domain Id",
+          "type": "string"
+        },
+        "entry_points": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Entry Points",
+          "type": "array"
+        },
+        "enumeration_method": {
+          "minLength": 1,
+          "title": "Enumeration Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain_id",
+        "enumeration_method",
+        "entry_points"
+      ],
+      "title": "FrameRegistryEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "amendment_id": {
+      "const": "iter001_003",
+      "default": "iter001_003",
+      "title": "Amendment Id",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/FrameRegistryEntry"
+      },
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.census-frame-registry.v1",
+      "default": "inbar.iter001.census-frame-registry.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "entries"
+  ],
+  "title": "FrameRegistry",
+  "type": "object"
+}

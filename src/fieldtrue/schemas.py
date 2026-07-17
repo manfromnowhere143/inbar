@@ -74,6 +74,12 @@ from fieldtrue.census import (
 from fieldtrue.census import (
     GateResult as CensusGateResult,
 )
+from fieldtrue.census_execution import (
+    CensusExecutionBinding,
+    CensusExecutionLease,
+    FrameRegistry,
+    RetrievalRecord,
+)
 from fieldtrue.control_authority import (
     ControlExecutionEvidence,
     ControlExecutionManifest,
@@ -225,7 +231,11 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "census_chronology_assessment.schema.json": ChronologyAssessment,
     "census_gate_result.schema.json": CensusGateResult,
     "census_owner_approval_receipt.schema.json": OwnerCensusApprovalReceipt,
+    "census_execution_binding.schema.json": CensusExecutionBinding,
+    "census_execution_lease.schema.json": CensusExecutionLease,
+    "census_frame_registry.schema.json": FrameRegistry,
     "census_report.schema.json": CensusReport,
+    "census_retrieval_record.schema.json": RetrievalRecord,
     "census_resource_usage.schema.json": CensusResourceUsage,
     "census_role_inheritance.schema.json": RoleInheritanceAssessment,
     "census_source_fact_locator.schema.json": SourceFactLocator,

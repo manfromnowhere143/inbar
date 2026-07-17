@@ -1,0 +1,65 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "final_uri": {
+      "minLength": 1,
+      "title": "Final Uri",
+      "type": "string"
+    },
+    "redirect_hops": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Redirect Hops",
+      "type": "array"
+    },
+    "request_uri": {
+      "minLength": 1,
+      "title": "Request Uri",
+      "type": "string"
+    },
+    "response_bytes": {
+      "minimum": 0,
+      "title": "Response Bytes",
+      "type": "integer"
+    },
+    "response_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Response Sha256",
+      "type": "string"
+    },
+    "retrieved_at": {
+      "format": "date-time",
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.census-retrieval-record.v1",
+      "default": "inbar.iter001.census-retrieval-record.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "session_id",
+    "candidate_id",
+    "request_uri",
+    "final_uri",
+    "redirect_hops",
+    "retrieved_at",
+    "response_bytes",
+    "response_sha256"
+  ],
+  "title": "RetrievalRecord",
+  "type": "object"
+}
