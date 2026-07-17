@@ -1,0 +1,117 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "amendment_document_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Amendment Document Artifact Sha256",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "lease_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Lease Hash",
+      "type": "string"
+    },
+    "lease_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Lease Id",
+      "type": "string"
+    },
+    "machine_proposal_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Machine Proposal Artifact Sha256",
+      "type": "string"
+    },
+    "max_cpu_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Cpu Seconds",
+      "type": "number"
+    },
+    "max_gpu_seconds": {
+      "const": 0,
+      "default": 0,
+      "title": "Max Gpu Seconds",
+      "type": "integer"
+    },
+    "max_peak_memory_bytes": {
+      "exclusiveMinimum": 0,
+      "title": "Max Peak Memory Bytes",
+      "type": "integer"
+    },
+    "max_wall_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Wall Seconds",
+      "type": "number"
+    },
+    "nonce": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Nonce",
+      "type": "string"
+    },
+    "not_before": {
+      "format": "date-time",
+      "title": "Not Before",
+      "type": "string"
+    },
+    "ontology_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Hash",
+      "type": "string"
+    },
+    "owner_approval_receipt_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Owner Approval Receipt Hash",
+      "type": "string"
+    },
+    "owner_ed25519_public_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Owner Ed25519 Public Key",
+      "type": "string"
+    },
+    "proposal_git_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Proposal Git Commit",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.lab-compute-lease.v1",
+      "default": "inbar.iter001.lab-compute-lease.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "signature": {
+      "pattern": "^[0-9a-f]{128}$",
+      "title": "Signature",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lease_id",
+    "session_id",
+    "amendment_document_artifact_sha256",
+    "machine_proposal_artifact_sha256",
+    "owner_approval_receipt_hash",
+    "ontology_hash",
+    "max_cpu_seconds",
+    "max_wall_seconds",
+    "max_peak_memory_bytes",
+    "not_before",
+    "expires_at",
+    "nonce",
+    "owner_ed25519_public_key",
+    "proposal_git_commit",
+    "lease_hash",
+    "signature"
+  ],
+  "title": "CausalLabComputeLease",
+  "type": "object"
+}

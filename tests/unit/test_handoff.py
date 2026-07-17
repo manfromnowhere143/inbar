@@ -1720,6 +1720,7 @@ def test_authority_closure_matches_the_fixed_reviewed_contract() -> None:
         "fieldtrue.adapters.adapt",
         "fieldtrue.approvals",
         "fieldtrue.canonical",
+        "fieldtrue.causal_laboratory",
         "fieldtrue.census",
         "fieldtrue.census_execution",
         "fieldtrue.control_authority",

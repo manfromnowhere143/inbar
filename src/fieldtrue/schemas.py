@@ -62,6 +62,16 @@ from fieldtrue.adapters.adapt import (
 )
 from fieldtrue.approvals import ApprovalReceipt
 from fieldtrue.canonical import atomic_write, canonical_json_pretty
+from fieldtrue.causal_laboratory import (
+    Branch,
+    BranchSet,
+    CausalLabComputeLease,
+    EpisodeReport,
+    MechanismClass,
+    MechanismOntology,
+    SealedMechanism,
+    Snapshot,
+)
 from fieldtrue.census import (
     CandidateScreening,
     CensusReport,
@@ -231,6 +241,14 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "census_chronology_assessment.schema.json": ChronologyAssessment,
     "census_gate_result.schema.json": CensusGateResult,
     "census_owner_approval_receipt.schema.json": OwnerCensusApprovalReceipt,
+    "causal_lab_branch.schema.json": Branch,
+    "causal_lab_branch_set.schema.json": BranchSet,
+    "causal_lab_compute_lease.schema.json": CausalLabComputeLease,
+    "causal_lab_episode_report.schema.json": EpisodeReport,
+    "causal_lab_mechanism_class.schema.json": MechanismClass,
+    "causal_lab_mechanism_ontology.schema.json": MechanismOntology,
+    "causal_lab_sealed_mechanism.schema.json": SealedMechanism,
+    "causal_lab_snapshot.schema.json": Snapshot,
     "census_execution_binding.schema.json": CensusExecutionBinding,
     "census_execution_lease.schema.json": CensusExecutionLease,
     "census_frame_registry.schema.json": FrameRegistry,

@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "description": "The injected mechanism, content-addressed and sealed.\n\nThe public artifact is the salted commitment only. The injected key and salt are the\ntruth plaintext and remain custodian-only until adjudication. The commitment binds the\nontology hash, so a mechanism cannot be reinterpreted under a different ontology.",
+  "properties": {
+    "commitment": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Commitment",
+      "type": "string"
+    },
+    "ontology_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.lab-sealed-mechanism.v1",
+      "default": "inbar.iter001.lab-sealed-mechanism.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ontology_hash",
+    "commitment"
+  ],
+  "title": "SealedMechanism",
+  "type": "object"
+}

@@ -1,0 +1,271 @@
+{
+  "$defs": {
+    "Branch": {
+      "additionalProperties": false,
+      "properties": {
+        "action_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Action Sha256",
+          "type": "string"
+        },
+        "executed": {
+          "title": "Executed",
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/BranchKind"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.lab-branch.v1",
+          "default": "inbar.iter001.lab-branch.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "settled_state_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Settled State Sha256"
+        },
+        "snapshot_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Snapshot Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "snapshot_hash",
+        "action_sha256",
+        "executed"
+      ],
+      "title": "Branch",
+      "type": "object"
+    },
+    "BranchKind": {
+      "enum": [
+        "no_op",
+        "targeted_test",
+        "wrong_but_safe",
+        "recovery",
+        "blocked_unsafe"
+      ],
+      "title": "BranchKind",
+      "type": "string"
+    },
+    "BranchSet": {
+      "additionalProperties": false,
+      "properties": {
+        "branches": {
+          "items": {
+            "$ref": "#/$defs/Branch"
+          },
+          "title": "Branches",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.lab-branch-set.v1",
+          "default": "inbar.iter001.lab-branch-set.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/Snapshot"
+        }
+      },
+      "required": [
+        "snapshot",
+        "branches"
+      ],
+      "title": "BranchSet",
+      "type": "object"
+    },
+    "LabHypothesisSet": {
+      "additionalProperties": false,
+      "description": "The proposer's committed hypotheses, formed blind to the injected mechanism.\n\nAt least two known mechanism keys and exactly one reserved unknown, mirroring the physical\nopen-world ambiguity gate. The diagnosis names the single key the method selected.",
+      "properties": {
+        "committed_at": {
+          "format": "date-time",
+          "title": "Committed At",
+          "type": "string"
+        },
+        "includes_unknown": {
+          "const": true,
+          "default": true,
+          "title": "Includes Unknown",
+          "type": "boolean"
+        },
+        "known_keys": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "Known Keys",
+          "type": "array"
+        },
+        "ontology_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Ontology Hash",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.lab-hypothesis-set.v1",
+          "default": "inbar.iter001.lab-hypothesis-set.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_hash",
+        "known_keys",
+        "committed_at"
+      ],
+      "title": "LabHypothesisSet",
+      "type": "object"
+    },
+    "SealedMechanism": {
+      "additionalProperties": false,
+      "description": "The injected mechanism, content-addressed and sealed.\n\nThe public artifact is the salted commitment only. The injected key and salt are the\ntruth plaintext and remain custodian-only until adjudication. The commitment binds the\nontology hash, so a mechanism cannot be reinterpreted under a different ontology.",
+      "properties": {
+        "commitment": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Commitment",
+          "type": "string"
+        },
+        "ontology_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Ontology Hash",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.lab-sealed-mechanism.v1",
+          "default": "inbar.iter001.lab-sealed-mechanism.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_hash",
+        "commitment"
+      ],
+      "title": "SealedMechanism",
+      "type": "object"
+    },
+    "Snapshot": {
+      "additionalProperties": false,
+      "description": "A frozen initial simulator state. Every branch descends from exactly one.",
+      "properties": {
+        "config_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Config Sha256",
+          "type": "string"
+        },
+        "initial_state_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Initial State Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.lab-snapshot.v1",
+          "default": "inbar.iter001.lab-snapshot.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "seed": {
+          "minimum": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "simulator_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Simulator Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "simulator_id",
+        "config_sha256",
+        "initial_state_sha256",
+        "seed"
+      ],
+      "title": "Snapshot",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One causal-laboratory episode. Binds the sealed truth, the blind hypotheses, the\nbranch set, and the method's diagnosis, before any truth reveal.",
+  "properties": {
+    "amendment_document_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Amendment Document Artifact Sha256",
+      "type": "string"
+    },
+    "branch_set": {
+      "$ref": "#/$defs/BranchSet"
+    },
+    "diagnosis_key": {
+      "minLength": 1,
+      "title": "Diagnosis Key",
+      "type": "string"
+    },
+    "episode_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "hypothesis_set": {
+      "$ref": "#/$defs/LabHypothesisSet"
+    },
+    "machine_proposal_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Machine Proposal Artifact Sha256",
+      "type": "string"
+    },
+    "ontology_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Hash",
+      "type": "string"
+    },
+    "owner_approval_receipt_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Owner Approval Receipt Hash",
+      "type": "string"
+    },
+    "produced_at": {
+      "format": "date-time",
+      "title": "Produced At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.lab-episode-report.v1",
+      "default": "inbar.iter001.lab-episode-report.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sealed_mechanism": {
+      "$ref": "#/$defs/SealedMechanism"
+    }
+  },
+  "required": [
+    "episode_id",
+    "amendment_document_artifact_sha256",
+    "machine_proposal_artifact_sha256",
+    "owner_approval_receipt_hash",
+    "ontology_hash",
+    "sealed_mechanism",
+    "branch_set",
+    "hypothesis_set",
+    "diagnosis_key",
+    "produced_at"
+  ],
+  "title": "EpisodeReport",
+  "type": "object"
+}

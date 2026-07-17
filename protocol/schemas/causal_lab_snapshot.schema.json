@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "A frozen initial simulator state. Every branch descends from exactly one.",
+  "properties": {
+    "config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Config Sha256",
+      "type": "string"
+    },
+    "initial_state_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Initial State Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.lab-snapshot.v1",
+      "default": "inbar.iter001.lab-snapshot.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "minimum": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "simulator_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Simulator Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "simulator_id",
+    "config_sha256",
+    "initial_state_sha256",
+    "seed"
+  ],
+  "title": "Snapshot",
+  "type": "object"
+}

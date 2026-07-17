@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "BranchKind": {
+      "enum": [
+        "no_op",
+        "targeted_test",
+        "wrong_but_safe",
+        "recovery",
+        "blocked_unsafe"
+      ],
+      "title": "BranchKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "action_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Action Sha256",
+      "type": "string"
+    },
+    "executed": {
+      "title": "Executed",
+      "type": "boolean"
+    },
+    "kind": {
+      "$ref": "#/$defs/BranchKind"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.lab-branch.v1",
+      "default": "inbar.iter001.lab-branch.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "settled_state_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Settled State Sha256"
+    },
+    "snapshot_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "snapshot_hash",
+    "action_sha256",
+    "executed"
+  ],
+  "title": "Branch",
+  "type": "object"
+}

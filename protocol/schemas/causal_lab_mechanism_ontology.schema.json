@@ -1,0 +1,66 @@
+{
+  "$defs": {
+    "MechanismClass": {
+      "additionalProperties": false,
+      "description": "One known fault mechanism. Its key is derived from its canonical definition.\n\nIncident, site, filename, time, and truth tokens can never distinguish a class; only the\nphysical definition can, exactly as the shortcut ontology requires.",
+      "properties": {
+        "causal_locus": {
+          "minLength": 1,
+          "title": "Causal Locus",
+          "type": "string"
+        },
+        "definition": {
+          "minLength": 1,
+          "title": "Definition",
+          "type": "string"
+        },
+        "failure_mode": {
+          "minLength": 1,
+          "title": "Failure Mode",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.lab-mechanism-class.v1",
+          "default": "inbar.iter001.lab-mechanism-class.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "causal_locus",
+        "failure_mode",
+        "definition"
+      ],
+      "title": "MechanismClass",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "classes": {
+      "items": {
+        "$ref": "#/$defs/MechanismClass"
+      },
+      "minItems": 2,
+      "title": "Classes",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.lab-mechanism-ontology.v1",
+      "default": "inbar.iter001.lab-mechanism-ontology.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "classes"
+  ],
+  "title": "MechanismOntology",
+  "type": "object"
+}
