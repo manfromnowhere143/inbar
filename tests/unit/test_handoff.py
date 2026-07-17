@@ -1721,6 +1721,7 @@ def test_authority_closure_matches_the_fixed_reviewed_contract() -> None:
         "fieldtrue.approvals",
         "fieldtrue.canonical",
         "fieldtrue.census",
+        "fieldtrue.census_execution",
         "fieldtrue.control_authority",
         "fieldtrue.control_observation",
         "fieldtrue.control_protocol",

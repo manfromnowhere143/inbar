@@ -74,16 +74,23 @@ def _session(lease: CensusExecutionLease, transport=_ok_transport, now=None) -> 
     return CensusSession(REPO_ROOT, lease, transport=transport, now=now or (lambda: NOW))
 
 
-@pytest.fixture(autouse=True)
-def _clean_store() -> object:
-    yield
+def _purge_store() -> None:
     import shutil
 
     store = REPO_ROOT / ".local/census"
-    for child in store.glob("sess-*"):
-        shutil.rmtree(child, ignore_errors=True)
-    for child in store.glob("dup-*"):
-        shutil.rmtree(child, ignore_errors=True)
+    for pattern in ("sess-*", "dup-*"):
+        for child in store.glob(pattern):
+            shutil.rmtree(child, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def _clean_store() -> object:
+    # Purge at BOTH setup and teardown: an interrupted run leaves a session directory on disk
+    # whose one-lease-one-session guard would otherwise poison the next run with a spurious
+    # "session store already exists". Setup-purge makes the suite robust to that residue.
+    _purge_store()
+    yield
+    _purge_store()
 
 
 # --- Lease controls ----------------------------------------------------------------
