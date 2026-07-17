@@ -1,0 +1,75 @@
+{
+  "amendment_document": {
+    "artifact_sha256": "df7a4eaba26b8099b0cf950d01cf1b853c65d44b5c9ff990e71593fdd5c41d72",
+    "path": "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_003.md"
+  },
+  "amendment_id": "iter001_003",
+  "approval": {
+    "approval_basis": "owner_delegation_not_owner_review",
+    "decision": "approve_census_execution_implementation_only",
+    "previous_receipt_genesis_forbidden": true,
+    "previous_receipt_sha256": "6be770e5b619c8a8a56c4718e3ceb10d52a23c93f92090fcd9a050eee9bf808d",
+    "receipt_path": "protocol/approvals/iter001_003_owner_approval.json",
+    "receipt_schema": "inbar.owner-amendment-approval-receipt.v3",
+    "v3_widens_decision_literal_only": true
+  },
+  "authority_effect": {
+    "canonical_control_authority": "bootstrap",
+    "census_run_requires_per_session_lease": true,
+    "lease_issuance_is_owner_ceremony": true,
+    "proposal_alone_implementation_authorized": false,
+    "proposal_alone_lease_issuance_authorized": false,
+    "proposal_alone_retrieval_authorized": false,
+    "registered_blocker_remains": "iter001-acquisition-contract"
+  },
+  "execution_lease": {
+    "binds": [
+      "amendment_document_artifact_sha256",
+      "machine_proposal_artifact_sha256",
+      "owner_approval_receipt_hash",
+      "frame_registry_artifact_sha256",
+      "session_id",
+      "nonce",
+      "resource_ceiling_base_units",
+      "not_before",
+      "expires_at"
+    ],
+    "one_lease_one_session": true,
+    "signed_by": "iter001-governance",
+    "verified_against": "git-pinned owner anchor and approval chain"
+  },
+  "frame_registry": {
+    "concretizes_frozen_domains_only": true,
+    "extension_requires_prospective_amendment": true,
+    "lease_binds_exact_registry_hash": true
+  },
+  "implementation_gate": {
+    "controls_execute_without_live_network": true,
+    "owner_approval_required_before_code": true,
+    "permitted_implementation": [
+      "typed_lease_contract_issuance_and_verification",
+      "retrieval_executor_transport_redirect_storage_ceiling_stoprule_measurement",
+      "content_addressed_session_store_and_manifest",
+      "frame_registry_artifact_and_schema",
+      "explicit_lease_and_registry_hashes_in_census_report",
+      "adversarial_control_suite"
+    ],
+    "production_artifacts_authorized": false
+  },
+  "iteration_id": "iter001_physical_causal_evidence_acquisition",
+  "normative_relation": {
+    "amendment_002_prevails_on_conflict": true,
+    "conflict_disposition": "INVALID",
+    "document_and_machine_proposal_jointly_required": true
+  },
+  "retrieval_discipline": {
+    "https_get_only_with_certifi_verification": true,
+    "per_session_bytes_capped_by_frozen_ceiling": true,
+    "redirects_bounded_and_recorded": true,
+    "retrieval_record_before_interpretation": true,
+    "stop_rule_enforced_at_transport_boundary": true,
+    "third_party_bytes_never_committed": true
+  },
+  "schema_version": "inbar.iter001-census-execution-proposal.v1",
+  "status": "immutable_proposal"
+}
