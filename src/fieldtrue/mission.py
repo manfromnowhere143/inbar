@@ -241,10 +241,10 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     ),
     "src/fieldtrue/domain.py": ("7648d416e3843dac5d1cf9c3c3be81b8d7cba235ec33c135d2697383a3d8474a"),
     "src/fieldtrue/handoff.py": (
-        "eb6179a7de4473478376e2748a2f41b8faf7a3e0e5974b703d888d46d0b98117"
+        "94bb59cd2d264d0a9a696aa2d5de6edfc906c2060474ecdf4885fd472fd38abf"
     ),
     "src/fieldtrue/schemas.py": (
-        "64d026aa4c9f4244485f56b3cbf20d89b6ffdf460b827d65c4d5e3f14dff343a"
+        "db598c9573c7d08f8f330be5f02fa573a3af14c837820e748a132979545263f9"
     ),
     "src/fieldtrue/shortcut_v2_crossfit.py": (
         "4beb28f55c8903c10c1744ead56757dc3d3994cb56b4c3b1ba58faf742ea17e5"
@@ -262,7 +262,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
     ),
     "tests/unit/test_handoff.py": (
-        "f1557c28479bfe5de04580a299f34a0604098282dee4c4045eb81baaa00b3718"
+        "3103edb425e86d38fd8a9f1a79fe58bcc1789ca7d80c6376533051354dbf884e"
     ),
     "tests/unit/test_mission.py": (
         "09b6915f052f333f21889dc2c0e42cf3b0ad85b072d8cf15bc4394644b71b3da"

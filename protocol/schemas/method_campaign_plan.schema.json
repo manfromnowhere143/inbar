@@ -1,0 +1,79 @@
+{
+  "$defs": {
+    "PlannedEpisode": {
+      "additionalProperties": false,
+      "description": "One episode's frozen injection: which mechanism (a known name or unknown) and its salt.",
+      "properties": {
+        "episode_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Episode Id",
+          "type": "string"
+        },
+        "injected_name": {
+          "minLength": 1,
+          "title": "Injected Name",
+          "type": "string"
+        },
+        "salt_hex": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Salt Hex",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.campaign-planned-episode.v1",
+          "default": "inbar.iter001.campaign-planned-episode.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "snapshot_seed": {
+          "minimum": 0,
+          "title": "Snapshot Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "episode_id",
+        "injected_name",
+        "snapshot_seed",
+        "salt_hex"
+      ],
+      "title": "PlannedEpisode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The complete, pre-committed episode schedule. Its hash is bound into the result.\n\nThe injection distribution, seed schedule, and episode count are fixed here before the run and\ncannot be chosen after inspecting outcomes.",
+  "properties": {
+    "episodes": {
+      "items": {
+        "$ref": "#/$defs/PlannedEpisode"
+      },
+      "minItems": 1,
+      "title": "Episodes",
+      "type": "array"
+    },
+    "ontology_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Hash",
+      "type": "string"
+    },
+    "plan_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.campaign-plan.v1",
+      "default": "inbar.iter001.campaign-plan.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_id",
+    "ontology_hash",
+    "episodes"
+  ],
+  "title": "CampaignPlan",
+  "type": "object"
+}

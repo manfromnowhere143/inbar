@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "One episode's frozen injection: which mechanism (a known name or unknown) and its salt.",
+  "properties": {
+    "episode_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "injected_name": {
+      "minLength": 1,
+      "title": "Injected Name",
+      "type": "string"
+    },
+    "salt_hex": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Salt Hex",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.campaign-planned-episode.v1",
+      "default": "inbar.iter001.campaign-planned-episode.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot_seed": {
+      "minimum": 0,
+      "title": "Snapshot Seed",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "episode_id",
+    "injected_name",
+    "snapshot_seed",
+    "salt_hex"
+  ],
+  "title": "PlannedEpisode",
+  "type": "object"
+}

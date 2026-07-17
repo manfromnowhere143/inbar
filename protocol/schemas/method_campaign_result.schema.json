@@ -1,0 +1,181 @@
+{
+  "$defs": {
+    "ConditionSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "abstention_correct_rate": {
+          "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+          "title": "Abstention Correct Rate",
+          "type": "string"
+        },
+        "abstention_rate": {
+          "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+          "title": "Abstention Rate",
+          "type": "string"
+        },
+        "committed_accuracy": {
+          "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+          "title": "Committed Accuracy",
+          "type": "string"
+        },
+        "committed_mean_confidence": {
+          "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+          "title": "Committed Mean Confidence",
+          "type": "string"
+        },
+        "condition": {
+          "enum": [
+            "passive",
+            "active"
+          ],
+          "title": "Condition",
+          "type": "string"
+        },
+        "diagnosis_accuracy": {
+          "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+          "title": "Diagnosis Accuracy",
+          "type": "string"
+        },
+        "episodes": {
+          "minimum": 1,
+          "title": "Episodes",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.campaign-condition-summary.v1",
+          "default": "inbar.iter001.campaign-condition-summary.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "unknown_injection_accuracy": {
+          "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+          "title": "Unknown Injection Accuracy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "condition",
+        "episodes",
+        "diagnosis_accuracy",
+        "abstention_rate",
+        "abstention_correct_rate",
+        "committed_accuracy",
+        "committed_mean_confidence",
+        "unknown_injection_accuracy"
+      ],
+      "title": "ConditionSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The comparative result, binding every authority and recomputed from the episode records.",
+  "properties": {
+    "active": {
+      "$ref": "#/$defs/ConditionSummary"
+    },
+    "active_strictly_helps": {
+      "title": "Active Strictly Helps",
+      "type": "boolean"
+    },
+    "amendment_document_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Amendment Document Artifact Sha256",
+      "type": "string"
+    },
+    "compute_lease_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Compute Lease Hash",
+      "type": "string"
+    },
+    "episodes": {
+      "minimum": 1,
+      "title": "Episodes",
+      "type": "integer"
+    },
+    "machine_proposal_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Machine Proposal Artifact Sha256",
+      "type": "string"
+    },
+    "method_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Method Id",
+      "type": "string"
+    },
+    "ontology_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Hash",
+      "type": "string"
+    },
+    "owner_approval_receipt_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Owner Approval Receipt Hash",
+      "type": "string"
+    },
+    "paired_active_minus_passive_accuracy": {
+      "pattern": "^-?(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Paired Active Minus Passive Accuracy",
+      "type": "string"
+    },
+    "paired_interval_high": {
+      "pattern": "^-?(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Paired Interval High",
+      "type": "string"
+    },
+    "paired_interval_low": {
+      "pattern": "^-?(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Paired Interval Low",
+      "type": "string"
+    },
+    "passive": {
+      "$ref": "#/$defs/ConditionSummary"
+    },
+    "plan_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "proposal_git_commit": {
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+      "title": "Proposal Git Commit",
+      "type": "string"
+    },
+    "result_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Result Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.campaign-result.v1",
+      "default": "inbar.iter001.campaign-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "simulator_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Simulator Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "result_id",
+    "amendment_document_artifact_sha256",
+    "machine_proposal_artifact_sha256",
+    "owner_approval_receipt_hash",
+    "proposal_git_commit",
+    "method_id",
+    "ontology_hash",
+    "simulator_id",
+    "plan_hash",
+    "compute_lease_hash",
+    "episodes",
+    "passive",
+    "active",
+    "paired_active_minus_passive_accuracy",
+    "paired_interval_low",
+    "paired_interval_high",
+    "active_strictly_helps"
+  ],
+  "title": "CampaignResult",
+  "type": "object"
+}

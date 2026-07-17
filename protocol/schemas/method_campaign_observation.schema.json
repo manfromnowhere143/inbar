@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "BranchKind": {
+      "enum": [
+        "no_op",
+        "targeted_test",
+        "wrong_but_safe",
+        "recovery",
+        "blocked_unsafe"
+      ],
+      "title": "BranchKind",
+      "type": "string"
+    },
+    "MethodBranchObservation": {
+      "additionalProperties": false,
+      "description": "The model-visible content of one permitted branch: what was commanded and what was seen.\n\nIt carries no settled-state hash, no sealed mechanism, and no salt. The observation type\nstructurally cannot transport the injected truth to the method.",
+      "properties": {
+        "action": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Action",
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/BranchKind"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.method-branch-observation.v1",
+          "default": "inbar.iter001.method-branch-observation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "telemetry": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Telemetry",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "action",
+        "telemetry"
+      ],
+      "title": "MethodBranchObservation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Everything a method is permitted to see for one episode-condition.\n\nOnly the ontology (keys and definitions), the candidate known keys, and the telemetry of the\npermitted branches. A blocked-unsafe branch is never permitted; it carries no telemetry.",
+  "properties": {
+    "branches": {
+      "items": {
+        "$ref": "#/$defs/MethodBranchObservation"
+      },
+      "minItems": 1,
+      "title": "Branches",
+      "type": "array"
+    },
+    "candidate_known_keys": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 2,
+      "title": "Candidate Known Keys",
+      "type": "array"
+    },
+    "ontology_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.method-observation.v1",
+      "default": "inbar.iter001.method-observation.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ontology_hash",
+    "candidate_known_keys",
+    "branches"
+  ],
+  "title": "MethodObservation",
+  "type": "object"
+}

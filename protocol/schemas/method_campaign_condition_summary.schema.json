@@ -1,0 +1,66 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "abstention_correct_rate": {
+      "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Abstention Correct Rate",
+      "type": "string"
+    },
+    "abstention_rate": {
+      "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Abstention Rate",
+      "type": "string"
+    },
+    "committed_accuracy": {
+      "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Committed Accuracy",
+      "type": "string"
+    },
+    "committed_mean_confidence": {
+      "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Committed Mean Confidence",
+      "type": "string"
+    },
+    "condition": {
+      "enum": [
+        "passive",
+        "active"
+      ],
+      "title": "Condition",
+      "type": "string"
+    },
+    "diagnosis_accuracy": {
+      "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Diagnosis Accuracy",
+      "type": "string"
+    },
+    "episodes": {
+      "minimum": 1,
+      "title": "Episodes",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.campaign-condition-summary.v1",
+      "default": "inbar.iter001.campaign-condition-summary.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "unknown_injection_accuracy": {
+      "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Unknown Injection Accuracy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "condition",
+    "episodes",
+    "diagnosis_accuracy",
+    "abstention_rate",
+    "abstention_correct_rate",
+    "committed_accuracy",
+    "committed_mean_confidence",
+    "unknown_injection_accuracy"
+  ],
+  "title": "ConditionSummary",
+  "type": "object"
+}

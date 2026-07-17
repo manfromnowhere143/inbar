@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "ConditionOutcome": {
+      "additionalProperties": false,
+      "description": "The adjudicated diagnosis of one episode under one evidence condition.",
+      "properties": {
+        "abstained": {
+          "title": "Abstained",
+          "type": "boolean"
+        },
+        "condition": {
+          "enum": [
+            "passive",
+            "active"
+          ],
+          "title": "Condition",
+          "type": "string"
+        },
+        "confidence": {
+          "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+          "title": "Confidence",
+          "type": "string"
+        },
+        "diagnosis_correct": {
+          "title": "Diagnosis Correct",
+          "type": "boolean"
+        },
+        "diagnosis_key": {
+          "title": "Diagnosis Key",
+          "type": "string"
+        },
+        "episode_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Episode Id",
+          "type": "string"
+        },
+        "identifiable": {
+          "title": "Identifiable",
+          "type": "boolean"
+        },
+        "injected_key": {
+          "title": "Injected Key",
+          "type": "string"
+        },
+        "injected_was_unknown": {
+          "title": "Injected Was Unknown",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.campaign-condition-outcome.v1",
+          "default": "inbar.iter001.campaign-condition-outcome.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "episode_id",
+        "condition",
+        "injected_key",
+        "injected_was_unknown",
+        "identifiable",
+        "diagnosis_key",
+        "diagnosis_correct",
+        "abstained",
+        "confidence"
+      ],
+      "title": "ConditionOutcome",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Both conditions for one paired episode, plus the episode report hashes for audit.",
+  "properties": {
+    "active": {
+      "$ref": "#/$defs/ConditionOutcome"
+    },
+    "active_episode_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Active Episode Hash",
+      "type": "string"
+    },
+    "episode_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "injected_key": {
+      "title": "Injected Key",
+      "type": "string"
+    },
+    "passive": {
+      "$ref": "#/$defs/ConditionOutcome"
+    },
+    "passive_episode_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Passive Episode Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.campaign-episode-outcome.v1",
+      "default": "inbar.iter001.campaign-episode-outcome.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "episode_id",
+    "injected_key",
+    "passive",
+    "active",
+    "passive_episode_hash",
+    "active_episode_hash"
+  ],
+  "title": "EpisodeOutcome",
+  "type": "object"
+}

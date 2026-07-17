@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "description": "A method's committed output: the hypotheses it carried and the single key it selected.\n\n`diagnosis_key` is one of the candidate known keys or the reserved unknown. Abstention is\nnaming the unknown. `confidence` is the method's stated posterior for the selected key, a\ndeterministic six-decimal string so a campaign result is reproducible byte for byte.",
+  "properties": {
+    "abstained": {
+      "title": "Abstained",
+      "type": "boolean"
+    },
+    "committed_at": {
+      "format": "date-time",
+      "title": "Committed At",
+      "type": "string"
+    },
+    "confidence": {
+      "pattern": "^(0\\.[0-9]{6}|1\\.000000)$",
+      "title": "Confidence",
+      "type": "string"
+    },
+    "diagnosis_key": {
+      "minLength": 1,
+      "title": "Diagnosis Key",
+      "type": "string"
+    },
+    "known_keys": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minItems": 2,
+      "title": "Known Keys",
+      "type": "array"
+    },
+    "method_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Method Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.method-diagnosis.v1",
+      "default": "inbar.iter001.method-diagnosis.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "method_id",
+    "known_keys",
+    "diagnosis_key",
+    "confidence",
+    "abstained",
+    "committed_at"
+  ],
+  "title": "MethodDiagnosis",
+  "type": "object"
+}

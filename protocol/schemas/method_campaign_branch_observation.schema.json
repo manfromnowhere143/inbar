@@ -1,0 +1,49 @@
+{
+  "$defs": {
+    "BranchKind": {
+      "enum": [
+        "no_op",
+        "targeted_test",
+        "wrong_but_safe",
+        "recovery",
+        "blocked_unsafe"
+      ],
+      "title": "BranchKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The model-visible content of one permitted branch: what was commanded and what was seen.\n\nIt carries no settled-state hash, no sealed mechanism, and no salt. The observation type\nstructurally cannot transport the injected truth to the method.",
+  "properties": {
+    "action": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Action",
+      "type": "array"
+    },
+    "kind": {
+      "$ref": "#/$defs/BranchKind"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.method-branch-observation.v1",
+      "default": "inbar.iter001.method-branch-observation.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "telemetry": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Telemetry",
+      "type": "array"
+    }
+  },
+  "required": [
+    "kind",
+    "action",
+    "telemetry"
+  ],
+  "title": "MethodBranchObservation",
+  "type": "object"
+}

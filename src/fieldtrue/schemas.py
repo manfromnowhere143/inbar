@@ -121,6 +121,17 @@ from fieldtrue.domain import (
     VerificationResult,
 )
 from fieldtrue.memory import ResearchMemoryRecord
+from fieldtrue.method_campaign import (
+    CampaignPlan,
+    CampaignResult,
+    ConditionOutcome,
+    ConditionSummary,
+    EpisodeOutcome,
+    MethodBranchObservation,
+    MethodDiagnosis,
+    MethodObservation,
+    PlannedEpisode,
+)
 from fieldtrue.receipts import LedgerEvent, LedgerHead, PublicationSignerAnchor, SignerAnchor
 from fieldtrue.runtime import RuntimeIdentity
 from fieldtrue.shortcut_contracts import (
@@ -249,6 +260,15 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "causal_lab_mechanism_ontology.schema.json": MechanismOntology,
     "causal_lab_sealed_mechanism.schema.json": SealedMechanism,
     "causal_lab_snapshot.schema.json": Snapshot,
+    "method_campaign_branch_observation.schema.json": MethodBranchObservation,
+    "method_campaign_condition_outcome.schema.json": ConditionOutcome,
+    "method_campaign_condition_summary.schema.json": ConditionSummary,
+    "method_campaign_episode_outcome.schema.json": EpisodeOutcome,
+    "method_campaign_observation.schema.json": MethodObservation,
+    "method_campaign_diagnosis.schema.json": MethodDiagnosis,
+    "method_campaign_plan.schema.json": CampaignPlan,
+    "method_campaign_planned_episode.schema.json": PlannedEpisode,
+    "method_campaign_result.schema.json": CampaignResult,
     "census_execution_binding.schema.json": CensusExecutionBinding,
     "census_execution_lease.schema.json": CensusExecutionLease,
     "census_frame_registry.schema.json": FrameRegistry,

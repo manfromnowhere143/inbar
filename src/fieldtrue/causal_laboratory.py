@@ -614,6 +614,33 @@ def reference_action_hash(action: tuple[int, ...]) -> str:
     )
 
 
+def reference_forward_telemetry(
+    *,
+    config: ReferenceFaultConfig,
+    initial_state: int,
+    mechanism_key: str,
+    action: tuple[int, ...],
+) -> tuple[int, ...]:
+    """The noise-free reference telemetry a mechanism hypothesis predicts.
+
+    This is the forward model a diagnosis method reasons with: identical to `_run_reference`
+    except that it omits the sealed per-step seed disturbance, which is custodian-only and never
+    visible to a method. A method that knew the disturbance could invert the seed and read the
+    truth; it cannot, so its prediction for the true mechanism differs from the observation by
+    exactly that disturbance, and its prediction for a wrong mechanism differs by the disturbance
+    plus the mechanism gap. Diagnosis is therefore a residual comparison the disturbance bounds
+    but does not defeat when the gap exceeds it.
+    """
+    gain, drive, bias = _reference_mechanism_transform(mechanism_key, config)
+    x = initial_state
+    telemetry: list[int] = []
+    for step in range(config.steps):
+        u = action[step] if step < len(action) else 0
+        x = (gain * x) // 100 + (drive * u) // 100 + bias
+        telemetry.append(x)
+    return tuple(telemetry)
+
+
 def reference_branch(
     *,
     kind: BranchKind,
