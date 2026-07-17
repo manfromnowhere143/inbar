@@ -58,8 +58,13 @@ def _git(repo_root: Path, *args: str) -> str:
 
 
 def _run_inbar(repo_root: Path, *args: str) -> str:
+    # --no-sync is load-bearing: a bare `uv run` reconciles the environment against
+    # .python-version and can recreate the venv with a different interpreter. Invoked from
+    # inside a running test suite on a 3.11/3.13/3.14 leg, that deletes the running
+    # interpreter's site-packages mid-suite, which is exactly what broke the Ubuntu
+    # compatibility legs on the first integrated head.
     completed = subprocess.run(  # noqa: S603 - fixed committed CLI plan
-        ["uv", "run", "inbar", *args],  # noqa: S607 - same PATH resolution as the frozen plan
+        ["uv", "run", "--no-sync", "inbar", *args],  # noqa: S607 - same PATH resolution as the frozen plan
         cwd=repo_root,
         capture_output=True,
         text=True,
