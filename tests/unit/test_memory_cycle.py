@@ -266,7 +266,7 @@ def test_cycle_appends_a_verifiable_hash_chain(
         assert current["previous_event_hash"] == previous["event_hash"]
         body = {k: v for k, v in current.items() if k != "event_hash"}
         assert sha256_value(body) == current["event_hash"]
-    resource, verdict, checkpoint, handoff = events[2], events[3], events[4], events[5]
+    verdict, resource, checkpoint, handoff = events[2], events[3], events[4], events[5]
     assert verdict["event_type"] == "finding"
     assert verdict["source_commit"] == result["implementation_commit"]
     # The verdict did not change, so its frozen payload and summary carry forward verbatim.

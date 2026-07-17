@@ -202,9 +202,36 @@ def produce_handoff_cycle(
         and event.get("links", {}).get("scope_correction") == _LEGACY_SOURCE_VERDICT_EVENT
     )
 
-    resource_event = _append_event(
+    # The current source-verdict finding is re-issued each cycle: the renderer requires its
+    # source commit and its bound audit-document bytes to match the implementation head. The
+    # verdict itself did not change, so the frozen payload and summary carry forward verbatim.
+    # It is appended first because ledger links may only reference earlier events.
+    verdict_event = _append_event(
         root,
         previous=previous,
+        event_id=source_verdict_event_id,
+        event_type="finding",
+        stage="mission-handoff",
+        status="negative",
+        actor_id=producer_actor_id,
+        summary=previous_verdict["summary"],
+        payload=dict(previous_verdict["payload"]),
+        evidence=[
+            _evidence_ref(
+                root,
+                uri=_SOURCE_AUDIT_PATH,
+                git_commit=implementation_commit,
+                media_type="text/markdown",
+                role="source",
+            )
+        ],
+        links={"scope_correction": _LEGACY_SOURCE_VERDICT_EVENT},
+        source_commit=implementation_commit,
+    )
+
+    resource_event = _append_event(
+        root,
+        previous=verdict_event,
         event_id=resource_event_id,
         event_type="resource",
         stage="engineering-validation",
@@ -242,35 +269,9 @@ def produce_handoff_cycle(
         source_commit=evidence_commit,
     )
 
-    # The current source-verdict finding is re-issued each cycle: the renderer requires its
-    # source commit and its bound audit-document bytes to match the implementation head. The
-    # verdict itself did not change, so the frozen payload and summary carry forward verbatim.
-    verdict_event = _append_event(
-        root,
-        previous=resource_event,
-        event_id=source_verdict_event_id,
-        event_type="finding",
-        stage="mission-handoff",
-        status="negative",
-        actor_id=producer_actor_id,
-        summary=previous_verdict["summary"],
-        payload=dict(previous_verdict["payload"]),
-        evidence=[
-            _evidence_ref(
-                root,
-                uri=_SOURCE_AUDIT_PATH,
-                git_commit=implementation_commit,
-                media_type="text/markdown",
-                role="source",
-            )
-        ],
-        links={"scope_correction": _LEGACY_SOURCE_VERDICT_EVENT},
-        source_commit=implementation_commit,
-    )
-
     checkpoint_event = _append_event(
         root,
-        previous=verdict_event,
+        previous=resource_event,
         event_id=checkpoint_event_id,
         event_type="execution",
         stage="mission-handoff",
