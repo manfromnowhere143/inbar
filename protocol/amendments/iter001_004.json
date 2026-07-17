@@ -1,0 +1,97 @@
+{
+  "amendment_document": {
+    "artifact_sha256": "1f9f5a17d9611bbf3383ccb4ca8bae91053431ca57cf4d48c989ae6e5bae0cac",
+    "path": "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_004.md"
+  },
+  "amendment_id": "iter001_004",
+  "approval": {
+    "approval_basis": "owner_delegation_not_owner_review",
+    "decision": "approve_causal_laboratory_implementation_only",
+    "previous_receipt_genesis_forbidden": true,
+    "previous_receipt_sha256": "2c0001fbb952ae1bff5d8b0fe0f7a04eeff7d2fd556a83006c42ae17428f7ec5",
+    "receipt_path": "protocol/approvals/iter001_004_owner_approval.json",
+    "receipt_schema": "inbar.owner-amendment-approval-receipt.v4",
+    "v4_widens_decision_literal_only": true
+  },
+  "authority_effect": {
+    "campaign_requires_compute_lease": true,
+    "canonical_control_authority": "bootstrap",
+    "proposal_alone_implementation_authorized": false,
+    "proposal_alone_simulation_run_authorized": false,
+    "registered_blocker_remains": "iter001-acquisition-contract",
+    "simulator_branch_never_counts_as_physical_incident": true
+  },
+  "compute_authority": {
+    "campaign_requires_signed_compute_lease": true,
+    "gpu_cloud_paid_forbidden": true,
+    "implementation_allows_bounded_local_cpu_smoke_episode": true,
+    "lease_binds": [
+      "frozen_resource_ceiling",
+      "mechanism_ontology_hash",
+      "session_id",
+      "nonce",
+      "validity_window"
+    ],
+    "lease_verified_against_git_pinned_owner_anchor": true
+  },
+  "forbidden_claims_unchanged": [
+    "diagnosis",
+    "intervention_benefit",
+    "recovery",
+    "safety",
+    "transfer",
+    "product_readiness",
+    "economic_value",
+    "state_of_the_art",
+    "physical_or_real_world_causal_claim_from_simulator"
+  ],
+  "implementation_gate": {
+    "controls_run_without_network_and_without_gpu": true,
+    "owner_approval_required_before_code": true,
+    "permitted_implementation": [
+      "typed_causal_laboratory_contracts_and_schemas",
+      "paired_branch_protocol_validator",
+      "sealed_mechanism_injection_and_authority_separation",
+      "provider_neutral_simulator_port_and_basilisk_adapter",
+      "compute_lease_contract_and_verifier",
+      "explicit_episode_snapshot_and_lease_hashes_in_report",
+      "adversarial_control_suite"
+    ],
+    "production_artifacts_authorized": false
+  },
+  "iteration_id": "iter001_physical_causal_evidence_acquisition",
+  "mechanism_injection": {
+    "authority_separation_proposer_safety_executor_adjudicator_distinct": true,
+    "c6_does_not_apply_truth_injected_not_read": true,
+    "injected_mechanism_is_sealed_truth_record": true,
+    "one_known_or_reserved_unknown_from_committed_ontology": true,
+    "proposer_commits_hypothesis_set_before_truth_access": true,
+    "sealed_from_model_visible_plane_logs_filenames_public_artifacts": true
+  },
+  "normative_relation": {
+    "conflict_disposition": "INVALID",
+    "document_and_machine_proposal_jointly_required": true,
+    "prior_frozen_contracts_prevail_on_conflict": true
+  },
+  "paired_branch_protocol": {
+    "branches": [
+      "no_op",
+      "targeted_test",
+      "wrong_but_safe",
+      "recovery",
+      "blocked_unsafe"
+    ],
+    "blocked_unsafe_recorded_refused_never_executed": true,
+    "branches_bind_originating_snapshot_hash": true,
+    "different_snapshot_members_are_invalid": true,
+    "from_one_frozen_initial_snapshot": true
+  },
+  "schema_version": "inbar.iter001-causal-laboratory-proposal.v1",
+  "simulator_port": {
+    "adapter_must_be_deterministic_under_fixed_seed_and_snapshot": true,
+    "basilisk_first_adapter_isc_permissive": true,
+    "no_network_paid_gpu_or_live_system": true,
+    "provider_neutral_typed_port": true
+  },
+  "status": "immutable_proposal"
+}
