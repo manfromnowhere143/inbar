@@ -201,9 +201,16 @@ def verify_census_lease(
     lease: CensusExecutionLease,
     *,
     frame_registry_bytes: bytes,
+    expected_public_key: Ed25519PublicKey = OWNER_PUBLIC_KEY,
     at: datetime | None = None,
 ) -> None:
-    """Fail closed on any scope, chain, registry, ceiling, window, or signature mismatch."""
+    """Fail closed on any scope, chain, registry, ceiling, window, or signature mismatch.
+
+    `expected_public_key` pins the signer and defaults to the frozen owner key, so a real run
+    only accepts an owner-signed lease. It is a parameter, not a constant, for the same reason
+    :func:`fieldtrue.approvals.verify_approval` takes its expected signer: a test signs with a
+    deterministic key rather than the local-only governance key, which is never on CI.
+    """
     checked_at = at or datetime.now(UTC)
     if checked_at.tzinfo is None or checked_at.utcoffset() is None:
         raise CensusExecutionError("lease verification time must be timezone-aware")
@@ -211,7 +218,7 @@ def verify_census_lease(
         "amendment_document_artifact_sha256": AMENDMENT_DOCUMENT_SHA256,
         "machine_proposal_artifact_sha256": MACHINE_PROPOSAL_SHA256,
         "owner_approval_receipt_hash": OWNER_APPROVAL_RECEIPT_HASH,
-        "owner_ed25519_public_key": OWNER_PUBLIC_KEY,
+        "owner_ed25519_public_key": expected_public_key,
         "proposal_git_commit": APPROVED_PROPOSAL_COMMIT,
     }
     observed = lease.model_dump(mode="json")
@@ -231,7 +238,7 @@ def verify_census_lease(
     if not lease.not_before <= checked_at < lease.expires_at:
         raise CensusExecutionError("lease is not currently valid")
     try:
-        VerifyKey(bytes.fromhex(OWNER_PUBLIC_KEY)).verify(
+        VerifyKey(bytes.fromhex(expected_public_key)).verify(
             bytes.fromhex(lease.lease_hash), bytes.fromhex(lease.signature)
         )
     except (BadSignatureError, ValueError) as error:
@@ -319,10 +326,16 @@ class CensusSession:
         *,
         transport: Transport | None = None,
         now: Callable[[], datetime] | None = None,
+        expected_public_key: Ed25519PublicKey = OWNER_PUBLIC_KEY,
     ) -> None:
         self._root = repo_root.resolve(strict=True)
         registry_bytes = (self._root / FRAME_REGISTRY_PATH).read_bytes()
-        verify_census_lease(lease, frame_registry_bytes=registry_bytes, at=(now or _utc_now)())
+        verify_census_lease(
+            lease,
+            frame_registry_bytes=registry_bytes,
+            expected_public_key=expected_public_key,
+            at=(now or _utc_now)(),
+        )
         self._lease = lease
         self._registry = FrameRegistry.model_validate_json(registry_bytes)
         self._allowed_hosts = self._registry.allowed_hosts()

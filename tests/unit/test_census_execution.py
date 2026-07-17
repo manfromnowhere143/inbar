@@ -34,7 +34,9 @@ from fieldtrue.census_execution import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-KEY = SigningKey((REPO_ROOT / ".local/keys/iter001-governance.ed25519").read_bytes())
+# A deterministic test key, not the local-only governance key, which is never on CI.
+KEY = SigningKey(hashlib.sha256(b"inbar-test-census-execution-signer").digest())
+KEY_PUB = KEY.verify_key.encode().hex()
 REGISTRY_BYTES = (REPO_ROOT / FRAME_REGISTRY_PATH).read_bytes()
 REGISTRY_HASH = hashlib.sha256(REGISTRY_BYTES).hexdigest()
 NOW = datetime(2026, 7, 17, 12, 0, 0, tzinfo=UTC)
@@ -71,7 +73,9 @@ def _ok_transport(uri: str) -> tuple[int, str, tuple[str, ...], bytes]:
 
 
 def _session(lease: CensusExecutionLease, transport=_ok_transport, now=None) -> CensusSession:
-    return CensusSession(REPO_ROOT, lease, transport=transport, now=now or (lambda: NOW))
+    return CensusSession(
+        REPO_ROOT, lease, transport=transport, now=now or (lambda: NOW), expected_public_key=KEY_PUB
+    )
 
 
 def _purge_store() -> None:
@@ -98,7 +102,9 @@ def _clean_store() -> object:
 
 def test_committed_lease_issues_and_verifies() -> None:
     lease = _lease()
-    verify_census_lease(lease, frame_registry_bytes=REGISTRY_BYTES, at=NOW)
+    verify_census_lease(
+        lease, frame_registry_bytes=REGISTRY_BYTES, expected_public_key=KEY_PUB, at=NOW
+    )
     assert lease.owner_approval_receipt_hash == OWNER_APPROVAL_RECEIPT_HASH
     assert lease.proposal_git_commit == APPROVED_PROPOSAL_COMMIT
     assert lease.amendment_document_artifact_sha256 == AMENDMENT_DOCUMENT_SHA256
@@ -108,32 +114,45 @@ def test_committed_lease_issues_and_verifies() -> None:
 def test_a_widened_ceiling_fails_closed() -> None:
     lease = _lease(max_retrieved_bytes=1024**4)
     with pytest.raises(CensusExecutionError, match="ceiling differs from the frozen"):
-        verify_census_lease(lease, frame_registry_bytes=REGISTRY_BYTES, at=NOW)
+        verify_census_lease(
+            lease, frame_registry_bytes=REGISTRY_BYTES, expected_public_key=KEY_PUB, at=NOW
+        )
 
 
 def test_a_wrong_frame_registry_fails_closed() -> None:
     lease = _lease()
     with pytest.raises(CensusExecutionError, match="does not bind the committed frame registry"):
-        verify_census_lease(lease, frame_registry_bytes=REGISTRY_BYTES + b" ", at=NOW)
+        verify_census_lease(
+            lease, frame_registry_bytes=REGISTRY_BYTES + b" ", expected_public_key=KEY_PUB, at=NOW
+        )
 
 
 def test_a_scope_forgery_fails_closed() -> None:
     lease = _lease(owner_approval_receipt_hash="e" * 64)
     with pytest.raises(CensusExecutionError, match="approved execution scope"):
-        verify_census_lease(lease, frame_registry_bytes=REGISTRY_BYTES, at=NOW)
+        verify_census_lease(
+            lease, frame_registry_bytes=REGISTRY_BYTES, expected_public_key=KEY_PUB, at=NOW
+        )
 
 
 def test_an_expired_lease_fails_closed() -> None:
     lease = _lease()
     with pytest.raises(CensusExecutionError, match="not currently valid"):
-        verify_census_lease(lease, frame_registry_bytes=REGISTRY_BYTES, at=NOW + timedelta(days=2))
+        verify_census_lease(
+            lease,
+            frame_registry_bytes=REGISTRY_BYTES,
+            expected_public_key=KEY_PUB,
+            at=NOW + timedelta(days=2),
+        )
 
 
 def test_a_forged_signature_fails_closed() -> None:
     lease = _lease()
     forged = lease.model_copy(update={"signature": "a" * 128})
     with pytest.raises(CensusExecutionError, match="signature mismatch"):
-        verify_census_lease(forged, frame_registry_bytes=REGISTRY_BYTES, at=NOW)
+        verify_census_lease(
+            forged, frame_registry_bytes=REGISTRY_BYTES, expected_public_key=KEY_PUB, at=NOW
+        )
 
 
 def test_lease_hash_forgery_is_rejected_by_the_model() -> None:
@@ -409,6 +428,7 @@ def test_naive_verification_time_is_rejected() -> None:
         verify_census_lease(
             _lease(),
             frame_registry_bytes=REGISTRY_BYTES,
+            expected_public_key=KEY_PUB,
             at=datetime(2026, 7, 17, 12, 0, 0),  # noqa: DTZ001
         )
 
