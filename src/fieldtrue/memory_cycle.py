@@ -37,8 +37,9 @@ from fieldtrue.validation_producer import write_validation_receipt
 _MEMORY_PATH: Final = "memory/research_engine_extraction.jsonl"
 _HANDOFF_PATH: Final = "HANDOFF.md"
 _RENDERER_PATH: Final = "src/fieldtrue/handoff.py"
-_SOURCE_VERDICT_EVENT: Final = "iter001-current-public-source-route-verdict-v2"
+_LEGACY_SOURCE_VERDICT_EVENT: Final = "iter001-public-substrate-verdict-v1"
 _ENGINE_BOUNDARY_EVENT: Final = "future-research-engine-shortcut-v2-lessons-v1"
+_SOURCE_AUDIT_PATH: Final = "docs/research/ITER001_SOURCE_ROLE_AUDIT.md"
 
 
 class MemoryCycleError(RuntimeError):
@@ -153,6 +154,7 @@ def produce_handoff_cycle(
     checkpoint_event_id: str,
     handoff_event_id: str,
     resource_event_id: str,
+    source_verdict_event_id: str,
 ) -> dict[str, str]:
     """Run the complete evidence, ledger, and handoff cycle at the current head.
 
@@ -193,6 +195,12 @@ def produce_handoff_cycle(
     ledger = _load_ledger(root)
     previous = ledger[-1]
     previous_handoff = next(event for event in reversed(ledger) if event["event_type"] == "handoff")
+    previous_verdict = next(
+        event
+        for event in reversed(ledger)
+        if event["event_type"] == "finding"
+        and event.get("links", {}).get("scope_correction") == _LEGACY_SOURCE_VERDICT_EVENT
+    )
 
     resource_event = _append_event(
         root,
@@ -230,13 +238,39 @@ def produce_handoff_cycle(
                 role="verifier",
             )
         ],
-        links={"source_verdict": _SOURCE_VERDICT_EVENT},
+        links={"source_verdict": source_verdict_event_id},
         source_commit=evidence_commit,
+    )
+
+    # The current source-verdict finding is re-issued each cycle: the renderer requires its
+    # source commit and its bound audit-document bytes to match the implementation head. The
+    # verdict itself did not change, so the frozen payload and summary carry forward verbatim.
+    verdict_event = _append_event(
+        root,
+        previous=resource_event,
+        event_id=source_verdict_event_id,
+        event_type="finding",
+        stage="mission-handoff",
+        status="negative",
+        actor_id=producer_actor_id,
+        summary=previous_verdict["summary"],
+        payload=dict(previous_verdict["payload"]),
+        evidence=[
+            _evidence_ref(
+                root,
+                uri=_SOURCE_AUDIT_PATH,
+                git_commit=implementation_commit,
+                media_type="text/markdown",
+                role="source",
+            )
+        ],
+        links={"scope_correction": _LEGACY_SOURCE_VERDICT_EVENT},
+        source_commit=implementation_commit,
     )
 
     checkpoint_event = _append_event(
         root,
-        previous=resource_event,
+        previous=verdict_event,
         event_id=checkpoint_event_id,
         event_type="execution",
         stage="mission-handoff",
@@ -271,7 +305,7 @@ def produce_handoff_cycle(
         ],
         links={
             "resource_observation": resource_event_id,
-            "source_verdict": _SOURCE_VERDICT_EVENT,
+            "source_verdict": source_verdict_event_id,
         },
         source_commit=evidence_commit,
     )
@@ -301,7 +335,7 @@ def produce_handoff_cycle(
         links={
             "checkpoint": checkpoint_event_id,
             "engine_boundary": _ENGINE_BOUNDARY_EVENT,
-            "source_verdict": _SOURCE_VERDICT_EVENT,
+            "source_verdict": source_verdict_event_id,
         },
         source_commit=evidence_commit,
     )

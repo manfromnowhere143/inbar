@@ -82,13 +82,34 @@ def _seed_repo(root: Path) -> None:
         "status": "blocked",
         "summary": "Seed handoff state.",
     }
+    verdict_body = dict(previous_body)
+    verdict_body.update(
+        {
+            "event_id": "seed-source-verdict-v1",
+            "event_type": "finding",
+            "status": "negative",
+            "sequence": 151,
+            "links": {"scope_correction": "iter001-public-substrate-verdict-v1"},
+            "payload": {"finding": "BLOCK_CURRENT_PUBLIC_SOURCE_ONLY_ROUTE"},
+            "summary": "The current protocol blocks the present public-source-only route.",
+        }
+    )
+    verdict_body["event_hash"] = sha256_value(
+        {k: v for k, v in verdict_body.items() if k != "event_hash"}
+    )
+    previous_body["previous_event_hash"] = verdict_body["event_hash"]
     previous_body["event_hash"] = sha256_value(
         {k: v for k, v in previous_body.items() if k != "event_hash"}
     )
     (root / "memory/research_engine_extraction.jsonl").write_text(
-        json.dumps(previous_body, sort_keys=True, separators=(",", ":")) + "\n",
+        json.dumps(verdict_body, sort_keys=True, separators=(",", ":"))
+        + "\n"
+        + json.dumps(previous_body, sort_keys=True, separators=(",", ":"))
+        + "\n",
         encoding="utf-8",
     )
+    (root / "docs/research").mkdir(parents=True)
+    (root / "docs/research/ITER001_SOURCE_ROLE_AUDIT.md").write_text("# audit\n", encoding="utf-8")
     _git(root, "add", "-A")
     _git(root, "commit", "-qm", "seed")
 
@@ -207,6 +228,7 @@ def _cycle(root: Path) -> dict[str, str]:
         checkpoint_event_id="cycle-test-checkpoint-v1",
         handoff_event_id="cycle-test-handoff-v1",
         resource_event_id="cycle-test-resource-v1",
+        source_verdict_event_id="cycle-test-source-verdict-v1",
     )
 
 
@@ -239,12 +261,19 @@ def test_cycle_appends_a_verifiable_hash_chain(
 
     lines = (tmp_path / "memory/research_engine_extraction.jsonl").read_text().splitlines()
     events = [json.loads(line) for line in lines]
-    assert [event["sequence"] for event in events] == [152, 153, 154, 155]
+    assert [event["sequence"] for event in events] == [151, 152, 153, 154, 155, 156]
     for previous, current in itertools.pairwise(events):
         assert current["previous_event_hash"] == previous["event_hash"]
         body = {k: v for k, v in current.items() if k != "event_hash"}
         assert sha256_value(body) == current["event_hash"]
-    resource, checkpoint, handoff = events[1], events[2], events[3]
+    resource, verdict, checkpoint, handoff = events[2], events[3], events[4], events[5]
+    assert verdict["event_type"] == "finding"
+    assert verdict["source_commit"] == result["implementation_commit"]
+    # The verdict did not change, so its frozen payload and summary carry forward verbatim.
+    assert verdict["payload"] == events[0]["payload"]
+    assert verdict["summary"] == events[0]["summary"]
+    assert verdict["evidence"][0]["uri"] == "docs/research/ITER001_SOURCE_ROLE_AUDIT.md"
+    assert verdict["evidence"][0]["git_commit"] == result["implementation_commit"]
     assert resource["event_type"] == "resource"
     assert checkpoint["payload"]["implementation_commit"] == result["implementation_commit"]
     assert checkpoint["payload"]["validation_receipt"]["receipt_id"] == RECEIPT_ID
@@ -254,8 +283,9 @@ def test_cycle_appends_a_verifiable_hash_chain(
     assert handoff["evidence"][0]["git_commit"] == result["implementation_commit"]
     assert checkpoint["links"]["resource_observation"] == "cycle-test-resource-v1"
     assert handoff["links"]["checkpoint"] == "cycle-test-checkpoint-v1"
+    assert handoff["links"]["source_verdict"] == "cycle-test-source-verdict-v1"
     # The mission state did not change, so the handoff payload carries forward verbatim.
-    assert handoff["payload"] == events[0]["payload"]
+    assert handoff["payload"] == events[1]["payload"]
 
 
 def test_cycle_refuses_a_dirty_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
