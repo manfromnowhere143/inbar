@@ -35,11 +35,17 @@ real-world evidence that already contains every required field and permits indep
 
 Because that block rests on a screen the mission itself records as not systematic, the mission's
 central negative premise is not an established result. Amendment 002 freezes a prospective,
-content-bound, independently reconstructible source-screening census to settle it. Its contracts are
-implemented and its adversarial controls execute; the census has not run. No domain has been
-enumerated, no artifact retrieved, no candidate screened, and no census verdict issued. A census
-pass would be a nomination for separately authorized acquisition, never an admission. The census
-cannot reach `KILL_PUBLIC_SUBSTRATE`: a bounded frame cannot establish an unbounded negative.
+content-bound, independently reconstructible source-screening census to settle it, and Amendment
+003 freezes its execution authority: a per-session lease that can only restate the frozen resource
+ceiling, an HTTPS-only certifi-verified retrieval executor that identifies the crawler honestly and
+never mimics a browser, a content-addressed local store that never commits third-party bytes, and a
+frame registry enumerating the frozen domains. Both amendments are implemented and their adversarial
+controls execute. Live retrieval has been exercised under a real owner-signed lease to validate the
+transport against the frozen frame; that is transport validation, not a census run. No census has
+been run to a verdict: no `CensusReport` exists, no candidate has been screened against the twelve
+gates, and no verdict has been issued. A census pass would be a nomination for separately authorized
+acquisition, never an admission. The census cannot reach `KILL_PUBLIC_SUBSTRATE`: a bounded frame
+cannot establish an unbounded negative.
 
 The current research wedge is offline spacecraft and robotics incident replay. The distinct proposed
 first product is a pre-action, offline and shadow-mode evidence dossier compiler with ranked,

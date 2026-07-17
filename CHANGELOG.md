@@ -107,8 +107,30 @@ changes and evidence.
 - Advanced source screening ahead of terminal integration. The roadmap grants no authority and its
   ordering is advisory, so no frozen contract changed.
 
-The census contracts are implemented and their adversarial controls execute. The census has not run:
-no domain enumerated, no artifact retrieved, no candidate screened, and no verdict issued. Execution
-requires a separate prospective resource authority.
+### Census execution authority and first world contact
+
+- Added Amendment 003 and its machine proposal, the separate prospective authority Amendment 002
+  required for execution, chained to the Amendment 002 owner approval and verified from committed
+  bytes by a lease and approval-chain verifier.
+- Added the per-session `CensusExecutionLease`, which can only restate Amendment 002's frozen
+  resource ceiling, so no ceremony can widen a run; the retrieval executor with HTTPS-only
+  certifi-verified transport, bounded recorded redirects, transport-boundary stop-rule refusal, and
+  live byte-ceiling enforcement; the content-addressed session store that never commits third-party
+  bytes; and the frame registry concretizing the nine frozen domains without extending them.
+- Made the crawler identify itself honestly. It never mimics a browser, because spoofing a
+  client to evade a bot filter would be detection evasion, which this mission forbids. A source that
+  refuses an honestly-identified research crawler produces a real access datum, recorded rather than
+  evaded.
+- Recorded the in-repository receipt, ledger, and handoff cycle producers that close the produce
+  and verify asymmetry: the repository could verify a handoff and validation receipt but could not
+  produce one, so a fresh clone can now regenerate its own resume contract from committed tooling.
+- Removed the governance-key dependency from the execution controls so collection no longer requires
+  the local-only signing key absent on CI; verification is public-key only and tests sign with a
+  deterministic key, mirroring the existing approval-receipt verifier.
+
+Live retrieval has been exercised under a real owner-signed lease to validate the transport against
+the frozen frame; that is transport validation, not a census run. No `CensusReport` exists, no
+candidate has been screened against the twelve gates, and no verdict has been issued. A live census
+run additionally requires its own signed execution lease.
 
 No scientific performance, safety, transfer, product-readiness, or economic claim has been made.

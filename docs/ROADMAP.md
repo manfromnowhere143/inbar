@@ -16,7 +16,7 @@ lifecycle-transition authority is not implemented.
 | Execution and recovery | Deterministic local replay fixtures and component-level verification primitives | Shortcut Authority V2 integration, an independently enforced terminal verifier and signer boundary, testbed adapters, or settled physical recovery evidence |
 | Monitor compilation | Typed monitor specification and provider-neutral port | A compiled, calibrated, transferred monitor |
 | Product | Proposed offline and shadow-mode dossier compiler boundary | A released or validated product |
-| External evidence | Dated source-routing decision with bounded legacy reconnaissance, plus approved and implemented census contracts with executable adversarial controls | An executed census, any screened candidate, a fact locator, or a census verdict |
+| External evidence | Dated source-routing decision with bounded legacy reconnaissance; approved and implemented screening (Amendment 002) and execution (Amendment 003) contracts with executable adversarial controls; live transport validated under a real owner-signed lease | A census run to a verdict, any screened candidate, a committed fact locator, or a `CensusReport` |
 
 The machine contract's `offline_spacecraft_and_robotics_test_incident_replay` wedge is the current
 research workflow, not a product-readiness claim. The proposed product has two ordered boundaries:
@@ -65,16 +65,27 @@ correction required no change to a frozen contract.
 
 ## Immediate next decision
 
-The census contracts are implemented and their adversarial controls execute. The census itself has
-**not run**: no domain has been enumerated, no artifact retrieved, no candidate screened, and no
-verdict issued. Execution requires a separate prospective resource authority under the frozen
-Iteration 001 ceiling.
+The screening contracts (Amendment 002) and the execution authority (Amendment 003) are implemented
+and their adversarial controls execute. Live retrieval has been exercised under a real owner-signed
+lease to validate the transport against the frozen frame; three of the first four domains returned
+bytes to an honestly-identified crawler and one refused it, which is recorded as an access datum.
+That is transport validation. The census itself has **not run to a verdict**: no `CensusReport`
+exists, no candidate has been screened against the twelve gates, and no verdict has been issued.
 
-Two decisions are now open and are not interchangeable.
+Three decisions are now open and are not interchangeable.
 
-1. Authorize census execution. Cheap, local, metadata-only, and bounded by the frozen ceiling. It
-   resolves whether the mission has a subject.
-2. Confront the feasibility constraint the census made explicit. Amendment 002 condition C6 holds
+1. Run the census to a verdict. Cheap, local, metadata-only, and bounded by the frozen ceiling under
+   a per-session lease. It resolves whether the mission has a subject among public sources. The
+   likely outcome is a defensible `CENSUS_NULL_WITHIN_FRAME`, because investigations rarely record a
+   pre-committed hypothesis set, an executed discriminating test, and independent outcome
+   adjudication in a machine-reconstructible, rights-clear form.
+2. Open the causal-laboratory plane. The source-role audit already froze a three-plane
+   architecture whose second plane is a legally cleared NOS3 or Basilisk simulator that executes
+   paired no-op, targeted, wrong-but-safe, recovery, and blocked-unsafe branches from identical
+   snapshots. This is where the method itself can be built and tested against injected ground truth
+   independent of whether public data qualifies, and it is the likeliest path to an actual result.
+   It requires its own prospective authority and does not begin before the census is settled.
+3. Confront the feasibility constraint the census made explicit. Amendment 002 condition C6 holds
    that a reviewer who reads an investigation record has read its conclusion, so an exposed
    extraction is contaminated and permanently ineligible for the incident floor. Combined with the
    parent's role-independence gate, counted dossiers require a second, unexposed reviewer and a
