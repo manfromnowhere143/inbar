@@ -472,3 +472,32 @@ def test_a_repeated_blob_is_not_rewritten() -> None:
     assert first.response_sha256 == second.response_sha256
     blob = REPO_ROOT / ".local/census/sess-1/blobs" / first.response_sha256
     assert blob.read_bytes() == b"<html>docket</html>"
+
+
+# --- Honest-identification controls -------------------------------------------------
+
+
+def test_crawler_identifies_honestly_and_never_mimics_a_browser() -> None:
+    from fieldtrue.census_execution import CRAWLER_USER_AGENT
+
+    ua = CRAWLER_USER_AGENT.lower()
+    # It names itself and its purpose.
+    assert "inbar" in ua
+    assert "census" in ua
+    # It must NOT impersonate a browser or common client: that would be detection evasion.
+    for forbidden in ("mozilla", "chrome", "safari", "firefox", "edge", "webkit", "gecko"):
+        assert forbidden not in ua, f"crawler UA must not mimic {forbidden}"
+
+
+def test_transport_sends_the_honest_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    from fieldtrue import census_execution
+
+    seen: dict[str, str] = {}
+
+    def capture(request: object, *_a: object, **_k: object) -> _FakeResponse:
+        seen["ua"] = request.get_header("User-agent")  # type: ignore[attr-defined]
+        return _FakeResponse(200, {}, b"ok")
+
+    monkeypatch.setattr(census_execution.urllib.request, "urlopen", capture)
+    census_execution.https_certifi_transport(ALLOWED_URI)
+    assert seen["ua"] == census_execution.CRAWLER_USER_AGENT

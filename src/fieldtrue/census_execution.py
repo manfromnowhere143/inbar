@@ -62,6 +62,14 @@ LOCAL_STORE_ROOT: Final = ".local/census"
 MAX_REDIRECT_HOPS: Final = 5
 _MAX_SINGLE_RESPONSE_BYTES: Final = 256 * 1024 * 1024
 
+# The crawler identifies itself honestly. It never mimics a browser: a source that blocks an
+# honestly-identified research crawler is producing a real access datum, not an obstacle to
+# evade. Spoofing a browser user-agent would be detection evasion, which this mission forbids.
+CRAWLER_USER_AGENT: Final = (
+    "InbarResearchCrawler/0.1 (+iter001 physical-causal-evidence source census; "
+    "public-metadata screening; honest-identification)"
+)
+
 
 class CensusExecutionError(CensusError):
     """A lease, transport, ceiling, frame, or storage rule refused the operation."""
@@ -292,7 +300,9 @@ def https_certifi_transport(uri: str) -> tuple[int, str, tuple[str, ...], bytes]
     for _ in range(MAX_REDIRECT_HOPS + 1):
         if urllib.parse.urlsplit(current).scheme != "https":
             raise CensusExecutionError("retrieval transport is https-only")
-        request = urllib.request.Request(current, method="GET")  # noqa: S310 - scheme enforced above
+        request = urllib.request.Request(  # noqa: S310 - scheme enforced above
+            current, method="GET", headers={"User-Agent": CRAWLER_USER_AGENT}
+        )
         try:
             with urllib.request.urlopen(  # noqa: S310 - scheme enforced above
                 request, timeout=60, context=context
