@@ -1,0 +1,81 @@
+{
+  "amendment_document": {
+    "artifact_sha256": "0ff5916abc82a7b51c7f67adb25c5e18abbe1a3d95dfcb46f4e35783d126cf2b",
+    "path": "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_005.md"
+  },
+  "amendment_id": "iter001_005",
+  "approval": {
+    "approval_basis": "owner_delegation_not_owner_review",
+    "decision": "approve_method_campaign_implementation_only",
+    "previous_receipt_genesis_forbidden": true,
+    "previous_receipt_sha256": "59a620b145bc8803e73bc34dcbd594dcfac7526a6ca313e3708ef2e3401db852",
+    "receipt_path": "protocol/approvals/iter001_005_owner_approval.json",
+    "receipt_schema": "inbar.owner-amendment-approval-receipt.v5",
+    "v5_widens_decision_literal_only": true
+  },
+  "authority_effect": {
+    "campaign_requires_compute_lease": true,
+    "canonical_control_authority": "bootstrap",
+    "in_simulator_result_never_a_physical_or_product_claim": true,
+    "proposal_alone_campaign_run_authorized": false,
+    "proposal_alone_implementation_authorized": false,
+    "registered_blocker_remains": "iter001-acquisition-contract",
+    "simulator_branch_never_counts_as_physical_incident": true
+  },
+  "campaign": {
+    "committed_before_run": ["seed_schedule", "injection_distribution", "episode_count"],
+    "conditions": {
+      "active": "method sees no_op and targeted_test branch telemetry",
+      "passive": "method sees only no_op branch telemetry"
+    },
+    "paired_same_injection_and_snapshot_across_conditions": true,
+    "varies_only_evidence_condition": true
+  },
+  "comparative_result": {
+    "binds": ["both_proposal_hashes", "owner_approval_receipt", "compute_lease", "ontology", "simulator_identity", "seed_schedule"],
+    "harness_recomputes_every_quantity": true,
+    "may_not_claim_physical_or_other_method": true,
+    "reports": ["per_condition_accuracy", "calibration", "abstention_rate_and_correctness", "unknown_handling", "paired_active_minus_passive_with_clustered_interval"]
+  },
+  "diagnosis_method_port": {
+    "blind_to_injected_mechanism_until_adjudication": true,
+    "inspecting_sealed_truth_or_adjudication_is_invalid_episode_discarded": true,
+    "provider_neutral_typed_port": true,
+    "receives_only_permitted_branch_telemetry_and_ontology": true,
+    "reference_baseline": "reference_likelihood_diagnoser",
+    "reference_baseline_frozen": ["forward_models", "confidence_floor", "tie_margin", "tie_break_rule"],
+    "returns_hypothesis_set_and_single_diagnosis_never_the_truth": true
+  },
+  "forbidden_claims_unchanged": [
+    "diagnosis",
+    "intervention_benefit",
+    "recovery",
+    "safety",
+    "transfer",
+    "product_readiness",
+    "economic_value",
+    "state_of_the_art",
+    "physical_or_real_world_claim_from_simulator"
+  ],
+  "implementation_gate": {
+    "controls_run_without_network_and_without_gpu": true,
+    "owner_approval_required_before_code": true,
+    "permitted_implementation": [
+      "typed_diagnosis_method_port",
+      "reference_likelihood_baseline",
+      "campaign_runner_and_evidence_condition_control",
+      "comparative_result_contract_and_harness_recomputation",
+      "explicit_method_campaign_and_result_hashes_bound_to_lease_and_episodes",
+      "adversarial_control_suite"
+    ],
+    "production_artifacts_authorized": false
+  },
+  "iteration_id": "iter001_physical_causal_evidence_acquisition",
+  "normative_relation": {
+    "conflict_disposition": "INVALID",
+    "document_and_machine_proposal_jointly_required": true,
+    "prior_frozen_contracts_prevail_on_conflict": true
+  },
+  "schema_version": "inbar.iter001-method-campaign-proposal.v1",
+  "status": "immutable_proposal"
+}
