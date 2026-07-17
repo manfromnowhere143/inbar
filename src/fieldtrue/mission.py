@@ -190,7 +190,7 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     "CONTINUITY.md": ("4ba251d829203170956e85358aeb4868f655bae1f7649d7ac7a60c82fd24d962"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
-    "README.md": "76b612ff435e151d78ea684ef5709e4f6dc90eafa2cea709a60cc51f3b69ee97",
+    "README.md": "2de19bb6322aadab9b59fb89292646e8873953c2569aec2d0e330b46e1e60a39",
     "docs/ARCHITECTURE.md": ("30d6df5d3fda894fdb344c92f4df0330e2984ad54791689e94f9a0ad521ad05d"),
     "docs/CLAIM_BOUNDARIES.md": (
         "6b21b47508462c0ccb5e199f00d51b7399cc11aee7199aa79a54b266f17ac85a"
@@ -235,7 +235,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     "protocol/verification_authorities/iter000_verification_001.json": (
         "154dee03ea4dc30507b9b2bcd57d83617655da7d10501f9f0e881088a7ed5dd9"
     ),
-    "pyproject.toml": ("317391041d968f321d559272f5607e8e59caeab0e0c949c29bdd42bc32a2570f"),
+    "pyproject.toml": ("b30b947d7a36b9a4bf3d83b9df971cb34f2410d93b1c81fa5e0da601bb538f6c"),
     "src/fieldtrue/acquisition.py": (
         "1db52fa08405ce5f28013715c34782475b57c814becd6e50aa0729353cc101ce"
     ),
