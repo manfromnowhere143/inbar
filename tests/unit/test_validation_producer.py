@@ -334,10 +334,15 @@ def test_write_validation_receipt_emits_canonical_bytes(
     _init_repo(tmp_path)
     monkeypatch.setattr("fieldtrue.validation_producer.plan_argv", _stub_plan)
     path = write_validation_receipt(tmp_path, receipt_id=RECEIPT_ID, producer_actor_id="claude")
-    payload = json.loads(path.read_bytes())
+    raw = path.read_bytes()
+    payload = json.loads(raw)
     assert payload["receipt_id"] == RECEIPT_ID
     assert payload["schema_version"] == "inbar.engineering-validation-receipt.v1"
-    assert path.read_bytes().endswith(b"\n")
+    # The renderer requires exact canonical bytes; endswith-newline alone missed a
+    # double-newline defect that cost a full oracle run.
+    from fieldtrue.canonical import canonical_json_pretty
+
+    assert raw == canonical_json_pretty(payload)
 
 
 # --- Subject-binding control -------------------------------------------------------

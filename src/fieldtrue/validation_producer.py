@@ -279,7 +279,7 @@ def write_validation_receipt(repo_root: Path, *, receipt_id: str, producer_actor
     )
     path = repo_root / _evidence_dir(receipt_id) / "receipt.json"
     payload: dict[str, Any] = receipt.model_dump(mode="json")
-    path.write_bytes(canonical_json_pretty(payload) + b"\n")
+    path.write_bytes(canonical_json_pretty(payload))
     return path
 
 
