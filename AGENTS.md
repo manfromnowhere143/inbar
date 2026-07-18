@@ -25,6 +25,13 @@ git status --short --branch
 
 ## Research discipline
 
+- Commit messages carry no trailers. No `Co-Authored-By`, no session links, no tool attribution, no
+  self-praise. State what happened and why, in plain factual prose. This convention holds across the
+  entire history and is written down here because it was previously only observable from that
+  history: a session in 2026-07-18 applied a tool default instead of matching the repository and put
+  `Co-Authored-By` trailers on nine commits that reached public `main`. Those stand uncorrected,
+  because rewriting published history to hide a convention error is worse than the error. Corrected
+  forward from `eb37d93`.
 - Commit `HYPOTHESIS.md` before experiment-specific tooling or outcome inspection.
 - Freeze source, split, baseline ladder, primary outcome, uncertainty method, spend ceiling, stop
   rule, falsifiers, verdict classes, and forbidden claims.
