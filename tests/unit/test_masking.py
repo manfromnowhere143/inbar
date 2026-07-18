@@ -23,6 +23,7 @@ from fieldtrue.graded_laboratory import (
     graded_run,
 )
 from fieldtrue.masking import (
+    BASELINE_COMMAND,
     COMPENSATOR_GAIN,
     RESOLVABLE_PERMILLE,
     SAFE_COMMAND_CEILING,
@@ -41,16 +42,18 @@ ACTUATOR_LOSS = _BY_NAME["actuator_loss"]
 SENSOR_BIAS = _BY_NAME["sensor_bias"]
 MECHANISMS = (*sorted(GRADED_ONTOLOGY.known_keys), UNKNOWN_MECHANISM_KEY)
 NO_OP = (0,) * 8
+BASELINE = (BASELINE_COMMAND,) * 8
 
 
 def _observe(key: str, severity: int, seed: int = 3) -> tuple[int, ...]:
+    """Telemetry under the baseline operating command, which is what the compensator sees."""
     _, telemetry = graded_run(
         config=GRADED_CONFIG,
         initial_state=GRADED_INITIAL_STATE,
         seed=seed,
         mechanism_key=key,
         severity=severity,
-        action=NO_OP,
+        action=BASELINE,
     )
     return telemetry
 
@@ -67,10 +70,10 @@ def test_compensator_depends_only_on_observed_telemetry() -> None:
     """
     trace = _observe(ACTUATOR_LOSS, 100)
     first = compensator_action(
-        observed_no_op=trace, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+        observed_baseline=trace, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
     )
     second = compensator_action(
-        observed_no_op=trace, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+        observed_baseline=trace, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
     )
     assert first == second
 
@@ -79,41 +82,99 @@ def test_compensator_stays_inside_the_safe_envelope_under_extreme_deviation() ->
     """An unbounded command is an unsafe action, regardless of how large the deviation is."""
     huge = _observe(SENSOR_BIAS, 100)
     action = compensator_action(
-        observed_no_op=huge, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE, gain=100_000
+        observed_baseline=huge,
+        config=GRADED_CONFIG,
+        initial_state=GRADED_INITIAL_STATE,
+        gain=100_000,
     )
     assert all(0 <= u <= SAFE_COMMAND_CEILING for u in action)
 
     inverted = tuple(-v for v in huge)
     action_low = compensator_action(
-        observed_no_op=inverted, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+        observed_baseline=inverted, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
     )
     assert all(0 <= u <= SAFE_COMMAND_CEILING for u in action_low)
 
 
-def test_a_nominal_system_receives_no_correction() -> None:
-    """With no departure there is nothing to compensate, so the commanded drive is zero."""
+def test_a_nominal_system_holds_the_baseline_command() -> None:
+    """With no departure there is nothing to compensate, so drive stays at baseline.
+
+    Not zero: the system is operating. A compensator that dropped an untroubled system to no drive
+    would itself be the anomaly.
+    """
     nominal = nominal_final_state(
-        config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE, action=NO_OP
+        config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE, action=BASELINE
     )
     action = compensator_action(
-        observed_no_op=(nominal,) * GRADED_CONFIG.steps,
+        observed_baseline=(nominal,) * GRADED_CONFIG.steps,
         config=GRADED_CONFIG,
         initial_state=GRADED_INITIAL_STATE,
     )
-    assert action == (0,) * GRADED_CONFIG.steps
+    assert action == (BASELINE_COMMAND,) * GRADED_CONFIG.steps
 
 
-def test_larger_deviation_commands_a_larger_correction() -> None:
-    """The compensator must actually be proportional, or it is not the policy it is described as."""
+def test_larger_deviation_commands_a_strictly_larger_correction() -> None:
+    """The compensator must be proportional, and the comparison must be strict.
+
+    This control previously asserted `severe >= mild` and passed on `0 >= 0` while the compensator
+    was completely inert, which is how an entire measurement reached a frozen protocol before the
+    defect was found. A guard that cannot fail is not a guard.
+    """
     mild = _observe(ACTUATOR_LOSS, 25)
     severe = _observe(ACTUATOR_LOSS, 100)
     mild_action = compensator_action(
-        observed_no_op=mild, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+        observed_baseline=mild, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
     )
     severe_action = compensator_action(
-        observed_no_op=severe, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+        observed_baseline=severe, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
     )
-    assert severe_action[0] >= mild_action[0]
+    assert severe_action[0] > mild_action[0]
+
+
+# --- Inertness controls -----------------------------------------------------------------
+#
+# Three components in this laboratory have been built, described as doing something, and found to do
+# nothing: a quadratic term that floored to zero under integer division, a first graded laboratory
+# that could not defeat its own method, and a compensator that never fired. Each passed every control
+# it had, because none of those controls could fail on an inert component. These can.
+
+
+def test_the_compensator_actually_fires_on_at_least_one_mechanism() -> None:
+    """If no correction ever departs from baseline, no masking measurement means anything."""
+    commanded = {
+        m: measure_cell(mechanism_key=m, severity=100, seed=0).commanded_correction
+        for m in MECHANISMS
+    }
+    assert any(u != BASELINE_COMMAND for u in commanded.values()), (
+        f"compensator inert across every mechanism: {commanded}"
+    )
+
+
+def test_the_measurement_moves_separability_somewhere() -> None:
+    """Pre and post separability must differ for at least one cell.
+
+    If the corrective action never changes what is resolvable, the masking index is identically
+    zero and the protocol cannot return either of its outcomes.
+    """
+    indices = [
+        measure_cell(mechanism_key=m, severity=s, seed=0).masking_index_permille
+        for m in MECHANISMS
+        for s in (45, 100)
+    ]
+    assert any(i != 0 for i in indices), f"separability never moved: {indices}"
+
+
+def test_at_least_one_mechanism_is_resolvable_before_correction() -> None:
+    """A denominator of zero makes the primary rate vacuous regardless of the data.
+
+    Freeze v1 returned exactly this and could not have produced information under any outcome.
+    """
+    resolvable = [
+        measure_cell(mechanism_key=m, severity=s, seed=0).resolvable_pre
+        for m in MECHANISMS
+        for s in (45, 100)
+    ]
+    assert any(resolvable), "no cell resolvable pre-action: the primary rate would be vacuous"
 
 
 # --- A cell cannot claim more than it observed -----------------------------------------
@@ -271,7 +332,7 @@ def test_measured_cell_is_reproducible() -> None:
 def test_measured_cell_records_the_command_it_actually_issued() -> None:
     cell = measure_cell(mechanism_key=ACTUATOR_LOSS, severity=100, seed=0)
     expected = compensator_action(
-        observed_no_op=_observe(ACTUATOR_LOSS, 100, seed=0),
+        observed_baseline=_observe(ACTUATOR_LOSS, 100, seed=0),
         config=GRADED_CONFIG,
         initial_state=GRADED_INITIAL_STATE,
     )

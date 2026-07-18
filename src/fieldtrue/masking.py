@@ -65,6 +65,16 @@ COMPENSATOR_GAIN: Final = 40
 SAFE_COMMAND_FLOOR: Final = 0
 SAFE_COMMAND_CEILING: Final = 100
 
+# The system is operating, not at rest. This is the correction that made the instrument work.
+#
+# Freeze v1 and v2 both observed the pre-action state under a no-op and both produced no correction
+# at all: a fault that attenuates drive is invisible when the commanded drive is zero, and a fault
+# that raises the state cannot be countered by a compensator that may only command positive drive.
+# Masking requires something to cancel, and there is nothing to cancel at rest. Under a baseline
+# command an actuator fault depresses output and the compensator raises drive to restore setpoint,
+# which is the classic case the phenomenon describes.
+BASELINE_COMMAND: Final = 50
+
 # A separability index at or above this is resolvable in principle; below it the closest competing
 # hypothesis sits inside the disturbance floor.
 RESOLVABLE_PERMILLE: Final = 1000
@@ -89,22 +99,25 @@ def nominal_final_state(
 
 def compensator_action(
     *,
-    observed_no_op: tuple[int, ...],
+    observed_baseline: tuple[int, ...],
     config: GradedFaultConfig,
     initial_state: int,
+    baseline: int = BASELINE_COMMAND,
     gain: int = COMPENSATOR_GAIN,
 ) -> tuple[int, ...]:
-    """The corrective action an autonomy layer commands after seeing the no-op telemetry.
+    """The corrective action an autonomy layer commands after seeing the baseline telemetry.
 
-    Mechanism-blind by construction: it sees one telemetry trace and a nominal expectation, and
-    never the ontology, the injected mechanism, or the severity.
+    It compares the observed final state against what a nominal system would have reached under the
+    same baseline command, and adjusts drive to close the shortfall. Mechanism-blind by
+    construction: it sees one telemetry trace and a nominal expectation, and never the ontology, the
+    injected mechanism, or the severity.
     """
-    no_op = (0,) * config.steps
-    deviation = (
-        nominal_final_state(config=config, initial_state=initial_state, action=no_op)
-        - observed_no_op[-1]
+    baseline_action = (baseline,) * config.steps
+    shortfall = (
+        nominal_final_state(config=config, initial_state=initial_state, action=baseline_action)
+        - observed_baseline[-1]
     )
-    commanded = (gain * deviation) // 100
+    commanded = baseline + (gain * shortfall) // 100
     clipped = max(SAFE_COMMAND_FLOOR, min(SAFE_COMMAND_CEILING, commanded))
     return (clipped,) * config.steps
 
@@ -207,22 +220,27 @@ def measure_cell(
     config: GradedFaultConfig = GRADED_CONFIG,
     initial_state: int = GRADED_INITIAL_STATE,
     candidate_keys: tuple[str, ...] | None = None,
+    baseline: int = BASELINE_COMMAND,
     gain: int = COMPENSATOR_GAIN,
 ) -> MaskingCell:
     """Measure separability before and after the autonomous correction for one cell."""
     keys = candidate_keys or (*sorted(GRADED_ONTOLOGY.known_keys), UNKNOWN_MECHANISM_KEY)
-    no_op = (0,) * config.steps
+    baseline_action = (baseline,) * config.steps
 
-    _, observed_no_op = graded_run(
+    _, observed_baseline = graded_run(
         config=config,
         initial_state=initial_state,
         seed=seed,
         mechanism_key=mechanism_key,
         severity=severity,
-        action=no_op,
+        action=baseline_action,
     )
     correction = compensator_action(
-        observed_no_op=observed_no_op, config=config, initial_state=initial_state, gain=gain
+        observed_baseline=observed_baseline,
+        config=config,
+        initial_state=initial_state,
+        baseline=baseline,
+        gain=gain,
     )
 
     # Per-mechanism, not catalog-wide. Freeze v1 specified the catalog-wide index and was vacuous:
@@ -232,7 +250,7 @@ def measure_cell(
         config=config,
         initial_state=initial_state,
         severity=severity,
-        action=no_op,
+        action=baseline_action,
         injected_key=mechanism_key,
         candidate_keys=keys,
     )
