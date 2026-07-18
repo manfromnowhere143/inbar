@@ -1,0 +1,324 @@
+{
+  "assurance_scope": "same-operator-engineering-observation-no-independent-attestation",
+  "authority_effect": "none",
+  "environment": {
+    "machine": "arm64",
+    "platform": "macOS-14.4-arm64-arm-64bit",
+    "python_version": "3.12.13",
+    "uv_version": "0.11.28"
+  },
+  "finished_at": "2026-07-18T10:17:47.570331Z",
+  "independent_attestation": false,
+  "mission_id": "inbar",
+  "mission_observation": {
+    "expected_blockers": [
+      "iter001-acquisition-contract"
+    ],
+    "missing_expected_blockers": [],
+    "mission_check_ids": [
+      "owner-boundary",
+      "active-identity",
+      "execution-authority",
+      "mission-stage",
+      "research-engine-deferred",
+      "publication-gates",
+      "publication-transition-evidence",
+      "gate-falsification",
+      "gate-control-registry",
+      "preregistration-first",
+      "hypothesis-status",
+      "iter001-acquisition-contract",
+      "dataset-lock",
+      "iteration-amendment-001",
+      "verification-correction-001",
+      "claim-registry",
+      "research-memory",
+      "research-memory-git-anchors",
+      "signer-anchor",
+      "schemas",
+      "lockfile",
+      "provider-independence"
+    ],
+    "observed_blockers": [
+      "iter001-acquisition-contract"
+    ],
+    "step_id": "mission-validate",
+    "unexpected_blockers": []
+  },
+  "plan_id": "inbar.core-engineering-validation.v1",
+  "plan_sha256": "5a2eeb4d7c9668000d549185e34d970781b0863247994db4ef751f1b7d13a19f",
+  "producer_actor_id": "daniel-wahnich",
+  "pytest_observation": {
+    "coverage_json": {
+      "bytes": 1230013,
+      "media_type": "application/json",
+      "path": "evidence/validation/inbar-core-validation-20260718-v13/coverage.json",
+      "sha256": "62aef9614d5b1d2f69e72d3f9ef6bb06bcc85292a3bf42018e452bc50ad22a70"
+    },
+    "covered_branches": 4488,
+    "covered_lines": 14614,
+    "junit_xml": {
+      "bytes": 212152,
+      "media_type": "application/xml",
+      "path": "evidence/validation/inbar-core-validation-20260718-v13/pytest.junit.xml",
+      "sha256": "be37a044a6eb9fa72833a55dd13aa5a11f3e1edbb4e13cad136a3848cca95e0b"
+    },
+    "num_branches": 5206,
+    "num_statements": 15748,
+    "step_id": "pytest-cov",
+    "tests_errors": 0,
+    "tests_failed": 0,
+    "tests_passed": 1432,
+    "tests_skipped": 0
+  },
+  "receipt_id": "inbar-core-validation-20260718-v13",
+  "resource_accounting": {
+    "cloud_jobs": null,
+    "direct_cost_usd": null,
+    "gpu_seconds": null,
+    "measurement_status": "not_metered",
+    "paid_calls": null
+  },
+  "result": "pass",
+  "schema_version": "inbar.engineering-validation-receipt.v1",
+  "scientific_result": "not_evaluated",
+  "started_at": "2026-07-18T10:01:21.940922Z",
+  "steps": [
+    {
+      "argv": [
+        "uv",
+        "lock",
+        "--check"
+      ],
+      "duration_ms": 24,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:01:21.965354Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:01:21.941124Z",
+      "stderr": {
+        "bytes": 29,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/uv-lock-check.stderr.txt",
+        "sha256": "14cc97df269b66f7f1732500489800c84d07a60f239199043ba2c5220f6658dc"
+      },
+      "stdout": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/uv-lock-check.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "step_id": "uv-lock-check",
+      "working_directory": "."
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        "."
+      ],
+      "duration_ms": 136,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:01:22.102778Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:01:21.966022Z",
+      "stderr": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/ruff-check.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 19,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/ruff-check.stdout.txt",
+        "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+      },
+      "step_id": "ruff-check",
+      "working_directory": "."
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        "."
+      ],
+      "duration_ms": 32,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:01:22.135691Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:01:22.103608Z",
+      "stderr": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/ruff-format-check.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 27,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/ruff-format-check.stdout.txt",
+        "sha256": "cafa7c5a1693e3113785dde7c8ea539245576e1e61cf368219dab32d2dba8315"
+      },
+      "step_id": "ruff-format-check",
+      "working_directory": "."
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "mypy",
+        "src"
+      ],
+      "duration_ms": 475,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:01:22.612232Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:01:22.136289Z",
+      "stderr": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/mypy.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 44,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/mypy.stdout.txt",
+        "sha256": "355a435c33a29b8f3f0db0815b88731b7ae35c080fe47fdbc27e9330572711aa"
+      },
+      "step_id": "mypy",
+      "working_directory": "."
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "inbar",
+        "schemas",
+        "check"
+      ],
+      "duration_ms": 409,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:01:23.022144Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:01:22.613028Z",
+      "stderr": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/schemas-check.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 17,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/schemas-check.stdout.txt",
+        "sha256": "ccaa8555bc72c8b3eeb0893b52a0c60e2ca778c2eca3f441e71bb52471480a1b"
+      },
+      "step_id": "schemas-check",
+      "working_directory": "."
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "inbar",
+        "memory",
+        "verify"
+      ],
+      "duration_ms": 338,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:01:23.361314Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:01:23.022858Z",
+      "stderr": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/memory-verify.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 102,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/memory-verify.stdout.txt",
+        "sha256": "11d67938be581445c56032a1a6ad1eaf7f9c48791115ffd071d93fc2adfdf8be"
+      },
+      "step_id": "memory-verify",
+      "working_directory": "."
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "inbar",
+        "mission",
+        "validate",
+        "--expect-failure",
+        "iter001-acquisition-contract"
+      ],
+      "duration_ms": 48116,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:02:11.478419Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:01:23.362027Z",
+      "stderr": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/mission-validate.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 3752,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/mission-validate.stdout.txt",
+        "sha256": "5796c903e721b51a584149a827c5a4ceb0ae79a9681c96f974324dddb05a3601"
+      },
+      "step_id": "mission-validate",
+      "working_directory": "."
+    },
+    {
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "--runxfail",
+        "--cov",
+        "--cov-report=json:evidence/validation/inbar-core-validation-20260718-v13/coverage.json",
+        "--junitxml=evidence/validation/inbar-core-validation-20260718-v13/pytest.junit.xml"
+      ],
+      "duration_ms": 936089,
+      "expected_exit_code": 0,
+      "finished_at": "2026-07-18T10:17:47.568694Z",
+      "observed_exit_code": 0,
+      "result": "pass",
+      "started_at": "2026-07-18T10:02:11.479584Z",
+      "stderr": {
+        "bytes": 0,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/pytest-cov.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 1960,
+        "media_type": "text/plain; charset=utf-8",
+        "path": "evidence/validation/inbar-core-validation-20260718-v13/pytest-cov.stdout.txt",
+        "sha256": "74a495bda7a665bc0f09b45f97bac3777593f380327c2618018e3277d467d36c"
+      },
+      "step_id": "pytest-cov",
+      "working_directory": "."
+    }
+  ],
+  "subject_commit": "1a76c8164cdf20af2128f14f02935876c53c8366",
+  "subject_tree": "549d4dd2be9aa0ec31e81809c29b6069120b5554"
+}
