@@ -9,8 +9,10 @@ adjudicate the outcome.**
 
 > **Honest status up front. Scientific state: `bootstrap`, BLOCKED at `iter001-acquisition-contract`.**
 > No corpus is admitted, no incident is screened to a verdict, no simulation campaign has run, and
-> no scientific result exists. Iteration 000 returned `BLOCKED_EVIDENCE` on NASA ADAPT: 16 real
-> incidents on 1 hardware identity, 0 of a required 30 complete dossiers. The public-source route is
+> no scientific result exists. Iteration 000 returned `BLOCKED_EVIDENCE` on NASA ADAPT: 16
+> evidence-useful experiment records on 1 hardware identity, 0 of a required 30 complete dossiers.
+> They are not called incidents here, because the incident construct is exactly what that gate
+> denied them. The public-source route is
 > recorded as `BLOCK_CURRENT_PUBLIC_SOURCE_ONLY_ROUTE` — a dated, non-systematic reconnaissance,
 > not an established negative. Six owner-signed amendments authorize the machinery that now exists:
 > A001 shortcut-authority V2, A002 source-screening census, A003 census execution, A004
@@ -34,6 +36,18 @@ adjudicate the outcome.**
 >
 > That an active test beats passive observation on faults unidentifiable at rest is a **known
 > theorem**, not a finding of this mission, and A006 prohibits it ever being reported as one.
+>
+> **What the six owner signatures actually prove.** The `iter001-governance` private key is stored
+> unencrypted in the working tree, readable by any process with filesystem access to this repository.
+> An automated agent has already read it and minted a valid compute lease with it. Every signature
+> here therefore establishes key possession under the stated trust model and **nothing about human
+> intent**. Five of the six amendments — A002 through A006 — were signed by the same agent that
+> proposed them, under owner delegation, with the owner declining to read them. The approval receipt
+> schema has no approval-basis field, so a machine verifier sees six clean owner signatures and every
+> caveat lives only in prose. Amendment 006 goes further: its own text states that the drafter
+> declines to sign and that owner reading is "the only independent check present anywhere in this
+> chain" — and it was then signed by the drafter anyway. That override is recorded in
+> [`AMENDMENT_006_APPROVAL_DEFECT.md`](experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_006_APPROVAL_DEFECT.md).
 >
 > This is a pre-release research system. A public code checkpoint here does not
 > imply a diagnosis, recovery, safety, transfer, product-readiness, state-of-the-art, or
@@ -74,11 +88,17 @@ flowchart LR
   classDef truth fill:#fff4e5,stroke:#b54708,color:#4a2500;
   classDef stop fill:#fff1f0,stroke:#cf222e,color:#4c1114;
   classDef adjudicate fill:#e6f4ea,stroke:#1a7f37,color:#0f3d1c;
+  classDef gate fill:#f3eaff,stroke:#8250df,color:#2b0f52;
   class E,H propose;
-  class T,S truth;
+  class T truth;
+  class S gate;
   class R stop;
   class O,Q adjudicate;
 ```
+
+Blue proposes, purple gates, orange holds sealed truth, red is a refusal, green adjudicates. The
+safety authority is drawn in its own colour rather than sharing the truth colour: it decides what may
+be executed and never what is true, and those two authorities must not read as one.
 
 The proposer sees model-visible evidence and never the sealed truth. The safety authority can
 refuse an action, and a refused action is recorded as refused, never executed. The outcome
@@ -91,12 +111,15 @@ controls throughout the repository.
 
 Every node below is bound to committed evidence. Color is semantic: gray is a null or block that
 retains full evidentiary weight, blue is completed engineering, orange is a bounded correction,
-green is authorized-and-built.
+green is authorized-and-built. A dotted edge to the blocker means the amendment built machinery
+bearing on `iter001-acquisition-contract` without closing it; every amendment carries one, because
+none of them closed it.
 
 ```mermaid
 flowchart TB
   I000["iter000 · NASA ADAPT<br/>BLOCKED_EVIDENCE<br/>16 incidents · 1 identity · 0/30"]
   SRC["source-role audit<br/>KILL_PUBLIC_SUBSTRATE →<br/>BLOCK_CURRENT_PUBLIC_SOURCE_ONLY_ROUTE"]
+  A001["Amendment 001 · shortcut authority V2<br/>exact-Gini kill baseline · LOGO cross-fit<br/>dormant · grants no authority"]
   A002["Amendment 002 · source-screening census<br/>frame · fact-locators · C1–C6 · I1–I4"]
   A003["Amendment 003 · census execution<br/>lease · certifi transport · frame registry"]
   WC["first world contact<br/>NTSB · CSB · NASA LLIS returned<br/>NRC refused — access datum"]
@@ -104,10 +127,12 @@ flowchart TB
   A005["Amendment 005 · method port + campaign<br/>effect is an ALGEBRAIC IDENTITY<br/>instrument cannot produce a negative"]
   A006["Amendment 006 · graded laboratory<br/>instrument can now falsify<br/>NULL · classical AFD ties the selector"]
   BLK["iter001-acquisition-contract<br/>BLOCKED · no corpus · no verdict"]
-  I000-->SRC-->A002-->A003-->WC-->A004-->A005-->A006
+  I000-->SRC-->A001-->A002-->A003-->WC-->A004-->A005-->A006
+  A001-.->BLK
   A002-.->BLK
   A003-.->BLK
   A004-.->BLK
+  A005-.->BLK
   A006-.->BLK
   classDef null fill:#f6f8fa,stroke:#57606a,color:#24292f;
   classDef complete fill:#eaf3ff,stroke:#0969da,color:#0c2d57;
@@ -115,7 +140,7 @@ flowchart TB
   classDef active fill:#e6f4ea,stroke:#1a7f37,color:#0f3d1c;
   class I000,BLK,A005 null;
   class SRC corrected;
-  class A002,A003,WC,A004 complete;
+  class A001,A002,A003,WC,A004 complete;
   class A006 active;
 ```
 
@@ -213,8 +238,8 @@ a comparison arm, not as a recommended method.
 Two disclosures belong with these results. The A006 implementation *preceded* its proposal,
 reversing the mission's canonical `propose → approve → implement` order, so the laboratory's design
 is outcome-informed and no result produced against it may be reported as prospective. And A006 was
-signed by the same agent that proposed it, under owner delegation without owner review — the second
-consecutive amendment in that condition. Both facts are recorded in the amendment, the machine
+signed by the same agent that proposed it, under owner delegation without owner review — the fifth
+consecutive amendment in that condition, since Amendments 002 through 005 each disclose the same. Both facts are recorded in the amendment, the machine
 proposal, and the approval receipt rather than inferred from the history.
 
 ## What is built, and what is not

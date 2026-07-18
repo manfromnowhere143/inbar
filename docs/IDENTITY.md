@@ -28,7 +28,7 @@ diligence, not a legal opinion.
 
 ## Open-source transition
 
-The repository remains private staging until the exact release commit has a green clean-clone CI
+The repository is public. It was published before the exact release commit had a green clean-clone CI
 matrix, identity and claim documents agree, rights and secret scans pass, a license is selected,
 and Daniel approves the visibility change. Canonical scientific authority may remain transparently
 blocked in an open-source code release, but no scientific result or product claim may be implied.

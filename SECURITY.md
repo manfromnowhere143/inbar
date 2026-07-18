@@ -7,9 +7,9 @@ live robots, destructive tests, production safety decisions, or unattended contr
 
 ## Reporting
 
-Do not disclose a suspected vulnerability in a public issue. After the repository is published,
-use GitHub's private vulnerability reporting or Security Advisories interface. Before publication,
-report privately to Daniel Wahnich through the established project communication channel.
+Do not disclose a suspected vulnerability in a public issue. The repository is public: use GitHub's
+private vulnerability reporting or Security Advisories interface on
+`https://github.com/manfromnowhere143/inbar`, or write to research@danielwahnich.dev.
 
 Include the affected revision, execution authority, reproduction steps, expected and observed
 behavior, and whether the issue can alter evidence, truth separation, approvals, signed ledgers,

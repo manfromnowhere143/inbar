@@ -177,7 +177,7 @@ No scientific performance, safety, transfer, product-readiness, or economic clai
 Amendment 006 reverses the mission's canonical propose-then-approve-then-implement order: the
 implementation preceded the proposal, so the laboratory's design is outcome-informed and no result
 produced against it may be reported as prospective. It was signed by the same agent that proposed
-it, under owner delegation without owner review, the second consecutive amendment in that
+it, under owner delegation without owner review, the fifth consecutive amendment in that
 condition. Both facts are recorded in the amendment document, the machine proposal, and the
 approval receipt.
 

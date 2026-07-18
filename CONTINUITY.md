@@ -147,7 +147,7 @@ design is therefore outcome-informed and no result produced against it may be re
 prospective. A claim-bearing result requires a superseding amendment that freezes the design,
 episode schedule, cost weights, and analysis before any further outcome is inspected. Amendment 006
 was also signed by the same agent that proposed it, under owner delegation without owner review, the
-second consecutive amendment in that condition.
+fifth consecutive amendment in that condition; Amendments 002 through 005 each disclose the same.
 
 ## Conditional research interest
 
@@ -183,17 +183,31 @@ claim diagnosis, recovery, safety, transfer, product readiness, or economic valu
 
 ## Release state
 
-The private remote is `https://github.com/manfromnowhere143/inbar.git`. Private pushes are reviewable
+The remote `https://github.com/manfromnowhere143/inbar.git` is **public**. This document previously
+described it as private; that was false and is corrected here. Pushes are reviewable
 engineering checkpoints, not publication. Inbar is intended for a disciplined open-source release,
 but visibility changes only after the exact release commit has green clean-clone CI, an explicit
 license, completed rights and secret scans, consistent identity and claim documents, and Daniel's
 approval.
 
-The current private personal-repository plan exposes neither branch protection nor repository
-rulesets. GitHub Actions therefore provide auditable evidence but cannot enforce integration policy
-against a direct push or merge. Direct integration remains an operator-controlled action. Before a
-public release, enable a protected integration path and bind its required checks to the exact tested
-head; the base-controlled target workflow alone is not a latest-head required check.
+The repository exposes neither branch protection nor repository rulesets. Both were verified absent:
+the branch-protection endpoint returns 404 and the ruleset list is empty. GitHub Actions therefore
+provide auditable evidence but cannot enforce integration policy against a direct push or merge.
+Direct integration remains an operator-controlled action.
+
+Two gates this document set for publication were not satisfied before visibility changed: a
+protected integration path with required checks bound to the exact tested head, and a green
+clean-clone CI matrix on the release commit. Both remain outstanding on a repository that is already
+public. That is recorded here rather than reworded, and the paragraph above is retained unedited so
+the gate it stated is still legible.
+
+A further defect compounds this. `uv run inbar handoff check` cannot pass on a pull request, because
+the workflow checks out GitHub's synthetic two-parent merge ref while the handoff contract requires a
+single-parent topology. Every pull-request run in this repository's history fails on that step, and
+every green run is a direct push to `main`. The consequence is that a change cannot be verified by
+base-controlled CI before it is published: publishing is the only way to test. For work where the
+proposer, implementer, reviewer, and signer are the same actor, base-controlled CI on the exact
+candidate head was the last remaining independent check, and it is unavailable.
 
 Candidate branches must start from the current integration head because history verification requires
 the immutable event base to be an ancestor of the exact candidate head. Rebase a behind-base branch
