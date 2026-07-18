@@ -1716,6 +1716,7 @@ def test_authority_closure_matches_the_fixed_reviewed_contract() -> None:
     assert tuple(item.name for item in handoff_module._BOUND_FIELDTRUE_MODULES) == (
         "fieldtrue",
         "fieldtrue.acquisition",
+        "fieldtrue.active_selection",
         "fieldtrue.adapters",
         "fieldtrue.adapters.adapt",
         "fieldtrue.approvals",
@@ -1728,6 +1729,7 @@ def test_authority_closure_matches_the_fixed_reviewed_contract() -> None:
         "fieldtrue.control_protocol",
         "fieldtrue.domain",
         "fieldtrue.git_trust",
+        "fieldtrue.graded_laboratory",
         "fieldtrue.handoff",
         "fieldtrue.memory",
         "fieldtrue.method_campaign",

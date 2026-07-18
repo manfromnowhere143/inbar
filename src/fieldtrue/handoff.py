@@ -54,6 +54,7 @@ from fieldtrue.schemas import schema_documents
 _HANDOFF_AUTHORITY_MODULE_NAMES = (
     "fieldtrue",
     "fieldtrue.acquisition",
+    "fieldtrue.active_selection",
     "fieldtrue.adapters",
     "fieldtrue.adapters.adapt",
     "fieldtrue.approvals",
@@ -66,6 +67,7 @@ _HANDOFF_AUTHORITY_MODULE_NAMES = (
     "fieldtrue.control_protocol",
     "fieldtrue.domain",
     "fieldtrue.git_trust",
+    "fieldtrue.graded_laboratory",
     "fieldtrue.handoff",
     "fieldtrue.memory",
     "fieldtrue.method_campaign",
