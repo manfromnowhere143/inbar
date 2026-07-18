@@ -458,6 +458,49 @@ def separability_index_permille(
     return worst_pair
 
 
+def mechanism_separability_permille(
+    *,
+    config: GradedFaultConfig,
+    initial_state: int,
+    severity: int,
+    action: tuple[int, ...],
+    injected_key: str,
+    candidate_keys: tuple[str, ...],
+) -> int:
+    """Separability of one injected mechanism against every other candidate, in permille.
+
+    This differs from `separability_index_permille`, which takes the minimum over *all* hypothesis
+    pairs and is therefore a property of the whole catalog: one degenerate pair drives it to zero
+    for every mechanism at once. Under a no-op, `actuator_loss` and the reserved unknown are
+    bit-identical, so the catalog-wide index is zero everywhere and cannot distinguish a mechanism
+    that is resolvable from one that is not.
+
+    This function asks the narrower question a per-mechanism measurement needs: given that `m` was
+    injected, how far is its signature from the nearest competing explanation? The minimum is taken
+    over the other candidates only, normalized by the disturbance the action must itself overcome.
+    """
+    others = [k for k in sorted(candidate_keys) if k != injected_key]
+    if not others:
+        raise GradedLaboratoryError("mechanism separability needs at least one competing candidate")
+    floor = expected_disturbance_l1(
+        config=config, initial_state=initial_state, severity=severity, action=action
+    )
+    nearest = None
+    for other in others:
+        distance = pairwise_signature_distance(
+            config=config,
+            initial_state=initial_state,
+            severity=severity,
+            action=action,
+            left_key=injected_key,
+            right_key=other,
+        )
+        scaled = (distance * 1000) // floor
+        nearest = scaled if nearest is None else min(nearest, scaled)
+    assert nearest is not None
+    return nearest
+
+
 def resolvable(index_permille: int) -> bool:
     """A pair separation at or above the disturbance floor is resolvable in principle."""
     return index_permille >= 1000

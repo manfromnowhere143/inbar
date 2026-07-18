@@ -48,7 +48,7 @@ from fieldtrue.graded_laboratory import (
     GradedFaultConfig,
     graded_forward_telemetry,
     graded_run,
-    separability_index_permille,
+    mechanism_separability_permille,
 )
 
 # --- Frozen compensator ------------------------------------------------------------------
@@ -225,18 +225,23 @@ def measure_cell(
         observed_no_op=observed_no_op, config=config, initial_state=initial_state, gain=gain
     )
 
-    pre = separability_index_permille(
+    # Per-mechanism, not catalog-wide. Freeze v1 specified the catalog-wide index and was vacuous:
+    # one degenerate pair drove it to zero for every cell, so no cell was ever resolvable before the
+    # action and the denominator was zero by construction. See ADJUDICATION_FREEZE_MASKING_V2.md.
+    pre = mechanism_separability_permille(
         config=config,
         initial_state=initial_state,
         severity=severity,
-        actions=(no_op,),
+        action=no_op,
+        injected_key=mechanism_key,
         candidate_keys=keys,
     )
-    post = separability_index_permille(
+    post = mechanism_separability_permille(
         config=config,
         initial_state=initial_state,
         severity=severity,
-        actions=(correction,),
+        action=correction,
+        injected_key=mechanism_key,
         candidate_keys=keys,
     )
     return MaskingCell(
