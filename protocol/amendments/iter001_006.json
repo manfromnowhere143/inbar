@@ -1,0 +1,100 @@
+{
+  "amendment_document": {
+    "artifact_sha256": "266d68f0f28b6474fbb09f971904bef394f8c1315b6fcb388eba88c4d0d5a741",
+    "path": "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_006.md"
+  },
+  "amendment_id": "iter001_006",
+  "approval": {
+    "approval_basis": "owner_delegation_not_owner_review",
+    "decision": "ratify_graded_laboratory_and_selection_implementation_only",
+    "independent_review_performed": false,
+    "previous_receipt_genesis_forbidden": true,
+    "previous_receipt_sha256": "e660be502da65893c03b0638376ea7a5d27b902f462eb89ad108633bb872fad4",
+    "proposer_and_signer_are_the_same_agent": true,
+    "receipt_path": "protocol/approvals/iter001_006_owner_approval.json",
+    "receipt_schema": "inbar.owner-amendment-approval-receipt.v6",
+    "v6_widens_decision_literal_only": true
+  },
+  "authority_effect": {
+    "campaign_requires_compute_lease": true,
+    "canonical_control_authority": "bootstrap",
+    "in_simulator_result_never_a_physical_or_product_claim": true,
+    "no_result_under_this_amendment_may_be_reported_as_prospective": true,
+    "proposal_alone_campaign_run_authorized": false,
+    "registered_blocker_remains": "iter001-acquisition-contract",
+    "simulator_branch_never_counts_as_physical_incident": true
+  },
+  "ceremony_deviation": {
+    "canonical_order": "propose_then_approve_then_implement",
+    "actual_order": "implement_then_propose_then_approve",
+    "consequence": "this_is_a_ratification_request_not_a_prospective_authorization",
+    "disclosed_in_document": true
+  },
+  "graded_laboratory": {
+    "degeneracy_partner": "actuator_deadband",
+    "deliberate_properties": [
+      "severity_graded_mechanisms_with_continuous_diagnosability",
+      "structural_mismatch_from_unmodeled_actuation_lag",
+      "latent_nuisance_offset_on_initial_state",
+      "signal_proportional_disturbance",
+      "action_shape_dependent_observability"
+    ],
+    "determinism_preserved": true,
+    "integer_fixed_point_arithmetic": true,
+    "replaces_amendment_005_laboratory": false,
+    "separability_index_is_a_property_of_the_laboratory_not_of_any_method": true
+  },
+  "selection_rule": {
+    "denominator_terms": ["direct_cost", "time_weight_times_seconds", "risk_weight_times_risk_units"],
+    "hypothesis_is_mechanism_and_severity_pair": true,
+    "implements": "argmax_information_gain_per_unit_generalized_cost_over_safe_actions",
+    "matches_frozen_mathematics_contract": true,
+    "severity_is_latent_and_marginalized_never_reported": true,
+    "unsafe_action_recorded_as_refused_never_omitted": true
+  },
+  "recorded_findings": {
+    "amendment_005_effect_is_an_algebraic_identity": true,
+    "amendment_005_probe_scores_zero_on_actuator_deadband": true,
+    "classical_set_based_rule_ties_the_information_gain_selector": true,
+    "cost_difference_sign_reversed_between_plant_revisions": true,
+    "null_reported_at_full_weight_under_invariant_7": true,
+    "selector_retained_as_comparison_arm_not_recommended_method": true
+  },
+  "forbidden_claims_unchanged": [
+    "diagnosis",
+    "intervention_benefit",
+    "recovery",
+    "safety",
+    "transfer",
+    "product_readiness",
+    "economic_value",
+    "state_of_the_art",
+    "physical_or_real_world_claim_from_simulator"
+  ],
+  "forbidden_claims_added": [
+    "active_test_superiority_over_passive_observation_as_a_discovery_of_this_mission",
+    "prospective_framing_of_any_result_produced_by_this_outcome_informed_laboratory"
+  ],
+  "implementation_gate": {
+    "controls_run_without_network_and_without_gpu": true,
+    "owner_approval_required_before_code": false,
+    "owner_approval_required_before_code_note": "not_satisfied_implementation_preceded_proposal",
+    "permitted_implementation": [
+      "severity_graded_laboratory_and_separability_index",
+      "latent_severity_hypothesis_space",
+      "action_catalog_with_declared_cost_time_and_risk",
+      "cost_aware_information_gain_selector_over_safe_actions",
+      "classical_set_based_comparison_baselines",
+      "adversarial_control_suite"
+    ],
+    "production_artifacts_authorized": false
+  },
+  "iteration_id": "iter001_physical_causal_evidence_acquisition",
+  "normative_relation": {
+    "conflict_disposition": "INVALID",
+    "document_and_machine_proposal_jointly_required": true,
+    "prior_frozen_contracts_prevail_on_conflict": true
+  },
+  "schema_version": "inbar.iter001-graded-laboratory-proposal.v1",
+  "status": "immutable_proposal"
+}
