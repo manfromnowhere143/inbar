@@ -63,6 +63,41 @@ can exist. Ordering the second before the first would have added verification de
 path with nothing to admit. This roadmap grants no authority and its ordering is advisory, so the
 correction required no change to a frozen contract.
 
+## Direction correction, 2026-07-18
+
+Milestone 6 named deterministic ambiguity baselines and milestone 7 named an active-test experiment.
+Both assumed the causal laboratory could measure a method. It could not, and the evidence for that is
+now committed: the Amendment 005 effect is an algebraic identity and its constant probe is
+structurally blind to a fault class. Amendment 006 rebuilt the laboratory so a method can fail in it.
+
+The active-test milestone is closed as a null rather than pursued. The classical set-based rule of
+Campbell and Nikoukhah (2004) ties the cost-aware information-gain selector at identical accuracy
+across a fiftyfold risk-weight sweep. Further investment in Bayesian action selection for this
+laboratory would be optimizing a component the evidence has already shown is not the bottleneck.
+
+What the work produced instead is an instrument: exact separability over an enumerable hypothesis
+space, able to state what is resolvable in principle before any method is scored. A 2026 review of
+the external literature identified three problems that require exactly that primitive and that no
+one currently owns.
+
+1. **Anomaly masking by autonomy.** JPL's Ops-for-Autonomy states that autonomous onboard decisions
+   alter state in response to information the ground never sees, hiding anomalies from downlink
+   reconstruction. That programme ran FY2020 through FY2023 and appears closed. No taxonomy,
+   detection method, or dataset was found. Masking is measurable here as the separability index
+   computed on post-action rather than pre-action observation.
+2. **Probe-quality benchmarking.** Existing benchmarks score whether an agent sought information, not
+   whether the action it chose was the best available one. Scoring a chosen probe against an
+   oracle-optimal probe requires an enumerable candidate space, which this laboratory has.
+3. **Identifiability-aware diagnosis.** Published work reasons about reducing uncertainty, almost
+   none about irreducibility: recognising that two hypotheses cannot be separated by any available
+   observation and deriving what would separate them. The nearest prior art located is a position
+   paper.
+
+These are candidate directions, not authorized work. Each requires a prospective amendment. Any
+novelty claim must distinguish itself explicitly from R2U2 runtime verification and from the 2026
+agent-reconstructability cluster, and the external scan should be repeated before commitment because
+that literature moved substantially within three months.
+
 ## Immediate next decision
 
 The screening contracts (Amendment 002) and the execution authority (Amendment 003) are implemented

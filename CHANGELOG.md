@@ -134,3 +134,57 @@ candidate has been screened against the twelve gates, and no verdict has been is
 run additionally requires its own signed execution lease.
 
 No scientific performance, safety, transfer, product-readiness, or economic claim has been made.
+
+### Causal-laboratory method campaign, and two nulls
+
+- Added the Amendment 005 diagnosis-method port, reference likelihood baseline, paired
+  passive/active campaign, and comparative result contract, all recomputed from atomic records.
+- **Established that the Amendment 005 laboratory cannot produce a negative result.** Its
+  mechanisms are separated by two to three orders of magnitude more than its disturbance, its
+  forward model is the simulator with the disturbance removed, and its discriminating action is a
+  frozen constant, so the mathematics contract's argmax is never evaluated. Its reported paired
+  active-minus-passive effect of 0.25, carried entirely by `actuator_loss` moving from 0/6 to 6/6,
+  is an algebraic identity: a parameter that multiplies the commanded input is unidentifiable when
+  that input is zero. An instrument that cannot produce a negative result cannot produce a
+  measurement.
+- Added the Amendment 006 severity-graded laboratory: continuous diagnosability, structural
+  mismatch from unmodeled actuation lag, a latent nuisance offset, signal-proportional disturbance,
+  and `actuator_deadband`, whose observability depends on the shape of the commanded action rather
+  than its presence. No single action resolves every hypothesis pair and the requirements run in
+  opposite directions.
+- Added a separability index in the Campbell and Nikoukhah sense, reported as a property of the
+  laboratory rather than of any method, so a campaign can distinguish an incorrect method from
+  insufficient evidence.
+- **Established that the Amendment 005 constant probe scores 0.00 on `actuator_deadband`.** A
+  command above the deadband threshold passes unattenuated, so the largest available probe is
+  structurally blind to that fault class.
+- Implemented the frozen selection rule `argmax I(H;Y_a|E) / max(C(a) + lambda*T(a) + mu*R(a),
+  epsilon)` over a safety-approved action set for the first time, with hypotheses as
+  (mechanism, severity) pairs and severity marginalized rather than reported.
+- **Established that the classical set-based rule ties the information-gain selector.** Identical
+  accuracy, within 1.01 across a fiftyfold sweep of the risk weight, with the sign of the cost
+  difference reversing between plant revisions. A difference whose direction is unstable under a
+  change to the plant is not an effect. Classical active fault diagnosis is sufficient for this
+  laboratory and the information-theoretic layer earns no advantage over it. The selector is
+  retained as a comparison arm, not as a recommended method.
+- Corrected an inert structural mismatch found by its own control: the mismatch was first
+  implemented as a quadratic curvature term that floors to zero under integer division at the
+  nominal operating point, so the laboratory claimed a property it did not have. Replaced with
+  unmodeled actuation dynamics, which no parameter hypothesis can absorb, and recomputed every
+  quantitative result.
+- Registered eight contracts in the schema surface and added forty-eight adversarial controls.
+
+Amendment 006 reverses the mission's canonical propose-then-approve-then-implement order: the
+implementation preceded the proposal, so the laboratory's design is outcome-informed and no result
+produced against it may be reported as prospective. It was signed by the same agent that proposed
+it, under owner delegation without owner review, the second consecutive amendment in that
+condition. Both facts are recorded in the amendment document, the machine proposal, and the
+approval receipt.
+
+That an active test outperforms passive observation on faults unidentifiable at rest is a known
+theorem, established by Campbell and Nikoukhah (2004) and by the interventional-identifiability
+results of Eberhardt (2005) and Hauser and Buehlmann (2012). Amendment 006 permanently prohibits
+reporting it as a discovery of this mission.
+
+No campaign has been run. No scientific performance, safety, transfer, product-readiness, or
+economic claim has been made.

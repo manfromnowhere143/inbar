@@ -108,6 +108,47 @@ directory. Only that staged copy is executed or rebound. Its structured self-ver
 match the complete platform identity, including the intentionally absent Linux commit metadata, and
 the staged executable remains covered by the authenticated runner tree digest.
 
+## Laboratory falsifiability and the selection null
+
+The Amendment 005 causal laboratory cannot produce a negative result. Its mechanisms are separated
+by two to three orders of magnitude more than its disturbance, its forward model is the simulator
+with the disturbance removed, and its discriminating action is a frozen constant, so the frozen
+selection argmax is never evaluated. Its reported paired active-minus-passive effect of 0.25 is an
+algebraic identity, not a measurement: a parameter that multiplies the commanded input is
+unidentifiable when that input is zero, which `_mechanism_identifiable` already proves analytically.
+Do not cite that effect as evidence about any method.
+
+Amendment 006 adds a severity-graded laboratory that can defeat a method: continuous diagnosability,
+structural mismatch from unmodeled actuation lag, a latent nuisance offset, signal-proportional
+disturbance, and a deadband mechanism whose observability depends on the shape of the commanded
+action. Separating the deadband from nominal requires a command below its threshold; separating it
+from attenuation requires one above. No single action resolves every pair, which is what makes
+selection a real problem rather than a formality. The Amendment 005 constant probe scores 0.00
+against the deadband class.
+
+The separability index is a property of the laboratory, not of any method. It exists so a campaign
+can report insufficient evidence separately from an incorrect method. A method that fails where the
+index is below one has not underperformed.
+
+The cost-aware information-gain selector earns nothing over the classical set-based rule of Campbell
+and Nikoukhah (2004). Identical accuracy, within 1.01 across a fiftyfold risk-weight sweep, with the
+sign of the cost difference reversing between plant revisions. Treat this as settled for this
+laboratory: do not rebuild the Bayesian selector expecting a different outcome, and do not report an
+advantage that does not exist. Two conditions absent from that comparison, a non-uniform mechanism
+prior and a variable budget permitting early stopping, are recorded as candidate hypotheses only and
+were identified after the adverse result, so they may not be tested as prospective claims except
+under an amendment that freezes design and analysis first.
+
+That an active test outperforms passive observation on faults unidentifiable at rest is a known
+theorem, not a finding of this mission. Amendment 006 prohibits reporting it as one, permanently.
+
+Amendment 006 reversed the canonical propose-then-approve-then-implement order. Its laboratory
+design is therefore outcome-informed and no result produced against it may be reported as
+prospective. A claim-bearing result requires a superseding amendment that freezes the design,
+episode schedule, cost weights, and analysis before any further outcome is inspected. Amendment 006
+was also signed by the same agent that proposed it, under owner delegation without owner review, the
+second consecutive amendment in that condition.
+
 ## Conditional research interest
 
 Daniel's deep interest in Einstein field equations, Ricci curvature, and general relativity is

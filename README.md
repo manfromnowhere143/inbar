@@ -12,14 +12,30 @@ adjudicate the outcome.**
 > no scientific result exists. Iteration 000 returned `BLOCKED_EVIDENCE` on NASA ADAPT: 16 real
 > incidents on 1 hardware identity, 0 of a required 30 complete dossiers. The public-source route is
 > recorded as `BLOCK_CURRENT_PUBLIC_SOURCE_ONLY_ROUTE` — a dated, non-systematic reconnaissance,
-> not an established negative. Four owner-signed amendments authorize the machinery that now exists:
+> not an established negative. Six owner-signed amendments authorize the machinery that now exists:
 > A001 shortcut-authority V2, A002 source-screening census, A003 census execution, A004
-> causal-laboratory. Under a real owner-signed lease, the census executor made first live contact
+> causal-laboratory, A005 diagnosis-method port and campaign, A006 graded laboratory and active test
+> selection. Under a real owner-signed lease, the census executor made first live contact
 > with public investigation sources — NTSB, the Chemical Safety Board, and NASA LLIS returned bytes
 > to an honestly-identified crawler; NRC refused it, recorded as a real access datum, not evaded.
 > **That is transport validation, not a census run.** No `CensusReport`, no candidate screened
-> against the twelve gates, no verdict. The causal-laboratory harness is implemented and covered but
-> no episode has run. This is a pre-release research system. A public code checkpoint here does not
+> against the twelve gates, no verdict.
+>
+> **Two of this mission's own results have been killed by its own controls, and both are reported
+> here at full weight rather than in a footnote.** The Amendment 005 causal laboratory cannot
+> produce a negative result: its mechanisms are separated by two to three orders of magnitude more
+> than its disturbance, its forward model is the simulator with the disturbance removed, and its
+> discriminating action is a frozen constant. Its reported paired effect of 0.25 is an *algebraic
+> identity* — a parameter that multiplies the commanded input is unidentifiable when that input is
+> zero. And the cost-aware information-gain selector built under A006 to replace that constant
+> **earns nothing**: the classical set-based rule of Campbell and Nikoukhah (2004) ties it at
+> identical accuracy, within 1.01 across a fiftyfold sweep of the risk weight. Classical active
+> fault diagnosis is sufficient for this laboratory.
+>
+> That an active test beats passive observation on faults unidentifiable at rest is a **known
+> theorem**, not a finding of this mission, and A006 prohibits it ever being reported as one.
+>
+> This is a pre-release research system. A public code checkpoint here does not
 > imply a diagnosis, recovery, safety, transfer, product-readiness, state-of-the-art, or
 > economic-value result, and none is claimed.
 
@@ -85,19 +101,22 @@ flowchart TB
   A003["Amendment 003 · census execution<br/>lease · certifi transport · frame registry"]
   WC["first world contact<br/>NTSB · CSB · NASA LLIS returned<br/>NRC refused — access datum"]
   A004["Amendment 004 · causal laboratory<br/>paired branches · sealed injection<br/>C6 dissolves under injected truth"]
+  A005["Amendment 005 · method port + campaign<br/>effect is an ALGEBRAIC IDENTITY<br/>instrument cannot produce a negative"]
+  A006["Amendment 006 · graded laboratory<br/>instrument can now falsify<br/>NULL · classical AFD ties the selector"]
   BLK["iter001-acquisition-contract<br/>BLOCKED · no corpus · no verdict"]
-  I000-->SRC-->A002-->A003-->WC-->A004
+  I000-->SRC-->A002-->A003-->WC-->A004-->A005-->A006
   A002-.->BLK
   A003-.->BLK
   A004-.->BLK
+  A006-.->BLK
   classDef null fill:#f6f8fa,stroke:#57606a,color:#24292f;
   classDef complete fill:#eaf3ff,stroke:#0969da,color:#0c2d57;
   classDef corrected fill:#fff4e5,stroke:#b54708,color:#4a2500;
   classDef active fill:#e6f4ea,stroke:#1a7f37,color:#0f3d1c;
-  class I000,BLK null;
+  class I000,BLK,A005 null;
   class SRC corrected;
-  class A002,A003,WC complete;
-  class A004 active;
+  class A002,A003,WC,A004 complete;
+  class A006 active;
 ```
 
 **Iteration 000 — `BLOCKED_EVIDENCE`.** NASA ADAPT passed source integrity, parser integrity, and
@@ -163,14 +182,51 @@ flowchart LR
 A simulator branch never counts as a physical incident. A causal-laboratory result establishes that
 the method works inside the simulator and nothing about the physical world.
 
+**Amendment 005 — the instrument that could not fail.** A005 added a diagnosis-method port, a
+reference likelihood baseline, and a paired passive/active campaign. It was then examined against
+the one question it had never been asked: *can a method fail in this laboratory?* It cannot. The
+mechanisms are separated by two to three orders of magnitude more than the disturbance, the forward
+model is the simulator with the disturbance removed — so diagnosis is table lookup with a tolerance
+rather than inference — and the discriminating action is a frozen constant `(100,)*8`, meaning the
+argmax the mission's mathematics has specified since preregistration is never evaluated. Its
+reported paired effect of 0.25, carried entirely by `actuator_loss` moving 0/6 → 6/6, is an
+**algebraic identity**: a parameter that multiplies the commanded input is unidentifiable when that
+input is zero. The repository already proves this analytically in `_mechanism_identifiable`. An
+instrument that cannot produce a negative result cannot produce a measurement.
+
+**Amendment 006 — an instrument that can falsify, and a null.** A006 rebuilds the laboratory so a
+method can fail in it: severity grading makes diagnosability continuous, an unmodeled actuation lag
+makes the forward model wrong in *form* rather than merely in noise, a latent offset and
+signal-proportional disturbance remove the free separability of a growing state, and
+`actuator_deadband` makes observability depend on the *shape* of the commanded action — separating
+it from nominal needs a command below its threshold, separating it from `actuator_loss` needs one
+above. No single action resolves every pair. Against this laboratory the A005 constant probe scores
+**0.00** on `actuator_deadband`: it is structurally blind to an entire fault class.
+
+A006 also implements the selection rule for the first time. It earns nothing. The classical
+set-based rule of Campbell and Nikoukhah (2004) ties it at identical accuracy, within 1.01 across a
+fiftyfold sweep of the risk weight, with the sign of the cost difference *reversing* between plant
+revisions — a difference whose direction is unstable under a change to the plant is not an effect.
+**Classical active fault diagnosis is sufficient for this laboratory.** The selector is retained as
+a comparison arm, not as a recommended method.
+
+Two disclosures belong with these results. The A006 implementation *preceded* its proposal,
+reversing the mission's canonical `propose → approve → implement` order, so the laboratory's design
+is outcome-informed and no result produced against it may be reported as prospective. And A006 was
+signed by the same agent that proposed it, under owner delegation without owner review — the second
+consecutive amendment in that condition. Both facts are recorded in the amendment, the machine
+proposal, and the approval receipt rather than inferred from the history.
+
 ## What is built, and what is not
 
 | Surface | Built and certified | Not established |
 | --- | --- | --- |
-| Mission governance | Four owner-signed amendments; git-pinned authority chain reconstructible from committed bytes; append-only research memory; self-regenerating handoff cycle | A general signed authority for every lifecycle transition; an independent attestation |
+| Mission governance | Six owner-signed amendments; git-pinned authority chain reconstructible from committed bytes; append-only research memory; self-regenerating handoff cycle | A general signed authority for every lifecycle transition; an independent attestation |
 | Corpus admission | Typed incident contract; positive, negative, and placebo controls; the census screening and execution layers | A qualifying physical dossier; a canonical control seal; a pilot verdict |
 | Source screening | Frozen frame; fact-locator, chronology (C1–C6), and role-inheritance (I1–I4) contracts; adversarial controls | A census run to a `CensusReport`; any screened candidate; any verdict |
 | Causal laboratory | Paired-branch protocol; sealed injection with authority separation; compute-lease contract; a deterministic reference simulator | A simulation campaign; a Basilisk adapter; any adjudicated method result |
+| Graded laboratory | Severity grading; structural mismatch from unmodeled actuation lag; latent nuisance offset; signal-proportional disturbance; action-shape-dependent observability; a separability index that can return *insufficient evidence* separately from *wrong method* | Any campaign run; any prospective result, permanently, because its design is outcome-informed |
+| Active test selection | The frozen `argmax I(H;Y_a\|E)/(C+λT+μR)` rule over a safety-approved action set; latent-severity hypotheses; refused actions recorded as refused | Any advantage over classical set-based active fault diagnosis, which ties it; any recommendation of this selector over that rule |
 | Claims | Scoped, content-bound claim registry synchronized with executable behavior | Any diagnosis, recovery, safety, transfer, product, or economic-value claim |
 
 ## Scientific invariants
