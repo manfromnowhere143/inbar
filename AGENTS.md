@@ -25,13 +25,45 @@ git status --short --branch
 
 ## Research discipline
 
-- Commit messages carry no trailers. No `Co-Authored-By`, no session links, no tool attribution, no
-  self-praise. State what happened and why, in plain factual prose. This convention holds across the
-  entire history and is written down here because it was previously only observable from that
-  history: a session in 2026-07-18 applied a tool default instead of matching the repository and put
-  `Co-Authored-By` trailers on nine commits that reached public `main`. Those stand uncorrected,
-  because rewriting published history to hide a convention error is worse than the error. Corrected
-  forward from `eb37d93`.
+## Standards, and the defects that produced them
+
+Every rule below is machine-checked by `scripts/ci/verify_conventions.py`, invoked from
+`tests/unit/test_conventions.py` so it runs in CI without editing the workflow. Each exists because
+it was broken, and each names the defect so a future reader can judge whether it still earns its
+place. A rule that no longer corresponds to a real failure should be deleted, not kept for symmetry.
+
+- **Commit messages carry no trailers.** No `Co-Authored-By`, no session links, no tool attribution,
+  no self-praise. Plain factual prose. *Defect 2026-07-18: nine commits reached public `main` with
+  `Co-Authored-By`. The history is not uniform — 31 of 108 prior commits carried trailers — but the
+  practice had settled clean for a long stretch, so the convention was observable only by reading the
+  recent log. Those nine stand uncorrected; rewriting published history to hide a convention error is
+  worse than the error.*
+
+- **One cycle, one push, wait for green.** A handoff commit must be the tip of its own push and must
+  reach green CI before the next cycle begins. *Defect 2026-07-18: cycles were batched and pushed
+  together, so `73679e1`, a fully validated handoff, sits in history with zero CI and always will.
+  Sentinel and Telos both push one artifact per commit for exactly this reason.*
+
+- **Every result and every freeze is linked from `README.md`.** *Defect 2026-07-18: three RESULT
+  documents existed and none was linked, while the README simultaneously asserted no result existed.
+  A result absent from the front page is a broken narrative.*
+
+- **A corrected claim may never reappear.** Superseded statements are pinned as tripwires. *Defect
+  2026-07-18: an adversarial audit found nine false or stale statements, including a private remote
+  that had become public.*
+
+- **Before reporting any effect, test whether it is entailed.** If a computation that never touches
+  the measurement reproduces it exactly, the effect is a correctness check on the implementation, not
+  a measurement. *Defect 2026-07-18: four of five effects tested this way were entailed by
+  construction, including a published headline that was falsified within the hour.*
+
+- **A guard that cannot fail is not a guard.** Every control must be verified against a deliberately
+  broken subject. *Defect 2026-07-18: three components were built, described as doing something, and
+  found to do nothing, each having passed controls that could not fail on an inert component.*
+
+- **Run the full validation plan before starting a cycle**, not a subset. *Defect 2026-07-18: a
+  20-minute cycle failed on a single 101-character line because `ruff check` was skipped in
+  preflight.*
 - Commit `HYPOTHESIS.md` before experiment-specific tooling or outcome inspection.
 - Freeze source, split, baseline ladder, primary outcome, uncertainty method, spend ceiling, stop
   rule, falsifiers, verdict classes, and forbidden claims.

@@ -149,6 +149,81 @@ episode schedule, cost weights, and analysis before any further outcome is inspe
 was also signed by the same agent that proposed it, under owner delegation without owner review, the
 fifth consecutive amendment in that condition; Amendments 002 through 005 each disclose the same.
 
+## Repeating defects, and why they must not recur
+
+One session on 2026-07-18 produced every defect below. They are recorded together because they share
+a single shape: **a rule the repository enforced only by being read was replaced by a generic
+default.** Rules the repository enforced mechanically all held — the handoff authority closure
+rejected unregistered modules, the claim registry rejected uncommitted digests, the dirty-tree guard
+refused a cycle mid-edit. Not one of those could be violated by inattention. Every rule that failed
+was one a reader had to notice.
+
+The correction is therefore not vigilance. It is `scripts/ci/verify_conventions.py`, run from
+`tests/unit/test_conventions.py`, which converts the broken conventions into checks that fail closed
+and are themselves verified against deliberately broken subjects.
+
+### The entailment defect, four occurrences
+
+An effect that a computation which never touches the measurement can reproduce exactly is a
+correctness check on the implementation, not a measurement.
+
+1. Amendment 005's paired active-minus-passive accuracy of 0.25. A parameter multiplying the
+   commanded input is unidentifiable when that input is zero; `_mechanism_identifiable` already
+   proved it analytically.
+2. A masking rate of 0.1504, published and then falsified by its own author within the hour. A
+   one-line inequality over the deadband threshold reproduced it at five of five severities.
+3. A susceptibility test reporting 175 of 175 agreement. It read the commanded correction from the
+   measured cell and recomputed the same comparison the measurement had already made.
+4. Three components — a quadratic curvature term, a first graded laboratory, a compensator — each
+   described as doing something and each doing nothing.
+
+One effect survived the test: the susceptibility criterion at 0.9947, whose independence evidence is
+that it reproduces the exact command in only 44.53 percent of cells while reproducing the outcome in
+99.47 percent. A restatement scores 1.000 on both.
+
+**Standing rule: before reporting any effect, ask whether a computation that never touches the
+measurement can reproduce it. If yes at 100 percent, it is not a measurement.**
+
+### The vacuous-guard defect
+
+Three inert components shipped because their controls could not fail on an inert component. One
+asserted that a severe deviation draws a correction at least as large as a mild one, and passed on
+zero against zero.
+
+**Standing rule: every control is verified against a deliberately broken subject before it is
+trusted. The compensator guards are checked against a zero-gain compensator; the convention guards
+against a tree with an unlinked result.**
+
+### The frozen-rule defect, and the one that was honoured
+
+Masking freeze v1 returned `MEASUREMENT_VACUOUS` because its own definition was ambiguous. The
+ambiguity was resolved after seeing it fail, which is disclosed in v2 and permanently bars a
+prospective claim from that configuration.
+
+The compensator-family gate's falsifier F-C3 then fired on two results that were probably legitimate:
+`half_gain` predicted the exact command in 53.6 percent of cells and the outcome in 100 percent,
+which is the signature of a predictive rule, not a circular one. The frozen rule voided them anyway
+and **the rule was honoured**, because reinterpreting a falsifier after watching it fire
+inconveniently would make every other result in this repository worthless. A corrected gate must be
+written prospectively and may not use the voided numbers to set its thresholds.
+
+### The push-rhythm defect
+
+Cycles were batched and pushed together, so `73679e1` — a fully validated handoff — carries no CI and
+always will. The sibling repositories both push one artifact per commit. That is not stylistic: a
+handoff whose CI never ran is an unverified recovery contract sitting in the history.
+
+**Standing rule: one cycle, one push, wait for green before the next.**
+
+### Consequences that cannot be undone
+
+- Nine commits on public `main` carry `Co-Authored-By` trailers. Recorded, not rewritten.
+- `73679e1` has no CI and cannot acquire one without rewriting published history.
+- Amendment 006 was signed by its own drafter in direct violation of its own approval clause,
+  recorded in `AMENDMENT_006_APPROVAL_DEFECT.md`. The owner's reading remains outstanding.
+- Amendment 006's laboratory design is outcome-informed, so no result from it may ever be reported as
+  prospective.
+
 ## Conditional research interest
 
 Daniel's deep interest in Einstein field equations, Ricci curvature, and general relativity is

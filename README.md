@@ -273,6 +273,29 @@ proposal, and the approval receipt rather than inferred from the history.
 | Active test selection | The frozen `argmax I(H;Y_a\|E)/(C+λT+μR)` rule over a safety-approved action set; latent-severity hypotheses; refused actions recorded as refused | Any advantage over classical set-based active fault diagnosis, which ties it; any recommendation of this selector over that rule |
 | Claims | Scoped, content-bound claim registry synchronized with executable behavior | Any diagnosis, recovery, safety, transfer, product, or economic-value claim |
 
+## Evidence index
+
+Every recorded result and every frozen protocol, linked here so none can exist without being
+discoverable from the front page. A result absent from this table is a broken narrative, and
+`scripts/ci/verify_conventions.py` fails the build if one appears.
+
+Frozen protocols precede their data. Each freeze commit is an ancestor of the measurement it
+governs, which is checkable from the history rather than asserted.
+
+| Gate | Governs | Outcome |
+| --- | --- | --- |
+| [iter000 attempt 001](experiments/iter000_nasa_adapt_corpus_readiness/proof/attempt_001/RESULT.md) | NASA ADAPT corpus readiness | `BLOCKED_EVIDENCE` |
+| [masking freeze v1](experiments/iter001_physical_causal_evidence_acquisition/ADJUDICATION_FREEZE_MASKING.md) | anomaly masking, first attempt | `MEASUREMENT_VACUOUS` — denominator zero by construction |
+| [masking freeze v2](experiments/iter001_physical_causal_evidence_acquisition/ADJUDICATION_FREEZE_MASKING_V2.md) | anomaly masking, second attempt | `INFRA_NULL` — the compensator never fired |
+| [masking freeze v3](experiments/iter001_physical_causal_evidence_acquisition/ADJUDICATION_FREEZE_MASKING_V3.md) | anomaly masking, confirmatory | [`RESULT_MASKING.md`](experiments/iter001_physical_causal_evidence_acquisition/RESULT_MASKING.md) — headline published, then falsified by its own author |
+| — | susceptibility criterion, exploratory | [`RESULT_SUSCEPTIBILITY.md`](experiments/iter001_physical_causal_evidence_acquisition/RESULT_SUSCEPTIBILITY.md) — includes a circular first attempt recorded as such |
+| [susceptibility freeze](experiments/iter001_physical_causal_evidence_acquisition/ADJUDICATION_FREEZE_SUSCEPTIBILITY.md) | susceptibility, confirmatory | [`RESULT_SUSCEPTIBILITY_CONFIRMATORY.md`](experiments/iter001_physical_causal_evidence_acquisition/RESULT_SUSCEPTIBILITY_CONFIRMATORY.md) — **0.9947**, no falsifier fired |
+| [compensator-family freeze](experiments/iter001_physical_causal_evidence_acquisition/ADJUDICATION_FREEZE_COMPENSATOR_FAMILY.md) | criterion invariance across policies | [`RESULT_COMPENSATOR_FAMILY.md`](experiments/iter001_physical_causal_evidence_acquisition/RESULT_COMPENSATOR_FAMILY.md) — one family valid, two voided by the gate's own falsifier |
+
+Three of seven gates produced a usable measurement. Two were instrument defects, one was voided in
+part by a falsifier that was too blunt, and one returned a block. That ratio is the honest cost of
+the discipline and is not smoothed in the reporting.
+
 ## Scientific invariants
 
 1. Model-visible evidence and adjudication truth are separate artifacts.
