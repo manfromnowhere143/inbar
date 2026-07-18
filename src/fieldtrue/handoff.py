@@ -2571,7 +2571,16 @@ def _render(repo_root: Path) -> bytes:
     if expected_failures != list(_EXPECTED_BOOTSTRAP_BLOCKERS):
         raise HandoffError("checkpoint blocker policy differs from the bootstrap renderer")
     if observed_failures != expected_failures:
-        raise HandoffError("current mission blockers differ from the linked checkpoint")
+        # Name both sides. A bare mismatch message forces a reader to reproduce the whole render
+        # to learn which check moved, which is impossible when the divergence is platform-specific
+        # and appears only on a remote runner. The detail is drawn from committed contract state,
+        # not from evidence content, so it discloses nothing a reader could not already recompute.
+        observed_detail = ", ".join(observed_failures) or "none"
+        expected_detail = ", ".join(expected_failures) or "none"
+        raise HandoffError(
+            "current mission blockers differ from the linked checkpoint: "
+            f"observed [{observed_detail}], checkpoint expected [{expected_detail}]"
+        )
     if len(failed_checks) != 1 or failed_checks[0].detail != _EXPECTED_BOOTSTRAP_DETAIL:
         raise HandoffError("registered bootstrap blocker has an unexpected failure cause")
     if len(mission_report.checks) != checkpoint_mission_checks:
