@@ -111,3 +111,73 @@ The measurement is deterministic integer arithmetic over hash-derived disturbanc
 quantity is recomputed from atomic cells by `recompute_masking_result`; no aggregate is asserted.
 The instrument's non-inertness is verified by three guards that fail against a zero-gain compensator
 and pass against the live one.
+
+---
+
+# Correction: the reported masking rate is an artifact
+
+Recorded the same day, before this result was pushed to any remote. The original text above is
+retained unedited. The headline it reports is wrong and is superseded by this section.
+
+## What is wrong
+
+The reported rate of 20/133 = 0.1504 counts only cells in `actuator_deadband` and `unknown`, and
+every one of those events is **analytically entailed by the mechanism definitions rather than
+discovered by measurement**.
+
+The deadband threshold is `(60 * severity) // 100` and the baseline command is 50. A deadband fault
+is visible at baseline exactly when `50 < threshold`, and invisible after correction exactly when
+`corrected_command >= threshold`. Predicting masking from that inequality alone reproduces the
+measurement at **5 of 5 severities**, with no simulation required:
+
+| severity | threshold | predicted | measured |
+| ---: | ---: | :--- | :--- |
+| 25 | 15 | excluded | excluded |
+| 45 | 27 | excluded | excluded |
+| 70 | 42 | excluded | excluded |
+| 85 | 51 | mask | mask |
+| 100 | 60 | mask | mask |
+
+The `unknown` events are the same tautology mirrored: once the correction pushes above the
+threshold, a deadband behaves identically to nominal, so `deadband` and `unknown` become mutually
+unresolvable at the same instant and both are counted.
+
+This is the same defect this repository already recorded against Amendment 005, whose paired effect
+of 0.25 was an algebraic identity. It is the third instance of the same error class in one day, and
+the corrective discipline is stated here so it is not repeated: **before reporting any effect, test
+whether it is derivable analytically from the mechanism definitions.** An effect that a one-line
+inequality predicts is a correctness check on the implementation, not a measurement.
+
+## The corrected result
+
+Excluding the entailed `deadband`/`unknown` pair leaves `gain_drift`, `actuator_loss`, and
+`sensor_bias` across five severities and seven seeds:
+
+| quantity | value |
+| --- | --- |
+| masking events | **0** |
+| cells resolvable pre-action | 105 |
+| masking rate | **0 / 105 = 0.0000** |
+| median masking index `M` | **−4346** |
+| cells revealed vs masked | 70 vs 35 |
+
+**F-M1 fires. F-M2 fires.**
+
+The corrected finding is the opposite of the original headline and is stated plainly: **in this
+laboratory, an autonomous corrective action never masks a non-degenerate fault, and systematically
+reveals faults instead.** Raising drive to restore setpoint excites the actuator path and separates
+mechanisms that sat closer together at baseline.
+
+The only masking this laboratory produces is a geometric coincidence between a deadband threshold
+and the commanded correction, which is a property of how the deadband was defined rather than a
+property of corrective action.
+
+## What this changes about the claim
+
+The masking hypothesis, as this laboratory can test it, is **falsified**. That is a real result and
+is reported at full weight under Invariant 7. It does not establish that anomaly masking is absent
+in physical systems, and a mechanism whose signature a correction happens to cross would mask in
+exactly the entailed way — which is itself worth knowing, but is a statement about geometry, not
+about autonomy.
+
+No claim of novelty, priority, or physical relevance is made or implied.
