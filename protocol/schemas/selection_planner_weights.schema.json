@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "description": "The frozen cost weights and denominator floor.\n\nThese must be frozen before outcome inspection. The defaults specify numerical behavior only\nand are not a claim that this is the correct operating point for any physical system.",
+  "properties": {
+    "denominator_floor": {
+      "default": "0.000001",
+      "pattern": "^[0-9]+\\.[0-9]{6}$",
+      "title": "Denominator Floor",
+      "type": "string"
+    },
+    "risk_weight": {
+      "default": "10.000000",
+      "pattern": "^[0-9]+\\.[0-9]{6}$",
+      "title": "Risk Weight",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.planner-weights.v1",
+      "default": "inbar.iter001.planner-weights.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "time_weight": {
+      "default": "1.000000",
+      "pattern": "^[0-9]+\\.[0-9]{6}$",
+      "title": "Time Weight",
+      "type": "string"
+    }
+  },
+  "title": "PlannerWeights",
+  "type": "object"
+}

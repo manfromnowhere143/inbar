@@ -1,0 +1,66 @@
+{
+  "additionalProperties": false,
+  "description": "A scalar recurrence with an unmodeled quadratic term and a tunable disturbance floor.\n\nThe plant realized by `graded_run` is\n\n    u_eff = (lag * u_previous + (1_000_000 - lag) * u_commanded) // 1_000_000\n    x'    = (gain * x)//100 + (drive * u_eff)//100 + bias\n\nThe forward model available to a method (`graded_forward_telemetry`) has no lag: it applies\neach command instantly. That is the structural mismatch, and it is unmodeled *dynamics* rather\nthan a perturbed parameter, so no mechanism hypothesis in the catalog can absorb it by\nadjusting gain, drive, or bias. `actuation_lag_ppm = 0` recovers an exactly-specified plant and\nis retained so a control can isolate the effect of mismatch from the effect of severity.\n\nAn earlier revision used a quadratic term `(curvature * x * x)//1_000_000` for this purpose. It\nwas removed after a control demonstrated it was inert: at the nominal operating point of\nx ~ 100 the term floors to zero under integer division, so the laboratory carried no structural\nmismatch at all while claiming one. Scaling it up was rejected because a quadratic large enough\nto matter near x ~ 100 diverges once the state reaches the thousands, which the gain-drift and\nsensor-bias mechanisms both reach within the horizon.\n\n`noise_amplitude` bounds the per-step integer disturbance to [-A, +A] for that amplitude A.\n`nuisance_amplitude` bounds an unobserved additive offset applied once to the initial state.",
+  "properties": {
+    "actuation_lag_ppm": {
+      "maximum": 1000000,
+      "minimum": 0,
+      "title": "Actuation Lag Ppm",
+      "type": "integer"
+    },
+    "bias": {
+      "title": "Bias",
+      "type": "integer"
+    },
+    "drive": {
+      "title": "Drive",
+      "type": "integer"
+    },
+    "gain": {
+      "title": "Gain",
+      "type": "integer"
+    },
+    "noise_amplitude": {
+      "maximum": 10000,
+      "minimum": 0,
+      "title": "Noise Amplitude",
+      "type": "integer"
+    },
+    "noise_ppm": {
+      "maximum": 1000000,
+      "minimum": 0,
+      "title": "Noise Ppm",
+      "type": "integer"
+    },
+    "nuisance_amplitude": {
+      "maximum": 10000,
+      "minimum": 0,
+      "title": "Nuisance Amplitude",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.graded-lab-config.v1",
+      "default": "inbar.iter001.graded-lab-config.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "steps": {
+      "maximum": 4096,
+      "minimum": 1,
+      "title": "Steps",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "gain",
+    "drive",
+    "bias",
+    "steps",
+    "actuation_lag_ppm",
+    "noise_amplitude",
+    "noise_ppm",
+    "nuisance_amplitude"
+  ],
+  "title": "GradedFaultConfig",
+  "type": "object"
+}

@@ -1,0 +1,36 @@
+{
+  "additionalProperties": false,
+  "description": "The plant parameters a mechanism realizes at a given severity.\n\n`deadband` is the command magnitude below which no drive reaches the plant. It is zero for\nevery mechanism except `actuator_deadband`, and it is the one parameter that makes the\nlaboratory's separability depend on the *shape* of an action rather than only its presence.",
+  "properties": {
+    "bias": {
+      "title": "Bias",
+      "type": "integer"
+    },
+    "deadband": {
+      "title": "Deadband",
+      "type": "integer"
+    },
+    "drive": {
+      "title": "Drive",
+      "type": "integer"
+    },
+    "gain": {
+      "title": "Gain",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.graded-lab-params.v1",
+      "default": "inbar.iter001.graded-lab-params.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "gain",
+    "drive",
+    "bias",
+    "deadband"
+  ],
+  "title": "MechanismParams",
+  "type": "object"
+}

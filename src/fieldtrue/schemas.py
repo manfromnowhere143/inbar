@@ -55,6 +55,14 @@ from fieldtrue.acquisition import (
     TrustedActor,
     TruthCustodyReceipt,
 )
+from fieldtrue.active_selection import (
+    ActionCandidate,
+    ActionScore,
+    Hypothesis,
+    HypothesisPosterior,
+    PlannerWeights,
+    SelectionResult,
+)
 from fieldtrue.adapters.adapt import (
     AdaptCoverageReport,
     AdaptDatasetLock,
@@ -120,6 +128,7 @@ from fieldtrue.domain import (
     TruthRecord,
     VerificationResult,
 )
+from fieldtrue.graded_laboratory import GradedFaultConfig, MechanismParams
 from fieldtrue.memory import ResearchMemoryRecord
 from fieldtrue.method_campaign import (
     CampaignPlan,
@@ -260,6 +269,14 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "causal_lab_mechanism_ontology.schema.json": MechanismOntology,
     "causal_lab_sealed_mechanism.schema.json": SealedMechanism,
     "causal_lab_snapshot.schema.json": Snapshot,
+    "graded_lab_config.schema.json": GradedFaultConfig,
+    "graded_lab_mechanism_params.schema.json": MechanismParams,
+    "selection_action_candidate.schema.json": ActionCandidate,
+    "selection_action_score.schema.json": ActionScore,
+    "selection_hypothesis.schema.json": Hypothesis,
+    "selection_hypothesis_posterior.schema.json": HypothesisPosterior,
+    "selection_planner_weights.schema.json": PlannerWeights,
+    "selection_result.schema.json": SelectionResult,
     "method_campaign_branch_observation.schema.json": MethodBranchObservation,
     "method_campaign_condition_outcome.schema.json": ConditionOutcome,
     "method_campaign_condition_summary.schema.json": ConditionSummary,

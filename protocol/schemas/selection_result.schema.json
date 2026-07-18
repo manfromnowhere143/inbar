@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "ActionScore": {
+      "additionalProperties": false,
+      "description": "One scored candidate. Refused actions are scored as refused, never silently dropped.",
+      "properties": {
+        "action_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "action_sha256": {
+          "title": "Action Sha256",
+          "type": "string"
+        },
+        "eligible": {
+          "title": "Eligible",
+          "type": "boolean"
+        },
+        "generalized_cost": {
+          "title": "Generalized Cost",
+          "type": "string"
+        },
+        "information_gain_nats": {
+          "title": "Information Gain Nats",
+          "type": "string"
+        },
+        "refusal_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Refusal Reason"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.action-score.v1",
+          "default": "inbar.iter001.action-score.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "score": {
+          "title": "Score",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "action_sha256",
+        "eligible",
+        "refusal_reason",
+        "information_gain_nats",
+        "generalized_cost",
+        "score"
+      ],
+      "title": "ActionScore",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The selected action and the complete scored catalog that justified it.",
+  "properties": {
+    "schema_version": {
+      "const": "inbar.iter001.selection-result.v1",
+      "default": "inbar.iter001.selection-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scores": {
+      "items": {
+        "$ref": "#/$defs/ActionScore"
+      },
+      "minItems": 1,
+      "title": "Scores",
+      "type": "array"
+    },
+    "selected_action_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Selected Action Id",
+      "type": "string"
+    },
+    "selected_action_sha256": {
+      "title": "Selected Action Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "selected_action_id",
+    "selected_action_sha256",
+    "scores"
+  ],
+  "title": "SelectionResult",
+  "type": "object"
+}

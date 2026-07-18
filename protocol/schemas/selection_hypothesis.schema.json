@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "One candidate explanation: a mechanism at a severity band.\n\nThe reserved unknown carries severity zero. Grading does not make an unmodeled departure\nlarger, so the unknown appears exactly once in a hypothesis space rather than once per band.",
+  "properties": {
+    "mechanism_key": {
+      "minLength": 1,
+      "title": "Mechanism Key",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.selection-hypothesis.v1",
+      "default": "inbar.iter001.selection-hypothesis.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "severity": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Severity",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "mechanism_key",
+    "severity"
+  ],
+  "title": "Hypothesis",
+  "type": "object"
+}

@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "description": "One executable test, with its declared cost, time, and risk.\n\nEvery term is in one declared cost unit, per the mathematics contract: `time_seconds` is\nconverted by `time_weight` and `risk_units` by `risk_weight`, so the denominator is\ndimensionally homogeneous. `safe` records the safety authority's verdict; an unsafe action is\nineligible regardless of how much information it would yield, and is never scored.",
+  "properties": {
+    "action": {
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 1,
+      "title": "Action",
+      "type": "array"
+    },
+    "action_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Action Id",
+      "type": "string"
+    },
+    "direct_cost": {
+      "minimum": 0,
+      "title": "Direct Cost",
+      "type": "integer"
+    },
+    "risk_units": {
+      "minimum": 0,
+      "title": "Risk Units",
+      "type": "integer"
+    },
+    "safe": {
+      "title": "Safe",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.action-candidate.v1",
+      "default": "inbar.iter001.action-candidate.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "time_seconds": {
+      "minimum": 0,
+      "title": "Time Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "action_id",
+    "action",
+    "direct_cost",
+    "time_seconds",
+    "risk_units",
+    "safe"
+  ],
+  "title": "ActionCandidate",
+  "type": "object"
+}
