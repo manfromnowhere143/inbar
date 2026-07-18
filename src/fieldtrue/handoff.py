@@ -69,6 +69,7 @@ _HANDOFF_AUTHORITY_MODULE_NAMES = (
     "fieldtrue.git_trust",
     "fieldtrue.graded_laboratory",
     "fieldtrue.handoff",
+    "fieldtrue.masking",
     "fieldtrue.memory",
     "fieldtrue.method_campaign",
     "fieldtrue.mission",

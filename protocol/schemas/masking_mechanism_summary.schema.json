@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "description": "Per-mechanism totals. Reported for every mechanism, including those with zero events.",
+  "properties": {
+    "cells_excluded_unresolvable_pre": {
+      "minimum": 0,
+      "title": "Cells Excluded Unresolvable Pre",
+      "type": "integer"
+    },
+    "cells_resolvable_pre": {
+      "minimum": 0,
+      "title": "Cells Resolvable Pre",
+      "type": "integer"
+    },
+    "cells_total": {
+      "minimum": 0,
+      "title": "Cells Total",
+      "type": "integer"
+    },
+    "masking_events": {
+      "minimum": 0,
+      "title": "Masking Events",
+      "type": "integer"
+    },
+    "mechanism_key": {
+      "minLength": 1,
+      "title": "Mechanism Key",
+      "type": "string"
+    },
+    "median_masking_index_permille": {
+      "title": "Median Masking Index Permille",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.masking-mechanism-summary.v1",
+      "default": "inbar.iter001.masking-mechanism-summary.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mechanism_key",
+    "cells_total",
+    "cells_resolvable_pre",
+    "cells_excluded_unresolvable_pre",
+    "masking_events",
+    "median_masking_index_permille"
+  ],
+  "title": "MechanismMaskingSummary",
+  "type": "object"
+}

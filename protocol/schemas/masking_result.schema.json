@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "MechanismMaskingSummary": {
+      "additionalProperties": false,
+      "description": "Per-mechanism totals. Reported for every mechanism, including those with zero events.",
+      "properties": {
+        "cells_excluded_unresolvable_pre": {
+          "minimum": 0,
+          "title": "Cells Excluded Unresolvable Pre",
+          "type": "integer"
+        },
+        "cells_resolvable_pre": {
+          "minimum": 0,
+          "title": "Cells Resolvable Pre",
+          "type": "integer"
+        },
+        "cells_total": {
+          "minimum": 0,
+          "title": "Cells Total",
+          "type": "integer"
+        },
+        "masking_events": {
+          "minimum": 0,
+          "title": "Masking Events",
+          "type": "integer"
+        },
+        "mechanism_key": {
+          "minLength": 1,
+          "title": "Mechanism Key",
+          "type": "string"
+        },
+        "median_masking_index_permille": {
+          "title": "Median Masking Index Permille",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.masking-mechanism-summary.v1",
+          "default": "inbar.iter001.masking-mechanism-summary.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mechanism_key",
+        "cells_total",
+        "cells_resolvable_pre",
+        "cells_excluded_unresolvable_pre",
+        "masking_events",
+        "median_masking_index_permille"
+      ],
+      "title": "MechanismMaskingSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The measurement, recomputed from atomic cells and bound to its adjudication freeze.\n\nThe three missingness quantities are reported together and none is reported alone: a cell that\nwas already unresolvable before the action cannot be masked, so it is excluded from the\ndenominator, but its count travels with the rate it was excluded from.",
+  "properties": {
+    "adjudication_freeze_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Adjudication Freeze Sha256",
+      "type": "string"
+    },
+    "cells_excluded_unresolvable_pre": {
+      "minimum": 0,
+      "title": "Cells Excluded Unresolvable Pre",
+      "type": "integer"
+    },
+    "cells_resolvable_pre": {
+      "minimum": 0,
+      "title": "Cells Resolvable Pre",
+      "type": "integer"
+    },
+    "cells_total": {
+      "minimum": 1,
+      "title": "Cells Total",
+      "type": "integer"
+    },
+    "compensator_gain": {
+      "title": "Compensator Gain",
+      "type": "integer"
+    },
+    "laboratory_config_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Laboratory Config Sha256",
+      "type": "string"
+    },
+    "masking_events": {
+      "minimum": 0,
+      "title": "Masking Events",
+      "type": "integer"
+    },
+    "per_mechanism": {
+      "items": {
+        "$ref": "#/$defs/MechanismMaskingSummary"
+      },
+      "minItems": 1,
+      "title": "Per Mechanism",
+      "type": "array"
+    },
+    "result_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Result Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.masking-result.v1",
+      "default": "inbar.iter001.masking-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "result_id",
+    "adjudication_freeze_sha256",
+    "laboratory_config_sha256",
+    "compensator_gain",
+    "cells_total",
+    "cells_resolvable_pre",
+    "cells_excluded_unresolvable_pre",
+    "masking_events",
+    "per_mechanism"
+  ],
+  "title": "MaskingResult",
+  "type": "object"
+}

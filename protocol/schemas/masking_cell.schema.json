@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "description": "One (mechanism, severity, seed) observation of separability before and after correction.",
+  "properties": {
+    "commanded_correction": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Commanded Correction",
+      "type": "integer"
+    },
+    "mechanism_key": {
+      "minLength": 1,
+      "title": "Mechanism Key",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.masking-cell.v1",
+      "default": "inbar.iter001.masking-cell.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "minimum": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "separability_post_permille": {
+      "minimum": 0,
+      "title": "Separability Post Permille",
+      "type": "integer"
+    },
+    "separability_pre_permille": {
+      "minimum": 0,
+      "title": "Separability Pre Permille",
+      "type": "integer"
+    },
+    "severity": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Severity",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "mechanism_key",
+    "severity",
+    "seed",
+    "commanded_correction",
+    "separability_pre_permille",
+    "separability_post_permille"
+  ],
+  "title": "MaskingCell",
+  "type": "object"
+}

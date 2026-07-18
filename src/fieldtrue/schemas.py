@@ -129,6 +129,7 @@ from fieldtrue.domain import (
     VerificationResult,
 )
 from fieldtrue.graded_laboratory import GradedFaultConfig, MechanismParams
+from fieldtrue.masking import MaskingCell, MaskingResult, MechanismMaskingSummary
 from fieldtrue.memory import ResearchMemoryRecord
 from fieldtrue.method_campaign import (
     CampaignPlan,
@@ -277,6 +278,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "selection_hypothesis_posterior.schema.json": HypothesisPosterior,
     "selection_planner_weights.schema.json": PlannerWeights,
     "selection_result.schema.json": SelectionResult,
+    "masking_cell.schema.json": MaskingCell,
+    "masking_mechanism_summary.schema.json": MechanismMaskingSummary,
+    "masking_result.schema.json": MaskingResult,
     "method_campaign_branch_observation.schema.json": MethodBranchObservation,
     "method_campaign_condition_outcome.schema.json": ConditionOutcome,
     "method_campaign_condition_summary.schema.json": ConditionSummary,

@@ -1731,6 +1731,7 @@ def test_authority_closure_matches_the_fixed_reviewed_contract() -> None:
         "fieldtrue.git_trust",
         "fieldtrue.graded_laboratory",
         "fieldtrue.handoff",
+        "fieldtrue.masking",
         "fieldtrue.memory",
         "fieldtrue.method_campaign",
         "fieldtrue.mission",
