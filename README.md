@@ -8,8 +8,10 @@ mechanism held permanently separate from the authority to establish truth, to ac
 adjudicate the outcome.**
 
 > **Honest status up front. Scientific state: `bootstrap`, BLOCKED at `iter001-acquisition-contract`.**
-> No corpus is admitted, no incident is screened to a verdict, no simulation campaign has run, and
-> no scientific result exists. Iteration 000 returned `BLOCKED_EVIDENCE` on NASA ADAPT: 16
+> No corpus is admitted, no incident is screened to a verdict, no simulation campaign has run under
+> a compute lease, and **no physical result exists**. One in-simulator result does exist and is
+> stated below rather than left for a reader to find. Iteration 000 returned `BLOCKED_EVIDENCE` on
+> NASA ADAPT: 16
 > evidence-useful experiment records on 1 hardware identity, 0 of a required 30 complete dossiers.
 > They are not called incidents here, because the incident construct is exactly what that gate
 > denied them. The public-source route is
@@ -33,6 +35,23 @@ adjudicate the outcome.**
 > **earns nothing**: the classical set-based rule of Campbell and Nikoukhah (2004) ties it at
 > identical accuracy, within 1.01 across a fiftyfold sweep of the risk weight. Classical active
 > fault diagnosis is sufficient for this laboratory.
+>
+> **The one result that survived.** Five effects were tested for entailment during this work. Four
+> were entailed by construction and are recorded as such, including the Amendment 005 paired effect
+> and a masking rate this mission published and then falsified itself within the hour. The fifth was
+> not: masking by a mechanism-blind compensator is predictable from **offline fault geometry** at
+> **0.9947**, measured on 750 informative cells whose severities, seeds, and baselines were all
+> unseen when the rule was frozen, against a threshold of 0.90 fixed in a committed file beforehand.
+> Four falsifiers were armed and none fired — including one that would have fired had agreement been
+> *too* perfect, since a prediction that never sees the noise cannot perfectly reproduce a noisy
+> measurement. The evidence of independence is a gap: the exact commanded correction is reproduced in
+> only **44.53 percent** of cells while the masking outcome is reproduced in **99.47 percent**.
+> See [`RESULT_SUSCEPTIBILITY_CONFIRMATORY.md`](experiments/iter001_physical_causal_evidence_acquisition/RESULT_SUSCEPTIBILITY_CONFIRMATORY.md),
+> its exploratory derivation and circular first attempt in
+> [`RESULT_SUSCEPTIBILITY.md`](experiments/iter001_physical_causal_evidence_acquisition/RESULT_SUSCEPTIBILITY.md),
+> and the falsified masking measurement it explains in
+> [`RESULT_MASKING.md`](experiments/iter001_physical_causal_evidence_acquisition/RESULT_MASKING.md).
+> This is a simulator. It establishes nothing about any physical system.
 >
 > That an active test beats passive observation on faults unidentifiable at rest is a **known
 > theorem**, not a finding of this mission, and A006 prohibits it ever being reported as one.
