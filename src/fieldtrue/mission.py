@@ -188,9 +188,9 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 # can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
 # adequate semantic review boundary.
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
-    "CONTINUITY.md": ("4ba251d829203170956e85358aeb4868f655bae1f7649d7ac7a60c82fd24d962"),
+    "CONTINUITY.md": ("f4547af455351e7431f5d421d33bc2935edb6b51e6c36f65cd137ab3e93e219a"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
-    "README.md": "2de19bb6322aadab9b59fb89292646e8873953c2569aec2d0e330b46e1e60a39",
+    "README.md": "480fe7803b99e2a5e85fdcac046df50d552268538545eda3f0a1e9496a0d7095",
     "docs/ARCHITECTURE.md": ("30d6df5d3fda894fdb344c92f4df0330e2984ad54791689e94f9a0ad521ad05d"),
     "docs/CLAIM_BOUNDARIES.md": (
         "6b21b47508462c0ccb5e199f00d51b7399cc11aee7199aa79a54b266f17ac85a"
@@ -199,7 +199,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "0c9d2e6cc1bb9b34db8113bb3bcc62077d4f125126af280fa4bf456b90850621"
     ),
     "docs/MATHEMATICS.md": ("2e10eda460f4483c050ae61c379fcab30a34de8ec3222f2aa3dfabff0fa07551"),
-    "docs/ROADMAP.md": ("8ae12c043a0c1f90257b510a8b13b01ad8dbe4edc2870d155ca538b1e42866c3"),
+    "docs/ROADMAP.md": ("4114a39859d75b3bc9863506c03388c521f614ebac4474d2d639dc9b52cd21dd"),
     "docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md": (
         "8e92178ba3d300e445bb4423f2e4ac7bf33bcc5d68e8d34a24578aa7496c5ee8"
     ),
@@ -244,7 +244,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "94bb59cd2d264d0a9a696aa2d5de6edfc906c2060474ecdf4885fd472fd38abf"
     ),
     "src/fieldtrue/schemas.py": (
-        "db598c9573c7d08f8f330be5f02fa573a3af14c837820e748a132979545263f9"
+        "a5791c5cb936a216377a255e118ca8e447a6144b06c0f3de3063ea0f73e30260"
     ),
     "src/fieldtrue/shortcut_v2_crossfit.py": (
         "4beb28f55c8903c10c1744ead56757dc3d3994cb56b4c3b1ba58faf742ea17e5"
