@@ -133,10 +133,11 @@ def test_larger_deviation_commands_a_strictly_larger_correction() -> None:
 
 # --- Inertness controls -----------------------------------------------------------------
 #
-# Three components in this laboratory have been built, described as doing something, and found to do
-# nothing: a quadratic term that floored to zero under integer division, a first graded laboratory
-# that could not defeat its own method, and a compensator that never fired. Each passed every control
-# it had, because none of those controls could fail on an inert component. These can.
+# Three components in this laboratory have been built, described as doing something, and found
+# to do nothing: a quadratic term that floored to zero under integer division, a first graded
+# laboratory that could not defeat its own method, and a compensator that never fired. Each
+# passed every control it had, because none of those controls could fail on an inert component.
+# These can.
 
 
 def test_the_compensator_actually_fires_on_at_least_one_mechanism() -> None:
