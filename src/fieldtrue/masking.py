@@ -122,6 +122,98 @@ def compensator_action(
     return (clipped,) * config.steps
 
 
+# --- Compensator families ---------------------------------------------------------------
+#
+# The susceptibility criterion rests on a claim about geometry: masking depends on where a command
+# lands relative to a fault's resolvable window, not on how the command was produced. That claim is
+# only testable against policies the criterion has never seen. These three are deliberately chosen
+# to differ in how much of the disturbance reaches the final command, because the criterion's
+# failures are predicted to come from noise moving the actual command across a window edge that the
+# predicted command did not cross.
+
+BANG_BANG_THRESHOLD: Final = 20  # shortfall above which the policy commands the ceiling
+
+
+def bang_bang_action(
+    *,
+    observed_baseline: tuple[int, ...],
+    config: GradedFaultConfig,
+    initial_state: int,
+    baseline: int = BASELINE_COMMAND,
+    gain: int = COMPENSATOR_GAIN,
+) -> tuple[int, ...]:
+    """Command the ceiling when the shortfall clears a threshold, otherwise hold baseline.
+
+    The command is quantized to two values, so a small disturbance rarely changes it. The criterion
+    is predicted to do at least as well here as against a proportional policy.
+    """
+    del gain
+    baseline_action = (baseline,) * config.steps
+    shortfall = (
+        nominal_final_state(config=config, initial_state=initial_state, action=baseline_action)
+        - observed_baseline[-1]
+    )
+    commanded = SAFE_COMMAND_CEILING if shortfall >= BANG_BANG_THRESHOLD else baseline
+    return (max(SAFE_COMMAND_FLOOR, min(SAFE_COMMAND_CEILING, commanded)),) * config.steps
+
+
+def half_gain_action(
+    *,
+    observed_baseline: tuple[int, ...],
+    config: GradedFaultConfig,
+    initial_state: int,
+    baseline: int = BASELINE_COMMAND,
+    gain: int = COMPENSATOR_GAIN,
+) -> tuple[int, ...]:
+    """Proportional restoration at half amplitude.
+
+    The same disturbance moves the command half as far, so the criterion is predicted to do at
+    least as well here as against the full-gain policy.
+    """
+    return compensator_action(
+        observed_baseline=observed_baseline,
+        config=config,
+        initial_state=initial_state,
+        baseline=baseline,
+        gain=gain // 2,
+    )
+
+
+def integrating_action(
+    *,
+    observed_baseline: tuple[int, ...],
+    config: GradedFaultConfig,
+    initial_state: int,
+    baseline: int = BASELINE_COMMAND,
+    gain: int = COMPENSATOR_GAIN,
+) -> tuple[int, ...]:
+    """Accumulate the shortfall across every step rather than reading only the final state.
+
+    Each step contributes its own disturbance draw to the command, so this policy carries more of
+    the noise into the commanded value than any of the others. The criterion is predicted to do
+    strictly worse here, and that prediction is what makes the comparison able to fail.
+    """
+    baseline_action = (baseline,) * config.steps
+    nominal = graded_forward_telemetry(
+        config=config,
+        initial_state=initial_state,
+        mechanism_key=UNKNOWN_MECHANISM_KEY,
+        severity=0,
+        action=baseline_action,
+    )
+    accumulated = sum(n - o for n, o in zip(nominal, observed_baseline, strict=True))
+    commanded = baseline + (gain * accumulated) // (100 * config.steps)
+    return (max(SAFE_COMMAND_FLOOR, min(SAFE_COMMAND_CEILING, commanded)),) * config.steps
+
+
+COMPENSATOR_FAMILIES: Final[dict[str, object]] = {
+    "proportional": compensator_action,
+    "bang_bang": bang_bang_action,
+    "half_gain": half_gain_action,
+    "integrating": integrating_action,
+}
+
+
 # --- Records -----------------------------------------------------------------------------
 
 

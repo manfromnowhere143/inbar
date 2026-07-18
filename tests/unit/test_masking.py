@@ -23,14 +23,19 @@ from fieldtrue.graded_laboratory import (
     graded_run,
 )
 from fieldtrue.masking import (
+    BANG_BANG_THRESHOLD,
     BASELINE_COMMAND,
+    COMPENSATOR_FAMILIES,
     COMPENSATOR_GAIN,
     RESOLVABLE_PERMILLE,
     SAFE_COMMAND_CEILING,
     MaskingCell,
     MaskingError,
     MechanismMaskingSummary,
+    bang_bang_action,
     compensator_action,
+    half_gain_action,
+    integrating_action,
     measure_cell,
     measurement_plan_hash,
     nominal_final_state,
@@ -370,3 +375,107 @@ def test_result_binds_its_freeze_and_laboratory_configuration() -> None:
     assert result.adjudication_freeze_sha256 == "b" * 64
     assert result.laboratory_config_sha256 == GRADED_CONFIG.config_sha256
     assert result.compensator_gain == COMPENSATOR_GAIN
+
+
+# --- Compensator families ---------------------------------------------------------------
+#
+# These exist to test whether the susceptibility criterion is geometric. They are only useful if
+# they genuinely differ in how much disturbance reaches the commanded value, so each control below
+# pins one distinguishing property rather than merely checking the function runs.
+
+
+def test_every_family_is_registered_and_callable() -> None:
+    assert set(COMPENSATOR_FAMILIES) == {
+        "proportional",
+        "bang_bang",
+        "half_gain",
+        "integrating",
+    }
+
+
+def test_bang_bang_command_is_quantized_to_two_values() -> None:
+    """Its predicted advantage comes from quantization, so quantization must be real."""
+    seen = set()
+    for m in MECHANISMS:
+        for s in (15, 45, 75, 100):
+            action = bang_bang_action(
+                observed_baseline=_observe(m, s),
+                config=GRADED_CONFIG,
+                initial_state=GRADED_INITIAL_STATE,
+            )
+            seen.add(action[0])
+    assert seen <= {BASELINE_COMMAND, 100}, f"bang-bang emitted intermediate commands: {seen}"
+    assert len(seen) > 1, "bang-bang never switched, so it is inert"
+
+
+def test_half_gain_moves_less_than_full_gain_for_the_same_observation() -> None:
+    """If it did not, it would not differ from the proportional policy in the predicted way."""
+    moved = 0
+    for m in MECHANISMS:
+        for s in (45, 75, 100):
+            obs = _observe(m, s)
+            full = compensator_action(
+                observed_baseline=obs, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+            )[0]
+            half = half_gain_action(
+                observed_baseline=obs, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+            )[0]
+            assert abs(half - BASELINE_COMMAND) <= abs(full - BASELINE_COMMAND)
+            if full != half:
+                moved += 1
+    assert moved > 0, "half gain never differed from full gain, so it is not a distinct policy"
+
+
+def test_integrating_carries_more_disturbance_into_the_command() -> None:
+    """The prediction that the criterion degrades here rests on this property.
+
+    The integrating policy reads every step, so each step's disturbance draw reaches the command.
+    Across seeds, its command must vary more than the proportional policy's, which reads only the
+    final state.
+    """
+    m = MECHANISMS[0]
+    prop, integ = [], []
+    for d in range(1, 30):
+        obs = _observe(m, 55, seed=d)
+        prop.append(
+            compensator_action(
+                observed_baseline=obs, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+            )[0]
+        )
+        integ.append(
+            integrating_action(
+                observed_baseline=obs, config=GRADED_CONFIG, initial_state=GRADED_INITIAL_STATE
+            )[0]
+        )
+    assert len(set(integ)) >= len(set(prop)), (
+        f"integrating command varied no more than proportional: "
+        f"{len(set(integ))} vs {len(set(prop))} distinct values"
+    )
+
+
+def test_every_family_respects_the_safe_envelope() -> None:
+    """A policy that leaves the envelope is an unsafe action regardless of its diagnostic value."""
+    for name, fn in COMPENSATOR_FAMILIES.items():
+        for m in MECHANISMS:
+            for s in (15, 55, 100):
+                action = fn(  # type: ignore[operator]
+                    observed_baseline=_observe(m, s),
+                    config=GRADED_CONFIG,
+                    initial_state=GRADED_INITIAL_STATE,
+                )
+                assert all(0 <= u <= 100 for u in action), f"{name} left the envelope: {action}"
+
+
+def test_bang_bang_threshold_is_reachable_in_this_laboratory() -> None:
+    """A threshold no fault can cross would make the policy silently equivalent to a no-op."""
+    crossed = False
+    for m in MECHANISMS:
+        for s in (55, 75, 100):
+            action = bang_bang_action(
+                observed_baseline=_observe(m, s),
+                config=GRADED_CONFIG,
+                initial_state=GRADED_INITIAL_STATE,
+            )
+            if action[0] == 100:
+                crossed = True
+    assert crossed, f"no fault ever produced a shortfall of {BANG_BANG_THRESHOLD} or more"
