@@ -82,6 +82,7 @@ _HANDOFF_AUTHORITY_MODULE_NAMES = (
     "fieldtrue.shortcut_contracts",
     "fieldtrue.shortcut_v2_crossfit",
     "fieldtrue.shortcut_v2_hashing",
+    "fieldtrue.shortcut_v2_ontology",
     "fieldtrue.shortcut_v2_release",
     "fieldtrue.shortcut_v2_tree",
     "fieldtrue.splits",

@@ -257,6 +257,21 @@ The exact ordered activation gates are generated in `HANDOFF.md` from the latest
 handoff event and its linked passing implementation checkpoint. They must be closed prospectively,
 with signed authority and negative controls, before any affected evidence or target access.
 
+The approved Shortcut V2 implementation scope now has an implementation-only structural ontology
+and prediction-key verifier. It does not create a real ontology or close Gate 1. Its assurance
+surface intentionally records no independent attestation, no external chronology, no semantic or
+identity-proxy review, no verified target-manifest or freeze chain, and no authority effect.
+
+`inbar.iter001.prediction-key-root.v1` is a mapping projection, not the complete artifact binding.
+Each future mechanism target directly binds the raw prediction-key manifest hash; the exact target
+manifest and its salted hiding commitment carry that binding through the later freeze and final
+reveal. A conforming implementation must enforce one manifest across all targets and reconstruct
+that entire chain. It is not implemented. The low-level cross-fit predictors also still accept
+caller-supplied local maps, so an omitted caller mapping can manufacture `key_unavailable` outside
+the verified projection path. Terminal integration must make raw manifest verification and exact
+projection mandatory. Software cannot replace the separate external semantic review,
+identity-proxy review, or genuine role independence.
+
 Do not reinterpret V1 shortcut booleans, lower thresholds, treat synthetic fixtures as evidence, or
 claim diagnosis, recovery, safety, transfer, product readiness, or economic value.
 
@@ -280,21 +295,26 @@ integration control, not retained scientific evidence or scientific authority.
 
 Two gates this document set for publication were not satisfied before visibility changed: a
 protected integration path with required checks bound to the exact tested head, and a green
-clean-clone CI matrix on the release commit. The first is now configured; the second remains
-outstanding on a repository that is already public until a protected candidate and its integrated
-commit both pass. That history is recorded here rather than erased.
+clean-clone CI matrix on the release commit. That historical defect remains recorded. It was later
+closed prospectively by pull request 7: candidate
+`dd7e4aca784b2cfbfcccde3070ea0115f1d60b82` passed the complete protected pull-request workflow in
+GitHub Actions run `29687555252`; its transparent merge wrapper
+`fce7826c92b1a29ad7b342d84345bf994d885610` then passed the post-merge `main` workflow in run
+`29688117756`. These are engineering integration observations, not scientific evidence or
+independent scientific attestation.
 
-Before the current correction, `uv run inbar handoff check` could not pass on a pull request because
+Before the correction merged through pull request 7, `uv run inbar handoff check` could not pass on
+a pull request because
 the workflow checks out GitHub's synthetic two-parent merge ref while the handoff contract accepted
 only the single-parent finalization commit. Every earlier pull-request run in this repository's
-history that reached this check failed on that topology, and no pull-request run has yet completed
-green. The verifier now accepts one integration wrapper only when its second parent is the exact
-validated final handoff, its first parent is a proper ancestor of the receipt-bound evidence, and
-its tree is identical to the final handoff tree. All receipt, finalization-path, regular-blob,
-strict-memory-append, clean-checkout, and repeated-state checks still apply. The protected GitHub
-event supplies the exact base and candidate identities; the graph predicate alone does not identify
-the intended integration tip. This makes base-controlled pull-request verification structurally
-possible; it does not itself attest that a run passed or grant scientific authority.
+history that reached this check failed on that topology. The verifier now accepts one integration
+wrapper only when its second parent is the exact validated final handoff, its first parent is a
+proper ancestor of the receipt-bound evidence, and its tree is identical to the final handoff tree.
+All receipt, finalization-path, regular-blob, strict-memory-append, clean-checkout, and repeated-state
+checks still apply. The protected GitHub event supplies the exact base and candidate identities; the
+graph predicate alone does not identify the intended integration tip. The pull-request and
+post-merge runs named above demonstrate the corrected path on those exact commits and no wider
+scientific or authority claim.
 
 Candidate branches must start from the current integration head because history verification
 requires the immutable event base to be an ancestor of the exact candidate head. Rebase a

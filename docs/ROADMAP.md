@@ -11,7 +11,7 @@ lifecycle-transition authority is not implemented.
 | --- | --- | --- |
 | Mission governance | Bootstrap contracts, blocked authority, append-only memory, fresh-snapshot generated handoff, and content-bound same-operator engineering-validation receipts | General signed authority for every mission-stage transition or independent validation attestation |
 | Corpus admission | Typed contracts, schemas, preassembled-dossier audit, and positive, negative, and placebo fixtures | Qualifying physical dossiers, canonical control authority, or a pilot verdict |
-| Hypothesis handling | Typed hypothesis sets and Bayesian updates over caller-supplied hypotheses and likelihoods | An engine that constructs and tests open-world physical mechanisms from raw incident evidence |
+| Hypothesis handling | Typed hypothesis sets, Bayesian updates over caller-supplied hypotheses and likelihoods, and an implementation-only structural verifier for shared content-derived prediction keys, exact unknown handling, and local-map projection | A real independently reviewed ontology; semantic-equivalence and identity-proxy adjudication; enforced one-manifest target/freeze/final-recomputation integration; or an engine that constructs and tests open-world physical mechanisms from raw incident evidence |
 | Test planning | Ranking of caller-supplied approved candidates under cost, time, risk, and safety constraints | Candidate-test generation, accredited outcome models, or physical execution authority |
 | Execution and recovery | Deterministic local replay fixtures and component-level verification primitives | Shortcut Authority V2 integration, an independently enforced terminal verifier and signer boundary, testbed adapters, or settled physical recovery evidence |
 | Monitor compilation | Typed monitor specification and provider-neutral port | A compiled, calibrated, transferred monitor |
@@ -124,6 +124,15 @@ In parallel, Iteration 001 needs genuinely separate custody: an unexposed eviden
 producing authority whose records establish role separation, and later a distinct apparatus owner,
 executor, and outcome verifier. This is a recruiting or partnership constraint, not an engineering
 feature that one operator can implement away.
+
+Shortcut Authority V2 still needs terminal integration. The historical v1 prediction-key root is a
+mapping projection; the complete raw manifest hash is carried by each future mechanism target, then
+transitively by the hidden target-manifest commitment frozen before releases. That complete
+target/freeze/final-recomputation chain is not implemented, and one global manifest must be enforced
+across all targets. The low-level predictors also still accept caller-created local maps, so raw
+ontology verification is not yet the only reachable prediction path. These software gaps do not
+replace the separate need for external semantic review, identity-proxy adjudication, and genuine
+role independence.
 
 Only after acquisition, role, source-binding, and domain-owner prerequisites are satisfied should a
 new amendment consider the paper design in

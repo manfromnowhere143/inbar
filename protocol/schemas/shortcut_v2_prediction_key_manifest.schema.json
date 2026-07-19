@@ -1,0 +1,217 @@
+{
+  "$defs": {
+    "HypothesisPredictionKeyAssignment": {
+      "additionalProperties": false,
+      "description": "One incident-local hypothesis assigned to one shared prediction key.",
+      "properties": {
+        "class_definition_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Class Definition Sha256"
+        },
+        "hypothesis_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Hypothesis Id",
+          "type": "string"
+        },
+        "prediction_key": {
+          "pattern": "^(?:unknown|[0-9a-f]{64})$",
+          "title": "Prediction Key",
+          "type": "string"
+        },
+        "unknown": {
+          "title": "Unknown",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hypothesis_id",
+        "prediction_key",
+        "unknown",
+        "class_definition_sha256"
+      ],
+      "title": "HypothesisPredictionKeyAssignment",
+      "type": "object"
+    },
+    "ShortcutAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.shortcut-attestation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[0-9a-f]{128}$",
+          "title": "Signature",
+          "type": "string"
+        },
+        "signer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Signer Id",
+          "type": "string"
+        },
+        "signer_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signer Public Key",
+          "type": "string"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "signer_id",
+        "kind",
+        "subject_sha256",
+        "signer_public_key",
+        "signature"
+      ],
+      "title": "ShortcutAttestation",
+      "type": "object"
+    },
+    "SignedCasePredictionKeyManifest": {
+      "additionalProperties": false,
+      "description": "One signed, pre-target prediction-key assignment for an exact hypothesis set.",
+      "properties": {
+        "ambiguity_review_receipt_artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Ambiguity Review Receipt Artifact Sha256",
+          "type": "string"
+        },
+        "assignments": {
+          "items": {
+            "$ref": "#/$defs/HypothesisPredictionKeyAssignment"
+          },
+          "minItems": 2,
+          "title": "Assignments",
+          "type": "array"
+        },
+        "case_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Case Key",
+          "type": "string"
+        },
+        "committed_at": {
+          "format": "date-time",
+          "title": "Committed At",
+          "type": "string"
+        },
+        "hypothesis_proposer_attestation": {
+          "$ref": "#/$defs/ShortcutAttestation"
+        },
+        "hypothesis_proposer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Hypothesis Proposer Id",
+          "type": "string"
+        },
+        "hypothesis_proposer_independence_group_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Hypothesis Proposer Independence Group Id",
+          "type": "string"
+        },
+        "hypothesis_set_artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Hypothesis Set Artifact Sha256",
+          "type": "string"
+        },
+        "incident_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Incident Id",
+          "type": "string"
+        },
+        "ontology_artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Ontology Artifact Sha256",
+          "type": "string"
+        },
+        "ontology_reviewer_attestation": {
+          "$ref": "#/$defs/ShortcutAttestation"
+        },
+        "ontology_reviewer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Ontology Reviewer Id",
+          "type": "string"
+        },
+        "ontology_reviewer_independence_group_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Ontology Reviewer Independence Group Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.prediction-key-assignment-manifest.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "case_key",
+        "incident_id",
+        "hypothesis_set_artifact_sha256",
+        "ontology_artifact_sha256",
+        "assignments",
+        "hypothesis_proposer_id",
+        "hypothesis_proposer_independence_group_id",
+        "ontology_reviewer_id",
+        "ontology_reviewer_independence_group_id",
+        "ambiguity_review_receipt_artifact_sha256",
+        "committed_at",
+        "hypothesis_proposer_attestation",
+        "ontology_reviewer_attestation"
+      ],
+      "title": "SignedCasePredictionKeyManifest",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Complete signed per-case assignments plus the exact frozen V1 semantic root.",
+  "properties": {
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/SignedCasePredictionKeyManifest"
+      },
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "ontology_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Artifact Sha256",
+      "type": "string"
+    },
+    "prediction_key_root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prediction Key Root Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.prediction-key-manifest.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "ontology_artifact_sha256",
+    "cases",
+    "prediction_key_root_sha256"
+  ],
+  "title": "PredictionKeyManifest",
+  "type": "object"
+}

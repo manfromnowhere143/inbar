@@ -1880,6 +1880,7 @@ def test_authority_closure_is_independent_of_prior_import_order() -> None:
             "import fieldtrue.terminal_authority\n"
             "import fieldtrue.control_producer\n"
         ),
+        "import fieldtrue.shortcut_v2_ontology\n",
         (
             "import fieldtrue.adapters.local_replay\n"
             "import fieldtrue.cli\n"
@@ -1954,6 +1955,7 @@ def test_authority_closure_matches_the_fixed_reviewed_contract() -> None:
         "fieldtrue.shortcut_contracts",
         "fieldtrue.shortcut_v2_crossfit",
         "fieldtrue.shortcut_v2_hashing",
+        "fieldtrue.shortcut_v2_ontology",
         "fieldtrue.shortcut_v2_release",
         "fieldtrue.shortcut_v2_tree",
         "fieldtrue.splits",
