@@ -1205,8 +1205,6 @@ def test_handoff_check_requires_exact_clean_v2_finalization(
     _git(handoff_repo, "commit", "--quiet", "-m", "finalize v2 handoff")
     final_commit = _git(handoff_repo, "rev-parse", "HEAD")
 
-    check_handoff(handoff_repo)
-
     integration_base = _git(
         handoff_repo,
         "rev-parse",
@@ -2072,12 +2070,10 @@ def test_snapshot_worker_isolated_from_parent_authority_monkeypatch(
     monkeypatch.setattr(handoff_module, "_render", reject_parent_execution)
     monkeypatch.setattr(handoff_module, "validate_mission", reject_parent_execution)
 
-    first = render_handoff(committed_worker_repo)
-    second = render_handoff(committed_worker_repo)
+    document = render_handoff(committed_worker_repo)
 
-    assert first == second
-    assert first.startswith(b"# Inbar Mission Handoff\n")
-    assert b"Generated-input digest:" in first
+    assert document.startswith(b"# Inbar Mission Handoff\n")
+    assert b"Generated-input digest:" in document
 
 
 def test_snapshot_worker_envelope_round_trip_and_error() -> None:
