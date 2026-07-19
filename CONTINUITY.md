@@ -195,6 +195,31 @@ zero against zero.
 trusted. The compensator guards are checked against a zero-gain compensator; the convention guards
 against a tree with an unlinked result.**
 
+That rule recurred on 2026-07-19, one day after it was recorded, and the recurrence is the reason
+this section's opening claim — that the correction is mechanism rather than vigilance — must be read
+literally. Commit `51d1885` shipped `shortcut_v2_ontology.py` with 42 of its 71 guards unreachable by
+any test, including the guards backing `explicit_unknown_verified`,
+`caller_pinned_group_separation_verified`, and `manifest_artifact_hash_verified`, which the assurance
+report asserts as verified. The module was not careless — 29 guards did carry real adversarial tests,
+and every documentation claim about it was accurate. The discipline was applied unevenly, which is
+exactly the failure a rule enforced by reading cannot catch. The repository-wide 90.01 percent
+coverage floor did not see it, because a module at 85.41 percent is invisible inside an aggregate.
+
+One guard, a class-definition hash comparison, was provably unreachable: its dictionary was keyed by
+the same derivation it compared against, and the model validator already forced the equality. It was
+deleted rather than tested, and the reason is recorded at the call site so it is not reinstated.
+Three further guards are reachable only by direct call to a private helper, because pydantic's
+`StrictStr` and the strict raw parser reject their broken subjects earlier. Those are defense in
+depth on helpers that may acquire new call sites, not dead code, and they are exercised as such.
+
+`scripts/ci/verify_guard_coverage.py`, run from `tests/unit/test_guard_coverage.py`, now measures
+this rule instead of asserting it. It extracts every `raise` in a registered authority module, runs
+that module's adversarial suite under a private coverage database, and fails naming any guard no
+broken subject reaches. Its analysis half is pure and is itself verified against deliberately broken
+subjects, because a falsifiability rule checked only against a passing tree would be the defect it
+names. Registration is a one-way ratchet: a guard added to a registered module fails the build until
+a test makes it fire.
+
 ### The frozen-rule defect, and the one that was honoured
 
 Masking freeze v1 returned `MEASUREMENT_VACUOUS` because its own definition was ambiguous. The
@@ -268,8 +293,12 @@ manifest and its salted hiding commitment carry that binding through the later f
 reveal. A conforming implementation must enforce one manifest across all targets and reconstruct
 that entire chain. It is not implemented. The low-level cross-fit predictors also still accept
 caller-supplied local maps, so an omitted caller mapping can manufacture `key_unavailable` outside
-the verified projection path. Terminal integration must make raw manifest verification and exact
-projection mandatory. Software cannot replace the separate external semantic review,
+the verified projection path. `IncidentLocalHypothesisMap` validates ordering and bijectivity but
+never provenance, so the same opening admits a strictly worse failure that this document previously
+did not disclose: a caller may supply a map binding the proposed key to a different hypothesis and
+obtain a confident, wrong `selected_hypothesis_id` rather than an abstention. Omission degrades to
+silence; substitution degrades to a false answer. Terminal integration must make raw manifest
+verification and exact projection mandatory. Software cannot replace the separate external semantic review,
 identity-proxy review, or genuine role independence.
 
 Do not reinterpret V1 shortcut booleans, lower thresholds, treat synthetic fixtures as evidence, or

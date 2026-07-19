@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from nacl.signing import SigningKey
@@ -17,6 +18,7 @@ from fieldtrue.shortcut_v2_crossfit import (
     CrossfitFold,
     CrossfitJobIdentity,
     IncidentLocalHypothesisMap,
+    LocalHypothesisAssignment,
     canonical_artifact_bytes,
     fit_categorical_train_mode,
     predict_categorical_holdout,
@@ -35,9 +37,14 @@ from fieldtrue.shortcut_v2_ontology import (
     MechanismClassDefinition,
     PinnedActorBinding,
     PredictionKeyManifest,
+    ShortcutOntologyAssuranceReport,
     ShortcutOntologyError,
+    ShortcutOntologyVerificationResult,
     SignedCasePredictionKeyManifest,
     SignedMechanismOntology,
+    _utf8,
+    _utf8_key,
+    _verify_exact_hypothesis_membership,
     assignment_attestation_subject,
     mechanism_class_prediction_key,
     ontology_attestation_subject,
@@ -1290,3 +1297,793 @@ def test_v1_mapping_projection_requires_the_separate_raw_manifest_hash() -> None
     assert report.freeze_receipt_chain_verified is False
     assert report.gate_closed is False
     assert report.authority_effect == "none"
+
+
+# --- broken-subject controls, group A -----------------------------------------------------
+
+
+def test_strict_revalidation_guard_rejects_a_construct_bypassed_model() -> None:
+    """:97 -- a model built past validation still fails the strict revalidation gate."""
+
+    broken = MechanismClassDefinition.model_construct(
+        schema_version="inbar.iter001.mechanism-class.v1",
+        canonical_name=17,
+        causal_locus="primary linear actuator",
+        failure_mode="static friction prevents commanded displacement",
+        temporal_signature="persistent command-position disagreement after onset",
+        directionality="command changes precede absent displacement",
+        definition="Mechanical stiction in the primary actuator prevents intended motion.",
+    )
+    with pytest.raises(ShortcutOntologyError, match="failed strict revalidation"):
+        mechanism_class_prediction_key(broken)
+
+
+def test_mechanism_class_text_guard_rejects_unencodable_surrogates() -> None:
+    """:104 -- reached by importing the private helper.
+
+    ``_utf8`` backs the ``MechanismClassDefinition`` text field validator, but
+    pydantic-core refuses a lone surrogate at the ``StrictStr`` layer first, so no
+    public model path can deliver an unencodable ``str`` to the field validator.
+    The guard is therefore driven directly; the surrounding model is separately
+    shown below to fail closed on the same input.
+    """
+
+    with pytest.raises(ValueError, match="mechanism-class text must be valid UTF-8"):
+        _utf8("broken-\ud800-text", label="mechanism-class text")
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "canonical_name",
+        "causal_locus",
+        "failure_mode",
+        "temporal_signature",
+        "directionality",
+        "definition",
+    ],
+)
+def test_mechanism_class_model_rejects_unencodable_surrogates(field_name: str) -> None:
+    """:104 companion -- every text field fails closed on a lone surrogate."""
+
+    payload: dict[str, object] = {
+        "schema_version": "inbar.iter001.mechanism-class.v1",
+        "canonical_name": "actuator-stiction",
+        "causal_locus": "primary linear actuator",
+        "failure_mode": "static friction prevents commanded displacement",
+        "temporal_signature": "persistent command-position disagreement after onset",
+        "directionality": "command changes precede absent displacement",
+        "definition": "Mechanical stiction in the primary actuator prevents intended motion.",
+    }
+    payload[field_name] = "broken-\ud800-text"
+    with pytest.raises(ValidationError, match="unable to parse raw data as a unicode string"):
+        MechanismClassDefinition.model_validate(payload, strict=True)
+
+
+def test_canonical_ordering_key_rejects_unencodable_text() -> None:
+    """:112 -- reached by importing the private helper.
+
+    Every public path into ``_utf8_key`` runs behind ``Identifier``/``Sha256``/
+    ``PredictionKey`` pattern constraints and strict revalidation, so no validated
+    model can carry a lone surrogate into the ordering key.  The guard is therefore
+    driven directly.
+    """
+
+    with pytest.raises(ShortcutOntologyError, match="canonical value is not valid UTF-8"):
+        _utf8_key("broken-\ud800-key")
+
+
+@pytest.mark.parametrize(
+    "bad_hash",
+    [
+        "not-a-hash",
+        "A" * 64,
+        "0" * 63,
+        "0" * 65,
+    ],
+)
+def test_prediction_key_root_rejects_non_sha256_ontology_hash(bad_hash: str) -> None:
+    """:121 -- the raw sha256 primitive rejects shape, case, and length violations."""
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="ontology artifact hash must be 64 lowercase hexadecimal characters",
+    ):
+        prediction_key_root_sha256(bad_hash, ())
+
+
+def test_prediction_key_root_rejects_non_string_ontology_hash() -> None:
+    """:121 -- a non-string hash never reaches the length or alphabet checks."""
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="ontology artifact hash must be 64 lowercase hexadecimal characters",
+    ):
+        prediction_key_root_sha256(cast(str, 12345), ())
+
+
+def test_signed_ontology_rejects_naive_commitment_time() -> None:
+    """:127 -- a naive datetime is not an admissible commitment time."""
+
+    fixture = _fixture()
+    payload = fixture.ontology.model_dump(mode="python")
+    payload["committed_at"] = T0.replace(tzinfo=None)
+    with pytest.raises(ValidationError, match="must be timezone-aware"):
+        SignedMechanismOntology.model_validate(payload, strict=True)
+
+
+@pytest.mark.parametrize(
+    ("incident_id", "hypothesis_set_sha256"),
+    [
+        ("incident alpha", "0" * 64),
+        ("-leading-dash", "0" * 64),
+        ("incident-alpha", "not-a-sha256"),
+        ("incident-alpha", "A" * 64),
+    ],
+)
+def test_case_key_rejects_untyped_inputs(incident_id: str, hypothesis_set_sha256: str) -> None:
+    """:282 -- the case key refuses to derive from inputs outside its typed contract."""
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="case-key input violates its typed contract",
+    ):
+        shortcut_case_key(incident_id, hypothesis_set_sha256)
+
+
+@pytest.mark.parametrize("token", ["NaN", "Infinity", "-Infinity"])
+def test_raw_parser_rejects_non_finite_json_constants(token: str) -> None:
+    """:567 -- non-finite JSON constants fail closed before typed validation."""
+
+    raw_bytes = f'{{"prediction_key_root_sha256": {token}}}'.encode()
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="JSON artifact contains non-finite constant",
+    ):
+        parse_prediction_key_manifest(
+            raw_bytes,
+            expected_artifact_sha256=sha256_bytes(raw_bytes),
+        )
+
+
+def test_raw_parser_rejects_mutable_artifact_buffers() -> None:
+    """:578 -- a mutable buffer is not an immutable artifact."""
+
+    raw_bytes = bytearray(b"{}")
+    with pytest.raises(ShortcutOntologyError, match="bytes must be immutable"):
+        parse_signed_mechanism_ontology(
+            cast(bytes, raw_bytes),
+            expected_artifact_sha256=sha256_bytes(bytes(raw_bytes)),
+        )
+
+
+def test_raw_parser_rejects_oversized_artifacts() -> None:
+    """:580 -- the byte limit fires before any hashing or parsing work."""
+
+    raw_bytes = b"{" + b" " * (16 * 1024 * 1024)
+    assert len(raw_bytes) > 16 * 1024 * 1024
+    with pytest.raises(ShortcutOntologyError, match="exceeds its byte limit"):
+        parse_prediction_key_manifest(raw_bytes, expected_artifact_sha256=ZERO_SHA)
+
+
+@pytest.mark.parametrize(
+    "raw_bytes",
+    [
+        b'{"schema_version": "\xff\xfe"}',
+        b'{"schema_version": ',
+        b"not json at all",
+    ],
+)
+def test_raw_parser_rejects_undecodable_or_malformed_json(raw_bytes: bytes) -> None:
+    """:595 -- both UTF-8 decoding and JSON parsing failures fail closed."""
+
+    with pytest.raises(ShortcutOntologyError, match="is not valid UTF-8 JSON"):
+        parse_signed_mechanism_ontology(
+            raw_bytes,
+            expected_artifact_sha256=sha256_bytes(raw_bytes),
+        )
+
+
+@pytest.mark.parametrize("raw_bytes", [b"[]", b'"text"', b"12", b"null"])
+def test_raw_parser_rejects_non_object_json_documents(raw_bytes: bytes) -> None:
+    """:597 -- a well-formed JSON document that is not an object is rejected."""
+
+    with pytest.raises(ShortcutOntologyError, match="must be a JSON object"):
+        parse_prediction_key_manifest(
+            raw_bytes,
+            expected_artifact_sha256=sha256_bytes(raw_bytes),
+        )
+
+
+def test_raw_parser_rejects_json_objects_outside_the_typed_contract() -> None:
+    """:601 -- a valid JSON object that is not the declared model fails closed."""
+
+    raw_bytes = b'{"schema_version": "inbar.iter001.not-this-model.v1"}'
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="signed mechanism ontology violates its typed contract",
+    ):
+        parse_signed_mechanism_ontology(
+            raw_bytes,
+            expected_artifact_sha256=sha256_bytes(raw_bytes),
+        )
+
+
+def test_raw_parser_rejects_artifacts_that_do_not_materialize_exactly() -> None:
+    """:603 -- bytes that validate but re-serialize differently are not the artifact."""
+
+    fixture = _fixture()
+    payload = json.loads(fixture.ontology_bytes.decode("utf-8"))
+    assert payload["committed_at"] == "2026-07-15T10:00:00Z"
+    payload["committed_at"] = "2026-07-15T10:00:00+00:00"
+    raw_bytes = json.dumps(payload).encode("utf-8")
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="omits or differs from the fully materialized typed artifact",
+    ):
+        parse_signed_mechanism_ontology(
+            raw_bytes,
+            expected_artifact_sha256=sha256_bytes(raw_bytes),
+        )
+
+
+# --- broken-subject controls, group B -----------------------------------------------------
+
+
+def test_known_class_named_unknown_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="reserved unknown name"):
+        MechanismClassDefinition.model_validate(
+            _definition(
+                "unknown",
+                causal_locus="primary linear actuator",
+                failure_mode="static friction prevents commanded displacement",
+                temporal_signature="persistent command-position disagreement after onset",
+                directionality="command changes precede absent displacement",
+                definition="A class that illegitimately claims the reserved unknown name.",
+            ).model_dump(mode="python"),
+            strict=True,
+        )
+
+
+def test_ontology_with_duplicate_exact_definition_is_rejected() -> None:
+    fixture = _fixture()
+    payload = fixture.ontology.model_dump(mode="python")
+    duplicated = fixture.ontology.classes[0]
+    payload["classes"] = (duplicated, duplicated)
+    with pytest.raises(ValidationError, match="duplicate exact definition"):
+        SignedMechanismOntology.model_validate(payload, strict=True)
+
+
+def test_unknown_assignment_carrying_a_class_definition_is_rejected() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"].manifest
+    unknown_assignment = next(item for item in alpha.assignments if item.unknown)
+    payload = unknown_assignment.model_dump(mode="python")
+    payload["class_definition_sha256"] = fixture.keys["a"]
+    with pytest.raises(ValidationError, match="requires the reserved key and no class definition"):
+        HypothesisPredictionKeyAssignment.model_validate(payload, strict=True)
+
+
+def test_unknown_assignment_naming_a_known_key_is_rejected() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"].manifest
+    unknown_assignment = next(item for item in alpha.assignments if item.unknown)
+    payload = unknown_assignment.model_dump(mode="python")
+    payload["prediction_key"] = fixture.keys["a"]
+    with pytest.raises(ValidationError, match="requires the reserved key and no class definition"):
+        HypothesisPredictionKeyAssignment.model_validate(payload, strict=True)
+
+
+def test_case_key_not_derived_from_its_incident_and_hypothesis_set_is_rejected() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"].manifest
+    payload = alpha.model_dump(mode="python")
+    payload["case_key"] = shortcut_case_key(
+        "incident-gamma",
+        alpha.hypothesis_set_artifact_sha256,
+    )
+    with pytest.raises(ValidationError, match="case key does not match its incident"):
+        SignedCasePredictionKeyManifest.model_validate(payload, strict=True)
+
+
+def test_one_prediction_key_mapped_to_two_hypotheses_is_rejected() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"].manifest
+    key_a = fixture.keys["a"]
+    payload = alpha.model_dump(mode="python")
+    payload["assignments"] = tuple(
+        item.model_copy(
+            update={
+                "prediction_key": key_a,
+                "class_definition_sha256": key_a,
+            }
+        )
+        if item.hypothesis_id == "alpha-known-c"
+        else item
+        for item in alpha.assignments
+    )
+    with pytest.raises(ValidationError, match="cannot map to multiple hypotheses"):
+        SignedCasePredictionKeyManifest.model_validate(payload, strict=True)
+
+
+def test_case_without_any_unknown_assignment_is_rejected() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"].manifest
+    key_b = fixture.keys["b"]
+    payload = alpha.model_dump(mode="python")
+    payload["assignments"] = tuple(
+        item.model_copy(
+            update={
+                "prediction_key": key_b,
+                "unknown": False,
+                "class_definition_sha256": key_b,
+            }
+        )
+        if item.unknown
+        else item
+        for item in alpha.assignments
+    )
+    with pytest.raises(ValidationError, match="exactly one explicit unknown assignment"):
+        SignedCasePredictionKeyManifest.model_validate(payload, strict=True)
+
+
+def test_shared_reviewer_and_proposer_id_is_rejected() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"].manifest
+    payload = alpha.model_dump(mode="python")
+    payload["hypothesis_proposer_id"] = REVIEWER.actor_id
+    with pytest.raises(ValidationError, match="hypothesis proposer IDs must differ"):
+        SignedCasePredictionKeyManifest.model_validate(payload, strict=True)
+
+
+def test_shared_reviewer_and_proposer_independence_group_is_rejected() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"].manifest
+    payload = alpha.model_dump(mode="python")
+    payload["hypothesis_proposer_id"] = PROPOSER.actor_id
+    payload["hypothesis_proposer_independence_group_id"] = REVIEWER.independence_group_id
+    with pytest.raises(ValidationError, match="independence groups must differ"):
+        SignedCasePredictionKeyManifest.model_validate(payload, strict=True)
+
+
+# --- broken-subject controls, group C -----------------------------------------------------
+
+
+def _case_for(
+    fixture: OntologyFixture,
+    *,
+    incident_id: str,
+    hypothesis_set_sha256: str,
+    ontology_sha256: str | None = None,
+) -> SignedCasePredictionKeyManifest:
+    keys = fixture.keys
+    return _signed_case(
+        incident_id=incident_id,
+        hypothesis_set_sha256=hypothesis_set_sha256,
+        ontology_sha256=ontology_sha256 or fixture.ontology_sha256,
+        assignments=(
+            HypothesisPredictionKeyAssignment(
+                hypothesis_id="hyp-known",
+                prediction_key=keys["a"],
+                unknown=False,
+                class_definition_sha256=keys["a"],
+            ),
+            HypothesisPredictionKeyAssignment(
+                hypothesis_id="hyp-unknown",
+                prediction_key="unknown",
+                unknown=True,
+                class_definition_sha256=None,
+            ),
+        ),
+        ambiguity_review_sha256="e" * 64,
+    )
+
+
+def _assurance_report(
+    *,
+    case_count: int,
+    assignment_count: int,
+) -> ShortcutOntologyAssuranceReport:
+    return ShortcutOntologyAssuranceReport(
+        schema_version="inbar.iter001.shortcut-ontology-assurance-report.v1",
+        assurance_scope="same-operator-implementation-only-structural-verification",
+        ontology_artifact_sha256="1" * 64,
+        prediction_key_manifest_artifact_sha256="2" * 64,
+        caller_pinned_trust_registry_artifact_sha256="3" * 64,
+        prediction_key_root_sha256="4" * 64,
+        case_count=case_count,
+        assignment_count=assignment_count,
+        caller_pinned_actor_bindings_checked=4,
+        exact_hypothesis_membership_verified=True,
+        explicit_unknown_verified=True,
+        structural_biconditional_verified=True,
+        signatures_verified=True,
+        declared_chronology_verified=True,
+        external_chronology_verified=False,
+        caller_pinned_group_separation_verified=True,
+        semantic_equivalence_verified=False,
+        identity_proxy_exclusion_verified=False,
+        real_independence_verified=False,
+        independent_attestation=False,
+        manifest_artifact_hash_verified=True,
+        prediction_key_root_is_mapping_projection=True,
+        target_manifest_chain_verified=False,
+        freeze_receipt_chain_verified=False,
+        gate_closed=False,
+        authority_effect="none",
+    )
+
+
+def _local_map(incident_id: str, assignment_count: int) -> IncidentLocalHypothesisMap:
+    return IncidentLocalHypothesisMap(
+        incident_id=incident_id,
+        assignments=tuple(
+            LocalHypothesisAssignment(
+                prediction_key=f"{index:064d}",
+                hypothesis_id=f"hyp-{index}",
+            )
+            for index in range(assignment_count)
+        ),
+    )
+
+
+def test_prediction_key_manifest_rejects_duplicate_incidents() -> None:
+    fixture = _fixture()
+    first = _case_for(
+        fixture,
+        incident_id="incident-alpha",
+        hypothesis_set_sha256="5" * 64,
+    )
+    second = _case_for(
+        fixture,
+        incident_id="incident-alpha",
+        hypothesis_set_sha256="6" * 64,
+    )
+    ordered = tuple(sorted((first, second), key=lambda item: item.case_key.encode("utf-8")))
+
+    with pytest.raises(
+        ValidationError,
+        match="prediction-key manifest contains duplicate incidents",
+    ):
+        PredictionKeyManifest(
+            schema_version="inbar.iter001.prediction-key-manifest.v1",
+            ontology_artifact_sha256=fixture.ontology_sha256,
+            cases=ordered,
+            prediction_key_root_sha256=ZERO_SHA,
+        )
+
+
+def test_prediction_key_manifest_rejects_foreign_ontology_artifact() -> None:
+    fixture = _fixture()
+    case = _case_for(
+        fixture,
+        incident_id="incident-alpha",
+        hypothesis_set_sha256="5" * 64,
+        ontology_sha256="7" * 64,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="case assignment names a different ontology artifact",
+    ):
+        PredictionKeyManifest(
+            schema_version="inbar.iter001.prediction-key-manifest.v1",
+            ontology_artifact_sha256=fixture.ontology_sha256,
+            cases=(case,),
+            prediction_key_root_sha256=ZERO_SHA,
+        )
+
+
+def test_prediction_key_manifest_rejects_root_that_is_not_the_frozen_projection() -> None:
+    fixture = _fixture()
+    case = _case_for(
+        fixture,
+        incident_id="incident-alpha",
+        hypothesis_set_sha256="5" * 64,
+    )
+
+    with pytest.raises(
+        ValidationError,
+        match="prediction-key root does not match the frozen V1 projection",
+    ):
+        PredictionKeyManifest(
+            schema_version="inbar.iter001.prediction-key-manifest.v1",
+            ontology_artifact_sha256=fixture.ontology_sha256,
+            cases=(case,),
+            prediction_key_root_sha256=ZERO_SHA,
+        )
+
+
+def test_prediction_key_root_rejects_duplicate_cases() -> None:
+    fixture = _fixture()
+    case = _case_for(
+        fixture,
+        incident_id="incident-alpha",
+        hypothesis_set_sha256="5" * 64,
+    )
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="prediction-key root contains duplicate cases",
+    ):
+        prediction_key_root_sha256(fixture.ontology_sha256, (case, case))
+
+
+def test_bound_case_rejects_proposer_without_the_hypothesis_proposer_role() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="bound case proposer must carry the hypothesis_proposer role",
+    ):
+        BoundCaseVerificationInput(
+            incident_id="incident-alpha",
+            raw_hypothesis_set_json=b"{}",
+            hypothesis_set_artifact_sha256="5" * 64,
+            ambiguity_review_receipt_artifact_sha256="6" * 64,
+            hypothesis_proposer=REVIEWER,
+            hypothesis_set_committed_at=T1,
+            ambiguity_review_committed_at=T2,
+            reviewed_hypothesis_set_committed_at=T3,
+            mechanism_target_committed_at=T4,
+            safe_test_review_committed_at=T5,
+        )
+
+
+def test_verification_result_rejects_local_map_count_mismatch() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="verified local-map count differs from the assurance report",
+    ):
+        ShortcutOntologyVerificationResult(
+            assurance_report=_assurance_report(case_count=2, assignment_count=2),
+            local_hypothesis_maps=(_local_map("incident-alpha", 2),),
+        )
+
+
+def test_verification_result_rejects_duplicate_local_map_incidents() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="verified local maps contain duplicate incidents",
+    ):
+        ShortcutOntologyVerificationResult(
+            assurance_report=_assurance_report(case_count=2, assignment_count=4),
+            local_hypothesis_maps=(
+                _local_map("incident-alpha", 2),
+                _local_map("incident-alpha", 2),
+            ),
+        )
+
+
+def test_verification_result_rejects_assignment_count_mismatch() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="verified local-map assignments differ from the assurance report",
+    ):
+        ShortcutOntologyVerificationResult(
+            assurance_report=_assurance_report(case_count=2, assignment_count=99),
+            local_hypothesis_maps=(
+                _local_map("incident-alpha", 2),
+                _local_map("incident-beta", 2),
+            ),
+        )
+
+
+# --- broken-subject controls, group D -----------------------------------------------------
+
+
+def _alpha_rebound_to(
+    fixture: OntologyFixture,
+    hypothesis_set: HypothesisSet,
+) -> tuple[PredictionKeyManifest, tuple[BoundCaseVerificationInput, ...]]:
+    """Rebind the alpha case and its bound input to a mutated hypothesis set."""
+
+    alpha = fixture.cases_by_incident["incident-alpha"]
+    beta = fixture.cases_by_incident["incident-beta"]
+    set_bytes, set_sha256 = _artifact(hypothesis_set)
+    ambiguity = alpha.manifest.ambiguity_review_receipt_artifact_sha256
+    case = _signed_case(
+        incident_id=alpha.manifest.incident_id,
+        hypothesis_set_sha256=set_sha256,
+        ontology_sha256=fixture.ontology_sha256,
+        assignments=alpha.manifest.assignments,
+        ambiguity_review_sha256=ambiguity,
+    )
+    bound = _bound_case(
+        incident_id=alpha.manifest.incident_id,
+        hypothesis_set_bytes=set_bytes,
+        hypothesis_set_sha256=set_sha256,
+        ambiguity_review_sha256=ambiguity,
+    )
+    manifest = _prediction_manifest(fixture.ontology_sha256, (case, beta.manifest))
+    return manifest, (bound, beta.bound)
+
+
+def test_inconsistent_caller_pins_for_one_role_and_actor_fail() -> None:
+    fixture = _fixture()
+    regrouped_worker = _validated_copy(
+        SHORTCUT_WORKER,
+        independence_group_id="substitute-worker-group",
+    )
+
+    with pytest.raises(ShortcutOntologyError, match="inconsistent pins for one role and actor"):
+        _verify(fixture, prohibited=(*PROHIBITED, regrouped_worker))
+
+
+def test_reviewer_inside_its_own_prohibited_set_fails() -> None:
+    fixture = _fixture()
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="cannot appear among its prohibited role bindings",
+    ):
+        _verify(fixture, prohibited=(*PROHIBITED, REVIEWER))
+
+
+def test_ontology_reviewer_group_differs_from_caller_pins() -> None:
+    fixture = _fixture()
+    regrouped = _resign_ontology(
+        _validated_copy(
+            fixture.ontology,
+            ontology_reviewer_independence_group_id="substitute-reviewer-group",
+        )
+    )
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="ontology reviewer identity or group differs from caller pins",
+    ):
+        verify_signed_mechanism_ontology(
+            regrouped,
+            expected_reviewer=REVIEWER,
+            prohibited_actor_bindings=(*PROHIBITED, PROPOSER),
+        )
+
+
+def test_assignment_incident_differs_from_its_hypothesis_set() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+    foreign_set = alpha.hypothesis_set.model_copy(update={"incident_id": "incident-gamma"})
+    manifest, bound_cases = _alpha_rebound_to(fixture, foreign_set)
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="assignment incident differs from its hypothesis set",
+    ):
+        _verify(fixture, manifest=manifest, bound_cases=bound_cases)
+
+
+def test_assignment_proposer_differs_from_its_hypothesis_set() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+    foreign_set = alpha.hypothesis_set.model_copy(update={"proposer_id": "substitute-proposer"})
+    manifest, bound_cases = _alpha_rebound_to(fixture, foreign_set)
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="assignment proposer differs from its hypothesis set",
+    ):
+        _verify(fixture, manifest=manifest, bound_cases=bound_cases)
+
+
+def test_bound_hypothesis_set_failing_strict_revalidation_is_rejected() -> None:
+    """The membership guard re-validates rather than trusting an already-typed object.
+
+    The public verifier can only reach this guard with a strictly parsed hypothesis set, so
+    the broken subject is built with ``model_construct`` to bypass field validation exactly
+    as an in-process caller holding an unvalidated object would.
+    """
+
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+    unvalidated = HypothesisSet.model_construct(
+        incident_id="incident alpha/not an identifier",
+        hypotheses=alpha.hypothesis_set.hypotheses,
+        proposer_id=PROPOSER.actor_id,
+    )
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="bound hypothesis set failed strict revalidation",
+    ):
+        _verify_exact_hypothesis_membership(
+            alpha.manifest,
+            unvalidated,
+            fixture.ontology.classes_by_prediction_key(),
+        )
+
+
+def test_duplicate_bound_verification_inputs_fail() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="bound verification inputs contain duplicate incidents",
+    ):
+        _verify(fixture, bound_cases=(alpha.bound, alpha.bound))
+
+
+def test_bound_inputs_must_exactly_cover_manifest_cases() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="bound verification inputs do not exactly cover prediction-key cases",
+    ):
+        _verify(fixture, bound_cases=(alpha.bound,))
+
+
+def test_manifest_binding_a_different_ontology_artifact_fails() -> None:
+    fixture = _fixture()
+    substituted_sha256 = "e" * 64
+    cases = tuple(
+        _resign_case(_validated_copy(case, ontology_artifact_sha256=substituted_sha256))
+        for case in fixture.manifest.cases
+    )
+    manifest = _prediction_manifest(substituted_sha256, cases)
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="prediction-key manifest binds a different ontology artifact",
+    ):
+        _verify(fixture, manifest=manifest)
+
+
+def test_case_assignment_differs_from_caller_bound_artifact_hashes() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+    beta = fixture.cases_by_incident["incident-beta"]
+    rebound = _bound_case(
+        incident_id=alpha.manifest.incident_id,
+        hypothesis_set_bytes=alpha.hypothesis_set_bytes,
+        hypothesis_set_sha256=alpha.hypothesis_set_sha256,
+        ambiguity_review_sha256="f" * 64,
+    )
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="case assignment differs from caller-bound artifact hashes",
+    ):
+        _verify(fixture, bound_cases=(rebound, beta.bound))
+
+
+def test_case_assignment_proposer_differs_from_caller_pins() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+    beta = fixture.cases_by_incident["incident-beta"]
+    substitute_proposer = _validated_copy(PROPOSER, actor_id="substitute-proposer")
+    rebound = _validated_copy(alpha.bound, hypothesis_proposer=substitute_proposer)
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="case assignment proposer differs from caller pins",
+    ):
+        _verify(fixture, bound_cases=(rebound, beta.bound))
+
+
+def test_case_assignment_reviewer_differs_from_caller_pins() -> None:
+    fixture = _fixture()
+    alpha = fixture.cases_by_incident["incident-alpha"]
+    beta = fixture.cases_by_incident["incident-beta"]
+    regrouped_case = _resign_case(
+        _validated_copy(
+            alpha.manifest,
+            ontology_reviewer_independence_group_id="substitute-reviewer-group",
+        )
+    )
+    manifest = _prediction_manifest(fixture.ontology_sha256, (regrouped_case, beta.manifest))
+
+    with pytest.raises(
+        ShortcutOntologyError,
+        match="case assignment reviewer differs from caller pins",
+    ):
+        _verify(fixture, manifest=manifest)
+
+
+def test_prohibited_roster_reuses_the_final_evaluator_pin_consistently() -> None:
+    """A repeated but identical pin is not an inconsistency and must not fail closed."""
+
+    fixture = _fixture()
+    result = _verify(fixture, prohibited=(*PROHIBITED, FINAL_EVALUATOR))
+
+    assert result.assurance_report.caller_pinned_group_separation_verified is True

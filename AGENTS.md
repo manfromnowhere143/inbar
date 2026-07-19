@@ -27,8 +27,9 @@ git status --short --branch
 
 ## Standards, and the defects that produced them
 
-Every rule below is machine-checked by `scripts/ci/verify_conventions.py`, invoked from
-`tests/unit/test_conventions.py` so it runs in CI without editing the workflow. Each exists because
+Every rule below is machine-checked by `scripts/ci/verify_conventions.py` and
+`scripts/ci/verify_guard_coverage.py`, invoked from `tests/unit/test_conventions.py` and
+`tests/unit/test_guard_coverage.py` so they run in CI without editing the workflow. Each exists because
 it was broken, and each names the defect so a future reader can judge whether it still earns its
 place. A rule that no longer corresponds to a real failure should be deleted, not kept for symmetry.
 
@@ -60,6 +61,16 @@ place. A rule that no longer corresponds to a real failure should be deleted, no
 - **A guard that cannot fail is not a guard.** Every control must be verified against a deliberately
   broken subject. *Defect 2026-07-18: three components were built, described as doing something, and
   found to do nothing, each having passed controls that could not fail on an inert component.*
+
+- **Every guard in a registered authority module is falsifiable, and that is measured.** A `raise`
+  no test can reach is either dead code or an untested control. *Defect 2026-07-19: commit `51d1885`
+  shipped an authority module in which 42 of its 71 guards had no test that could make them fire,
+  including guards backing `explicit_unknown_verified`, `caller_pinned_group_separation_verified`,
+  and `manifest_artifact_hash_verified` — fields the assurance report asserts as verified. One guard
+  was provably unreachable. The rule above had been written as prose and never mechanized, so it
+  recurred within a day of being recorded. `scripts/ci/verify_guard_coverage.py` now measures it:
+  registering a module is a ratchet, and a guard added to one fails the build until a broken subject
+  reaches it.*
 
 - **Run the full validation plan before starting a cycle**, not a subset. *Defect 2026-07-18: a
   20-minute cycle failed on a single 101-character line because `ruff check` was skipped in
