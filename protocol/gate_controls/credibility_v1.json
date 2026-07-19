@@ -12,6 +12,7 @@
         "screening.iter001.enumerated-source-sufficiency.v1",
         "state.iter001.qualifying-source-admission.v1",
         "correction.iter001.alfa-unit-wording.v1",
+        "correction.iter001.a006-evidence-and-binding.v1",
         "implementation.iter001.bootstrap-admission.v1",
         "implementation.iter001.shortcut-v2-primitives.v1",
         "implementation.inbar.credibility-controls.v1",

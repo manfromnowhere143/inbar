@@ -2,6 +2,10 @@
 
 Status: RECORDED
 
+> Current repository-wide disposition: historical simulator record with authority effect `none`.
+> Amendment 006 does not cover the committed graded-laboratory bytes. No active scientific or
+> physical claim follows from this document; see `AMENDMENT_006_EVIDENCE_DEFECT.md`.
+
 Gate: `ADJUDICATION_FREEZE_MASKING_V3.md`, SHA-256
 `e2acf50440e3f08995e900b753eb4566806e71df695ce4bb2d620e466b6f9366`, committed at `d35054b`
 before any confirmatory cell was measured.

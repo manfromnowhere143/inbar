@@ -135,7 +135,7 @@ run additionally requires its own signed execution lease.
 
 No scientific performance, safety, transfer, product-readiness, or economic claim has been made.
 
-### Causal-laboratory method campaign, and two nulls
+### Causal-laboratory method campaign and evidence corrections
 
 - Added the Amendment 005 diagnosis-method port, reference likelihood baseline, paired
   passive/active campaign, and comparative result contract, all recomputed from atomic records.
@@ -147,11 +147,11 @@ No scientific performance, safety, transfer, product-readiness, or economic clai
   is an algebraic identity: a parameter that multiplies the commanded input is unidentifiable when
   that input is zero. An instrument that cannot produce a negative result cannot produce a
   measurement.
-- Added the Amendment 006 severity-graded laboratory: continuous diagnosability, structural
-  mismatch from unmodeled actuation lag, a latent nuisance offset, signal-proportional disturbance,
-  and `actuator_deadband`, whose observability depends on the shape of the commanded action rather
-  than its presence. No single action resolves every hypothesis pair and the requirements run in
-  opposite directions.
+- Added a severity-graded laboratory candidate alongside Amendment 006: continuous diagnosability,
+  structural mismatch from unmodeled actuation lag, a latent nuisance offset, signal-proportional
+  disturbance, and `actuator_deadband`, whose observability depends on the shape of the commanded
+  action rather than its presence. No single action resolves every hypothesis pair and the
+  requirements run in opposite directions.
 - Added a separability index in the Campbell and Nikoukhah sense, reported as a property of the
   laboratory rather than of any method, so a campaign can distinguish an incorrect method from
   insufficient evidence.
@@ -161,25 +161,30 @@ No scientific performance, safety, transfer, product-readiness, or economic clai
 - Implemented the frozen selection rule `argmax I(H;Y_a|E) / max(C(a) + lambda*T(a) + mu*R(a),
   epsilon)` over a safety-approved action set for the first time, with hypotheses as
   (mechanism, severity) pairs and severity marginalized rather than reported.
-- **Established that the classical set-based rule ties the information-gain selector.** Identical
-  accuracy, within 1.01 across a fiftyfold sweep of the risk weight, with the sign of the cost
-  difference reversing between plant revisions. A difference whose direction is unstable under a
-  change to the plant is not an effect. Classical active fault diagnosis is sufficient for this
-  laboratory and the information-theoretic layer earns no advantage over it. The selector is
-  retained as a comparison arm, not as a recommended method.
+- Recorded an outcome-informed prose observation that a classical set-based rule tied the
+  information-gain selector. A later evidence audit found no retained comparator implementation,
+  atomic output, or executable sweep and found that A006's bound source hashes do not match
+  committed code. The comparison is therefore `INVALID` as a retained result, not a settled null;
+  the numbers are unreconstructed rather than refuted.
 - Corrected an inert structural mismatch found by its own control: the mismatch was first
   implemented as a quadratic curvature term that floors to zero under integer division at the
   nominal operating point, so the laboratory claimed a property it did not have. Replaced with
   unmodeled actuation dynamics, which no parameter hypothesis can absorb, and recomputed every
   quantitative result.
 - Registered eight contracts in the schema surface and added forty-eight adversarial controls.
+- Added a canonical retrospective susceptibility reconstruction with separate seed-independent
+  predictions and noisy measurements. It reproduces the historical counts but also shows that the
+  0.90 threshold was below the always-non-masking comparator and that F-S2 was not operationally
+  machine-defined. The arithmetic is an engineering observation; the confirmatory interpretation
+  is `INCONCLUSIVE`.
 
 Amendment 006 reverses the mission's canonical propose-then-approve-then-implement order: the
 implementation preceded the proposal, so the laboratory's design is outcome-informed and no result
 produced against it may be reported as prospective. It was signed by the same agent that proposed
 it, under owner delegation without owner review, the fifth consecutive amendment in that
-condition. Both facts are recorded in the amendment document, the machine proposal, and the
-approval receipt.
+condition. Its source hashes also match neither the first committed nor the current implementation.
+These facts are recorded without rewriting the frozen amendment, machine proposal, or approval
+receipt.
 
 That an active test outperforms passive observation on faults unidentifiable at rest is a known
 theorem, established by Campbell and Nikoukhah (2004) and by the interventional-identifiability

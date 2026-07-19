@@ -1,7 +1,8 @@
 """Safe, cost-aware active test selection over the graded laboratory.
 
-PROPOSED under Amendment 006. Implementation-only; this module carries no authority and no
-campaign result, scientific claim, or method comparison is authorized by its existence.
+This module is present as an implementation-only candidate and carries no authority. Amendment 006
+does not cover its committed bytes. No campaign result, scientific claim, or method comparison is
+authorized by its existence.
 
 What this implements
 --------------------
@@ -9,11 +10,11 @@ The selection rule frozen in `docs/MATHEMATICS.md`:
 
     a* = argmax over a in A_safe of  I(H; Y_a | E) / max(C(a) + lambda*T(a) + mu*R(a), epsilon)
 
-That equation has been specified in the mission's mathematics since the preregistration and has
-never been implemented. Amendment 005 substitutes a single frozen constant, `TARGETED_TEST_ACTION
-= (100,)*8`, for the entire argmax. Under the graded laboratory that constant is provably wrong:
-a command above the deadband threshold passes unattenuated, so the largest available probe is
-structurally blind to `actuator_deadband` and scores zero on it.
+That equation has been specified in the mission's mathematics since the preregistration but had not
+been implemented before this candidate. Amendment 005 substitutes a single frozen constant,
+`TARGETED_TEST_ACTION = (100,)*8`, for the entire argmax. Under the graded laboratory that constant
+is provably wrong: a command above the deadband threshold passes unattenuated, so the largest
+available probe is structurally blind to `actuator_deadband` and scores zero on it.
 
 Severity is latent
 ------------------
@@ -68,14 +69,12 @@ from fieldtrue.graded_laboratory import (
     graded_run,
 )
 
-# --- Amendment 006 authority binding ---------------------------------------------------
+# --- Amendment 006 historical linkage --------------------------------------------------
 #
-# This module exists under Amendment 006, ratified by owner-approval receipt
-# `iter001-graded-laboratory-owner-approval-006` over proposal commit `dab4ba9f`. The receipt
-# discloses that the proposer and the signer are the same agent and that no independent review
-# occurred. Ratification is not prospective authorization: the implementation preceded the
-# proposal, so this laboratory's design is outcome-informed and no result produced against it may
-# be reported as prospective.
+# These identifiers retain the intended A006 linkage. Amendment 006's bound source hash never
+# matched a committed version of this module, so its owner-signature receipt does not cover this
+# implementation. The implementation also preceded the proposal, making the design outcome-informed;
+# no result produced against it may be reported as prospective.
 
 AMENDMENT_ID: Final = "iter001_006"
 APPROVED_PROPOSAL_COMMIT: Final = "dab4ba9f8eb967e1eceb70feaecc5262882cbde0"

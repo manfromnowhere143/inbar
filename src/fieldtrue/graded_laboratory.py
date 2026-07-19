@@ -1,7 +1,8 @@
 """Severity-graded reference laboratory with structural model mismatch.
 
-PROPOSED under Amendment 006. This module is implementation-only and carries no authority.
-No campaign result, scientific claim, or method comparison is authorized by its existence.
+This module is present as an implementation-only candidate and carries no authority. Amendment 006
+does not cover its committed bytes. No campaign result, scientific claim, or method comparison is
+authorized by its existence.
 
 Why this module exists
 ----------------------
@@ -11,9 +12,9 @@ disturbance removed. Under those conditions diagnosis is arithmetic, not inferen
 of the true mechanism is bounded by the disturbance and the residual of every false mechanism is
 enormous. A method cannot fail, so a campaign cannot measure a method.
 
-That is a verified instrument pointed at a phenomenon requiring no instrument. This module makes
-the laboratory able to defeat the method, which is the precondition for a campaign result to
-carry information.
+That is a verified instrument pointed at a phenomenon requiring no instrument. This candidate is
+intended to make the laboratory able to defeat the method, which is the precondition for a campaign
+result to carry information.
 
 Three changes, each closing one specific escape:
 
@@ -53,14 +54,12 @@ from fieldtrue.causal_laboratory import (
 )
 from fieldtrue.domain import FrozenModel
 
-# --- Amendment 006 authority binding ---------------------------------------------------
+# --- Amendment 006 historical linkage --------------------------------------------------
 #
-# This module exists under Amendment 006, ratified by owner-approval receipt
-# `iter001-graded-laboratory-owner-approval-006` over proposal commit `dab4ba9f`. The receipt
-# discloses that the proposer and the signer are the same agent and that no independent review
-# occurred. Ratification is not prospective authorization: the implementation preceded the
-# proposal, so this laboratory's design is outcome-informed and no result produced against it may
-# be reported as prospective.
+# These identifiers retain the intended A006 linkage. Amendment 006's bound source hash never
+# matched a committed version of this module, so its owner-signature receipt does not cover this
+# implementation. The implementation also preceded the proposal, making the design outcome-informed;
+# no result produced against it may be reported as prospective.
 
 AMENDMENT_ID: Final = "iter001_006"
 APPROVED_PROPOSAL_COMMIT: Final = "dab4ba9f8eb967e1eceb70feaecc5262882cbde0"
@@ -77,7 +76,7 @@ OWNER_APPROVAL_RECEIPT_HASH: Final = (
 
 
 class GradedFaultConfig(FrozenModel):
-    """A scalar recurrence with an unmodeled quadratic term and a tunable disturbance floor.
+    """A scalar recurrence with unmodeled actuation dynamics and a tunable disturbance floor.
 
     The plant realized by `graded_run` is
 

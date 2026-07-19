@@ -2,6 +2,10 @@
 
 Status: RECORDED — CONFIRMATORY
 
+> Current disposition: **CORRECTED — RETROSPECTIVE ENGINEERING RECONSTRUCTION; CONFIRMATORY
+> INTERPRETATION INCONCLUSIVE.** The original report is retained below. See the correction appended
+> to this document.
+
 Gate: `ADJUDICATION_FREEZE_SUSCEPTIBILITY.md`, SHA-256
 `57bdb965c821b20e3e76007009e0e0e700e73862deaafaae8e5ce1428f3cad38`, committed at `524d5e8`
 before any confirmatory cell was measured.
@@ -127,3 +131,66 @@ performed.
 
 Five effects were tested for entailment during this line of work. Four were entailed by construction
 and are recorded as such. This is the one that was not.
+
+# Correction: the counts replay, but the confirmatory interpretation does not survive
+
+Status: CORRECTED — RETROSPECTIVE ENGINEERING RECONSTRUCTION; CONFIRMATORY INTERPRETATION
+`INCONCLUSIVE`
+
+Recorded: 2026-07-19
+
+Authority effect: none.
+
+The original run retained no executable runner and no atomic confirmatory cells. A retrospective
+reconstruction now keeps the 75 seed-independent predictions separate from the 1,125 noisy
+measurements and derives every aggregate from those atomic records. The canonical artifact is
+`proof/susceptibility_confirmatory_v1/reconstruction.json`, SHA-256
+`99f6f08f5e2fc720606dcbc109988b7654dd223861dd212885e0a1e755770151`.
+
+It reproduces the prose arithmetic exactly:
+
+| quantity | exact replay |
+| --- | ---: |
+| all-cell agreement | 1,121 / 1,125 |
+| informative agreement | 746 / 750 |
+| masking events | 64 |
+| exact commands on informative cells | 334 / 750 |
+| disagreements | 4 |
+| confusion matrix | TP 60, FP 0, FN 4, TN 686 |
+| sensitivity | 60 / 64 |
+| specificity | 686 / 686 |
+| balanced accuracy | 31 / 32 |
+
+This verifies the reported deterministic calculation against the source and frozen schedule. It
+does not recreate evidence that existed at the historical execution time.
+
+## Why the interpretation is corrected
+
+1. The preregistered 0.90 agreement threshold was non-discriminating for this schedule. An
+   always-non-masking comparator scores 686/750, or 0.9147, on the informative set without using
+   fault geometry. The observed sensitivity and balanced accuracy are stronger retrospective
+   diagnostics, but they were not the frozen success rule.
+2. F-S2 required disagreements to lie within one disturbance-width of a window boundary but did not
+   machine-define the mapping from telemetry disturbance to command-window distance. The four
+   disagreements can be located exactly, but the preregistered F-S2 verdict cannot be independently
+   executed from the freeze.
+3. Prediction and measurement share the same hand-authored forward geometry and separability rule.
+   The replay tests disturbance around that structure, not model misspecification or physical
+   transfer.
+4. The reserved `unknown` mechanism realizes nominal dynamics at every severity, so it is a nominal
+   placeholder rather than a genuinely unmodeled fault family.
+5. Amendment 006's bound source hashes match neither the first committed nor the current graded
+   laboratory. The implementation is not covered by that amendment.
+
+The 0.9947 association inside this deterministic simulator is not refuted. It is an engineering
+observation whose confirmatory scientific interpretation is inconclusive. It must not be described
+as a physical result, a general accuracy, a state-of-the-art result, or a confirmed result.
+
+Reproduce and verify the retained artifact with:
+
+```bash
+uv run pytest tests/unit/test_susceptibility_replay.py -q
+```
+
+The controlling authority and evidence correction is
+`AMENDMENT_006_EVIDENCE_DEFECT.md`.

@@ -145,13 +145,32 @@ FORBIDDEN_PHRASES: dict[str, tuple[str, ...]] = {
         "no scientific result exists",
         "Four owner-signed amendments",
         "16 real incidents",
+        "16 incidents",
+        "Classical active fault diagnosis is sufficient for this laboratory.",
+        "The one result that survived.",
+        "Inbar makes the failure modes structurally impossible",
         "the second\nconsecutive amendment",
     ),
     "CONTINUITY.md": (
         "The private remote is",
+        "Treat this as settled for this\nlaboratory",
         "second consecutive amendment in that condition",
     ),
+    "CHANGELOG.md": (
+        "Established that the classical set-based rule ties the information-gain selector.",
+    ),
+    "docs/MATHEMATICS.md": ("denominator_floor`, whose current default is `1e-9` cost units",),
+    "docs/ROADMAP.md": (
+        "The active-test milestone is closed as a null",
+        "Existing benchmarks score whether an agent sought information, not",
+    ),
     "docs/IDENTITY.md": ("The repository remains private staging",),
+    "src/fieldtrue/active_selection.py": (
+        "This module exists under Amendment 006, ratified by owner-approval receipt",
+    ),
+    "src/fieldtrue/graded_laboratory.py": (
+        "This module exists under Amendment 006, ratified by owner-approval receipt",
+    ),
 }
 
 

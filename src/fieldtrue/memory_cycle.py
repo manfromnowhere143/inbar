@@ -1,8 +1,8 @@
 """Produce the receipt, ledger, and handoff cycle that lands a candidate.
 
 The handoff checker requires an exact topology: a validation-evidence commit that is the
-single-parent child of the implementation head, three chained research-memory events bound to
-those commits, and a final commit that changes only the ledger and the generated handoff. The
+single-parent child of the implementation head, chained research-memory events bound to those
+commits, and a final commit that changes only the ledger and the generated handoff. The
 checker was committed; the producer that satisfies it was not — every prior cycle came from
 out-of-repo tooling, so a fresh clone could verify a handoff it had no way to make.
 
@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
@@ -40,6 +41,163 @@ _RENDERER_PATH: Final = "src/fieldtrue/handoff.py"
 _LEGACY_SOURCE_VERDICT_EVENT: Final = "iter001-public-substrate-verdict-v1"
 _ENGINE_BOUNDARY_EVENT: Final = "future-research-engine-shortcut-v2-lessons-v1"
 _SOURCE_AUDIT_PATH: Final = "docs/research/ITER001_SOURCE_ROLE_AUDIT.md"
+
+
+@dataclass(frozen=True)
+class _EvidenceCorrectionSpec:
+    target_event_id: str
+    old: str
+    corrected: str
+    evidence: tuple[tuple[str, str, str], ...]
+
+
+_EVIDENCE_CORRECTIONS: Final = (
+    _EvidenceCorrectionSpec(
+        target_event_id="inbar-core-validation-checkpoint-v12",
+        old=(
+            "Ratified the graded laboratory and the cost-aware active test selector under "
+            "Amendment 006, established that the Amendment 005 laboratory cannot produce a "
+            "negative result, and recorded a null: the classical set-based rule ties the "
+            "information-gain selector."
+        ),
+        corrected=(
+            "Amendment 006 binds no committed graded-laboratory or active-selector source and no "
+            "exact test artifacts. Its classical-selector comparison is invalid as retained "
+            "evidence, not a settled null."
+        ),
+        evidence=(
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/"
+                "AMENDMENT_006_EVIDENCE_DEFECT.md",
+                "text/markdown",
+                "source",
+            ),
+            ("tests/unit/test_susceptibility_replay.py", "text/x-python", "verifier"),
+        ),
+    ),
+    _EvidenceCorrectionSpec(
+        target_event_id="inbar-core-validation-checkpoint-v15",
+        old=(
+            "Recorded and then corrected the first confirmatory measurement: the reported masking "
+            "rate was an analytically entailed artifact, and excluding it the corrective action "
+            "never masks a non-degenerate fault and systematically reveals faults instead. F-M1 "
+            "and F-M2 both fire."
+        ),
+        corrected=(
+            "The masking exercise remains a historical simulator record with no active "
+            "confirmatory, physical, or recovery status. Amendment 006 does not cover the "
+            "committed implementation, and the post-exclusion behavior is not promoted beyond "
+            "engineering evidence."
+        ),
+        evidence=(
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/"
+                "AMENDMENT_006_EVIDENCE_DEFECT.md",
+                "text/markdown",
+                "source",
+            ),
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/RESULT_MASKING.md",
+                "text/markdown",
+                "source",
+            ),
+        ),
+    ),
+    _EvidenceCorrectionSpec(
+        target_event_id="inbar-core-validation-checkpoint-v16",
+        old=(
+            "Proposed a machine-checkable approval basis for owner receipts, and recorded masking "
+            "susceptibility as an offline-computable fault geometry that predicts masking in 169 "
+            "of 175 cells without touching the measurement."
+        ),
+        corrected=(
+            "The exploratory 169-of-175 susceptibility observation remains unreconstructed and "
+            "carries no active scientific status. A later, separate confirmatory schedule is "
+            "retrospectively reconstructed, but its interpretation is inconclusive."
+        ),
+        evidence=(
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/RESULT_SUSCEPTIBILITY.md",
+                "text/markdown",
+                "source",
+            ),
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/"
+                "RESULT_SUSCEPTIBILITY_CONFIRMATORY.md",
+                "text/markdown",
+                "source",
+            ),
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/proof/"
+                "susceptibility_confirmatory_v1/reconstruction.json",
+                "application/json",
+                "derived",
+            ),
+        ),
+    ),
+    _EvidenceCorrectionSpec(
+        target_event_id="inbar-core-validation-checkpoint-v17",
+        old=(
+            "Recorded the mission's first confirmatory result to pass its own pre-registered "
+            "prediction: masking is predictable from offline fault geometry at 0.9947 on 750 "
+            "informative cells whose configurations were unseen when the rule was frozen."
+        ),
+        corrected=(
+            "The confirmatory arithmetic is retrospectively reconstructed, but the frozen "
+            "threshold was weaker than an always-non-masking comparator and one falsifier was not "
+            "operationally machine-defined. Its interpretation is inconclusive, not a first "
+            "scientific result."
+        ),
+        evidence=(
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/"
+                "AMENDMENT_006_EVIDENCE_DEFECT.md",
+                "text/markdown",
+                "source",
+            ),
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/"
+                "RESULT_SUSCEPTIBILITY_CONFIRMATORY.md",
+                "text/markdown",
+                "source",
+            ),
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/proof/"
+                "susceptibility_confirmatory_v1/reconstruction.json",
+                "application/json",
+                "derived",
+            ),
+        ),
+    ),
+    _EvidenceCorrectionSpec(
+        target_event_id="inbar-core-validation-checkpoint-v18",
+        old=(
+            "Linked all three results from the front page and retired the false claim that no "
+            "scientific result exists; tested the susceptibility criterion against three unseen "
+            "compensator families, where the prediction designed to degrade it did degrade it and "
+            "a frozen falsifier voided two figures it should not have."
+        ),
+        corrected=(
+            "None of the simulator documents is an active scientific result. The susceptibility "
+            "interpretation is inconclusive, the compensator-family observation is "
+            "unreconstructed, and A006 implementation coverage is blocked."
+        ),
+        evidence=(
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/"
+                "AMENDMENT_006_EVIDENCE_DEFECT.md",
+                "text/markdown",
+                "source",
+            ),
+            (
+                "experiments/iter001_physical_causal_evidence_acquisition/"
+                "RESULT_COMPENSATOR_FAMILY.md",
+                "text/markdown",
+                "source",
+            ),
+        ),
+    ),
+)
 
 
 class MemoryCycleError(RuntimeError):
@@ -115,12 +273,13 @@ def _append_event(
     evidence: list[dict[str, Any]],
     links: dict[str, str],
     source_commit: str,
+    corrects_event_id: str | None = None,
 ) -> dict[str, Any]:
     moment = _now()
     body: dict[str, Any] = {
         "access": "internal",
         "actor": {"actor_id": actor_id, "kind": "agent"},
-        "corrects_event_id": None,
+        "corrects_event_id": corrects_event_id,
         "cost_usd": "0",
         "engine_requirement": None,
         "epistemic_phase": "retrospective",
@@ -160,6 +319,7 @@ def produce_handoff_cycle(
     handoff_event_id: str,
     resource_event_id: str,
     source_verdict_event_id: str,
+    evidence_correction_event_ids: tuple[str, ...] = (),
 ) -> dict[str, str]:
     """Run the complete evidence, ledger, and handoff cycle at the current head.
 
@@ -234,9 +394,51 @@ def produce_handoff_cycle(
         source_commit=implementation_commit,
     )
 
+    previous_event = verdict_event
+    if evidence_correction_event_ids:
+        if len(evidence_correction_event_ids) != len(_EVIDENCE_CORRECTIONS):
+            raise MemoryCycleError("evidence-correction event IDs do not match the correction set")
+        by_id = {event["event_id"]: event for event in ledger}
+        for event_id, correction in zip(
+            evidence_correction_event_ids, _EVIDENCE_CORRECTIONS, strict=True
+        ):
+            target = by_id.get(correction.target_event_id)
+            if target is None or target.get("summary") != correction.old:
+                raise MemoryCycleError(
+                    f"evidence-correction target differs: {correction.target_event_id}"
+                )
+            previous_event = _append_event(
+                root,
+                previous=previous_event,
+                event_id=event_id,
+                event_type="correction",
+                stage="evidence-correction",
+                status="recorded",
+                actor_id=producer_actor_id,
+                summary=f"Corrected the retained evidence status of {correction.target_event_id}.",
+                payload={
+                    "old": correction.old,
+                    "corrected": correction.corrected,
+                    "authority_effect": "none",
+                },
+                evidence=[
+                    _evidence_ref(
+                        root,
+                        uri=uri,
+                        git_commit=implementation_commit,
+                        media_type=media_type,
+                        role=role,
+                    )
+                    for uri, media_type, role in correction.evidence
+                ],
+                links={},
+                source_commit=implementation_commit,
+                corrects_event_id=correction.target_event_id,
+            )
+
     resource_event = _append_event(
         root,
-        previous=verdict_event,
+        previous=previous_event,
         event_id=resource_event_id,
         event_type="resource",
         stage="engineering-validation",

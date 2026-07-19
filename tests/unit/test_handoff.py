@@ -1764,6 +1764,7 @@ def test_preloaded_wrapper_allowlist_matches_the_fixed_reviewed_contract() -> No
                 "fieldtrue.experiment",
                 "fieldtrue.memory_cycle",
                 "fieldtrue.ports",
+                "fieldtrue.susceptibility_replay",
                 "fieldtrue.validation_producer",
             }
         )

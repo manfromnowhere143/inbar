@@ -101,6 +101,9 @@ _HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES = frozenset(
         # A producer tool, not an authority source: nothing in the renderer's import closure
         # depends on it, so it is captured as bound wrapper source rather than bound authority.
         "fieldtrue.memory_cycle",
+        # A retrospective engineering replay, not an authority source. Its tests preload it before
+        # handoff tests, so the renderer binds its wrapper bytes without importing or trusting it.
+        "fieldtrue.susceptibility_replay",
         "fieldtrue.validation_producer",
     }
 )

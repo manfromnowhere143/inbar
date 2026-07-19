@@ -29,10 +29,45 @@ from fieldtrue.domain import (
     engineering_validation_plan_sha256,
 )
 from fieldtrue.handoff import RECOVERY_CHECKPOINT_ACTION
-from fieldtrue.memory_cycle import MemoryCycleError, produce_handoff_cycle
+from fieldtrue.memory_cycle import (
+    _EVIDENCE_CORRECTIONS,
+    MemoryCycleError,
+    _EvidenceCorrectionSpec,
+    produce_handoff_cycle,
+)
 
 RECEIPT_ID = "inbar-core-validation-cycle-test"
 NOW = datetime(2026, 7, 18, 12, 0, 0, tzinfo=UTC)
+
+
+def test_evidence_correction_set_binds_every_superseded_checkpoint_summary() -> None:
+    repo = Path(__file__).resolve().parents[2]
+    records = [
+        json.loads(line)
+        for line in (repo / "memory/research_engine_extraction.jsonl").read_text().splitlines()
+    ]
+    by_id = {record["event_id"]: record for record in records}
+
+    assert [item.target_event_id for item in _EVIDENCE_CORRECTIONS] == [
+        "inbar-core-validation-checkpoint-v12",
+        "inbar-core-validation-checkpoint-v15",
+        "inbar-core-validation-checkpoint-v16",
+        "inbar-core-validation-checkpoint-v17",
+        "inbar-core-validation-checkpoint-v18",
+    ]
+    for item in _EVIDENCE_CORRECTIONS:
+        assert by_id[item.target_event_id]["summary"] == item.old
+        assert item.corrected != item.old
+        for uri, _media_type, _role in item.evidence:
+            assert (repo / uri).is_file()
+
+    assert "no active confirmatory, physical, or recovery status" in (
+        _EVIDENCE_CORRECTIONS[1].corrected
+    )
+    assert "169-of-175 susceptibility observation remains unreconstructed" in (
+        _EVIDENCE_CORRECTIONS[2].corrected
+    )
+    assert "not a first scientific result" in _EVIDENCE_CORRECTIONS[3].corrected
 
 
 def _git(root: Path, *args: str) -> str:
@@ -219,7 +254,7 @@ def _install_stubs(
     return calls
 
 
-def _cycle(root: Path) -> dict[str, str]:
+def _cycle(root: Path, *, evidence_correction_event_ids: tuple[str, ...] = ()) -> dict[str, str]:
     return produce_handoff_cycle(
         root,
         receipt_id=RECEIPT_ID,
@@ -229,6 +264,7 @@ def _cycle(root: Path) -> dict[str, str]:
         handoff_event_id="cycle-test-handoff-v1",
         resource_event_id="cycle-test-resource-v1",
         source_verdict_event_id="cycle-test-source-verdict-v1",
+        evidence_correction_event_ids=evidence_correction_event_ids,
     )
 
 
@@ -291,6 +327,56 @@ def test_cycle_appends_a_verifiable_hash_chain(
     assert handoff["links"]["source_verdict"] == "cycle-test-source-verdict-v1"
     # The mission state did not change, so the handoff payload carries forward verbatim.
     assert handoff["payload"] == events[1]["payload"]
+
+
+def test_cycle_appends_explicit_evidence_correction_links(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed_repo(tmp_path)
+    _install_stubs(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "fieldtrue.memory_cycle._EVIDENCE_CORRECTIONS",
+        (
+            _EvidenceCorrectionSpec(
+                target_event_id="seed-source-verdict-v1",
+                old="The current protocol blocks the present public-source-only route.",
+                corrected="The bounded correction remains in force.",
+                evidence=(
+                    (
+                        "docs/research/ITER001_SOURCE_ROLE_AUDIT.md",
+                        "text/markdown",
+                        "source",
+                    ),
+                ),
+            ),
+        ),
+    )
+    result = _cycle(
+        tmp_path,
+        evidence_correction_event_ids=("cycle-test-evidence-correction-v1",),
+    )
+
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "memory/research_engine_extraction.jsonl").read_text().splitlines()
+    ]
+    correction = events[3]
+    assert correction["event_type"] == "correction"
+    assert correction["corrects_event_id"] == "seed-source-verdict-v1"
+    assert correction["payload"]["old"] == events[0]["summary"]
+    assert correction["payload"]["corrected"] == "The bounded correction remains in force."
+    assert correction["source_commit"] == result["implementation_commit"]
+    assert correction["evidence"][0]["git_commit"] == result["implementation_commit"]
+    assert events[4]["previous_event_hash"] == correction["event_hash"]
+
+
+def test_cycle_rejects_an_incomplete_evidence_correction_id_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed_repo(tmp_path)
+    _install_stubs(tmp_path, monkeypatch)
+    with pytest.raises(MemoryCycleError, match="do not match"):
+        _cycle(tmp_path, evidence_correction_event_ids=("only-one",))
 
 
 def test_cycle_refuses_a_dirty_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
