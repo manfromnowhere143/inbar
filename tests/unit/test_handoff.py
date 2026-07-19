@@ -2062,18 +2062,51 @@ else:
 
 def test_snapshot_worker_isolated_from_parent_authority_monkeypatch(
     committed_worker_repo: Path,
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    repo = tmp_path / "isolated-worker-source"
+    clone_environment = handoff_module.git_environment()
+    clone_environment["GIT_ALLOW_PROTOCOL"] = "file"
+    subprocess.run(  # noqa: S603 - fixed trusted Git and local test paths
+        [
+            str(handoff_module.TRUSTED_GIT_PATH),
+            "clone",
+            "--quiet",
+            "--no-hardlinks",
+            "--",
+            str(committed_worker_repo),
+            str(repo),
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        env=clone_environment,
+        timeout=60,
+    )
+    _git(repo, "config", "user.name", "Inbar Handoff Test")
+    _git(repo, "config", "user.email", "handoff@example.invalid")
+    renderer = repo / handoff_module._RENDERER_PATH
+    sentinel = b"# isolated committed worker source\n"
+    # Keep this isolation test focused on the real snapshot/child boundary. Separate tests execute
+    # the complete renderer and reject stale preloaded source.
+    renderer.write_bytes(
+        renderer.read_bytes()
+        + b"\n\ndef _render_in_process(_repo_root):\n"
+        + b'    return b"# isolated committed worker source\\n"\n'
+    )
+    _git(repo, "add", handoff_module._RENDERER_PATH)
+    _git(repo, "commit", "--quiet", "-m", "install isolated worker sentinel")
+
     def reject_parent_execution(*_args: object, **_kwargs: object) -> object:
         raise AssertionError("parent authority function executed")
 
     monkeypatch.setattr(handoff_module, "_render", reject_parent_execution)
     monkeypatch.setattr(handoff_module, "validate_mission", reject_parent_execution)
 
-    document = render_handoff(committed_worker_repo)
+    document = render_handoff(repo)
 
-    assert document.startswith(b"# Inbar Mission Handoff\n")
-    assert b"Generated-input digest:" in document
+    assert document == sentinel
 
 
 def test_snapshot_worker_envelope_round_trip_and_error() -> None:

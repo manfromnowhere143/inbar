@@ -292,10 +292,10 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
     ),
     "tests/unit/test_handoff.py": (
-        "1c0dbaff26af3012129292bb446a1dd783b11c8afa018697d00ac0be8ebdd21d"
+        "72f0b07ddbb11e50cdb7450571e423641587c1398ac46c1fcd5ff212a3aab8d2"
     ),
     "tests/unit/test_mission.py": (
-        "09b6915f052f333f21889dc2c0e42cf3b0ad85b072d8cf15bc4394644b71b3da"
+        "f366e097ca75ccdf8df5d212bc9c5d52b02756607b7377a6047e4c6271dda11e"
     ),
     "tests/unit/test_release_contract.py": (
         "e8d6d726eed62f1c4eb004f33ca22813d4ac0be96d7ec153157f7624ade208d1"

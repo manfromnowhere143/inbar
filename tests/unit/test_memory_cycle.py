@@ -447,4 +447,4 @@ def test_run_inbar_passes_through_success_and_surfaces_failure() -> None:
     output = _run_inbar(repo, "schemas", "check")
     assert "SCHEMAS_VERIFIED" in output
     with pytest.raises(MemoryCycleError, match="failed"):
-        _run_inbar(repo, "mission", "validate", "--expect-failure", "no-such-check")
+        _run_inbar(repo, "not-a-command")
