@@ -163,6 +163,11 @@ from fieldtrue.shortcut_v2_crossfit import (
     TreeFittedState,
     TreePredictionManifest,
 )
+from fieldtrue.shortcut_v2_ontology import (
+    PredictionKeyManifest,
+    ShortcutOntologyAssuranceReport,
+    SignedMechanismOntology,
+)
 from fieldtrue.shortcut_v2_release import (
     RegistryRecomputationAuthoritySubject,
     RuleAxisFoldAuthoritySubject,
@@ -312,6 +317,9 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "shortcut_v2_feature_vector.schema.json": FeatureVector,
     "shortcut_v2_fitted_state_root_item.schema.json": FittedStateRootItem,
     "shortcut_v2_local_hypothesis_map.schema.json": IncidentLocalHypothesisMap,
+    "shortcut_v2_mechanism_ontology.schema.json": SignedMechanismOntology,
+    "shortcut_v2_ontology_assurance_report.schema.json": (ShortcutOntologyAssuranceReport),
+    "shortcut_v2_prediction_key_manifest.schema.json": PredictionKeyManifest,
     "shortcut_v2_prediction_root_item.schema.json": PredictionRootItem,
     "shortcut_v2_registry_recomputation_subject.schema.json": (
         RegistryRecomputationAuthoritySubject

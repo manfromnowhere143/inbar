@@ -66,6 +66,17 @@ adjudicate the outcome.**
 > The separate source-binding and retained-comparison defect is recorded in
 > [`AMENDMENT_006_EVIDENCE_DEFECT.md`](experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_006_EVIDENCE_DEFECT.md).
 >
+> **Shortcut V2 ontology status.** The repository now contains an implementation-only structural
+> verifier for content-derived mechanism keys, exact hypothesis coverage, one reserved `unknown`,
+> caller-pinned signatures and group separation, declared chronology, and derived local maps. It
+> creates no real ontology and closes no gate. The v1 prediction-key root is intentionally a
+> mapping projection; complete metadata is bound by the raw manifest hash carried through future
+> mechanism targets and the hidden target-manifest commitment. That target/freeze/final-
+> recomputation chain is not implemented. The existing low-level predictors also still accept
+> caller-supplied local maps, so verified projection is not yet an enforced terminal path.
+> Genuinely external semantic review, identity-proxy review, and role independence remain absent.
+> Gate 1 therefore remains `blocked`.
+>
 > This is a pre-release research system. A public code checkpoint here does not
 > imply a diagnosis, recovery, safety, transfer, product-readiness, state-of-the-art, or
 > economic-value result, and none is claimed.

@@ -1,0 +1,166 @@
+{
+  "additionalProperties": false,
+  "description": "Nonauthoritative report of implementation-only structural verification.",
+  "properties": {
+    "assignment_count": {
+      "exclusiveMinimum": 0,
+      "title": "Assignment Count",
+      "type": "integer"
+    },
+    "assurance_scope": {
+      "const": "same-operator-implementation-only-structural-verification",
+      "title": "Assurance Scope",
+      "type": "string"
+    },
+    "authority_effect": {
+      "const": "none",
+      "title": "Authority Effect",
+      "type": "string"
+    },
+    "caller_pinned_actor_bindings_checked": {
+      "exclusiveMinimum": 0,
+      "title": "Caller Pinned Actor Bindings Checked",
+      "type": "integer"
+    },
+    "caller_pinned_group_separation_verified": {
+      "const": true,
+      "title": "Caller Pinned Group Separation Verified",
+      "type": "boolean"
+    },
+    "caller_pinned_trust_registry_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Caller Pinned Trust Registry Artifact Sha256",
+      "type": "string"
+    },
+    "case_count": {
+      "exclusiveMinimum": 0,
+      "title": "Case Count",
+      "type": "integer"
+    },
+    "declared_chronology_verified": {
+      "const": true,
+      "title": "Declared Chronology Verified",
+      "type": "boolean"
+    },
+    "exact_hypothesis_membership_verified": {
+      "const": true,
+      "title": "Exact Hypothesis Membership Verified",
+      "type": "boolean"
+    },
+    "explicit_unknown_verified": {
+      "const": true,
+      "title": "Explicit Unknown Verified",
+      "type": "boolean"
+    },
+    "external_chronology_verified": {
+      "const": false,
+      "title": "External Chronology Verified",
+      "type": "boolean"
+    },
+    "freeze_receipt_chain_verified": {
+      "const": false,
+      "title": "Freeze Receipt Chain Verified",
+      "type": "boolean"
+    },
+    "gate_closed": {
+      "const": false,
+      "title": "Gate Closed",
+      "type": "boolean"
+    },
+    "identity_proxy_exclusion_verified": {
+      "const": false,
+      "title": "Identity Proxy Exclusion Verified",
+      "type": "boolean"
+    },
+    "independent_attestation": {
+      "const": false,
+      "title": "Independent Attestation",
+      "type": "boolean"
+    },
+    "manifest_artifact_hash_verified": {
+      "const": true,
+      "title": "Manifest Artifact Hash Verified",
+      "type": "boolean"
+    },
+    "ontology_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Artifact Sha256",
+      "type": "string"
+    },
+    "prediction_key_manifest_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prediction Key Manifest Artifact Sha256",
+      "type": "string"
+    },
+    "prediction_key_root_is_mapping_projection": {
+      "const": true,
+      "title": "Prediction Key Root Is Mapping Projection",
+      "type": "boolean"
+    },
+    "prediction_key_root_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prediction Key Root Sha256",
+      "type": "string"
+    },
+    "real_independence_verified": {
+      "const": false,
+      "title": "Real Independence Verified",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.shortcut-ontology-assurance-report.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "semantic_equivalence_verified": {
+      "const": false,
+      "title": "Semantic Equivalence Verified",
+      "type": "boolean"
+    },
+    "signatures_verified": {
+      "const": true,
+      "title": "Signatures Verified",
+      "type": "boolean"
+    },
+    "structural_biconditional_verified": {
+      "const": true,
+      "title": "Structural Biconditional Verified",
+      "type": "boolean"
+    },
+    "target_manifest_chain_verified": {
+      "const": false,
+      "title": "Target Manifest Chain Verified",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema_version",
+    "assurance_scope",
+    "ontology_artifact_sha256",
+    "prediction_key_manifest_artifact_sha256",
+    "caller_pinned_trust_registry_artifact_sha256",
+    "prediction_key_root_sha256",
+    "case_count",
+    "assignment_count",
+    "caller_pinned_actor_bindings_checked",
+    "exact_hypothesis_membership_verified",
+    "explicit_unknown_verified",
+    "structural_biconditional_verified",
+    "signatures_verified",
+    "declared_chronology_verified",
+    "external_chronology_verified",
+    "caller_pinned_group_separation_verified",
+    "semantic_equivalence_verified",
+    "identity_proxy_exclusion_verified",
+    "real_independence_verified",
+    "independent_attestation",
+    "manifest_artifact_hash_verified",
+    "prediction_key_root_is_mapping_projection",
+    "target_manifest_chain_verified",
+    "freeze_receipt_chain_verified",
+    "gate_closed",
+    "authority_effect"
+  ],
+  "title": "ShortcutOntologyAssuranceReport",
+  "type": "object"
+}

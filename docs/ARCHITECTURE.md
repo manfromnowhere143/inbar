@@ -44,6 +44,34 @@ Domain code imports no adapter, cloud SDK, Aweb code, model provider, or simulat
 replay path is the reference implementation and must reproduce every published result without
 credentials.
 
+## Shared prediction-key boundary
+
+Shortcut Authority V2 does not train on incident-local hypothesis IDs. Each known mechanism class
+is represented by the exact six-field Amendment 001 definition and its domain-separated content
+hash; each case has exactly one reserved `unknown`. A verified manifest must cover every hypothesis
+in every bound hypothesis-set artifact exactly once, prove a local key bijection, and only then
+project into the narrower execution-local map consumed by cross-fit prediction. A proposed global
+key genuinely absent from a held-out case yields `key_unavailable`; deleting a present assignment
+invalidates the raw manifest-verification path rather than producing that abstention.
+
+This boundary separates structural computation from scientific review. Code can recompute exact
+bytes, hashes, joins, signatures against caller-pinned keys, declared group inequality, and declared
+timestamp order. It cannot decide natural-language semantic equivalence, detect identity proxies by
+meaning, establish real organizational independence, or prove an external timestamp. The assurance
+contract records those fields as false and grants no authority.
+
+The historical `inbar.iter001.prediction-key-root.v1` is a mapping-only projection. Complete
+manifest bytes are separately bound by the raw artifact hash carried by each mechanism target; the
+aggregate target manifest and its salted hiding commitment then carry that binding through the
+public freeze and final reveal. A conforming implementation must enforce one exact prediction-key
+manifest across all targets and verify the complete transitive chain.
+
+That integration is not implemented. The low-level cross-fit predictors still accept caller-created
+`IncidentLocalHypothesisMap` objects, so they are execution primitives rather than ontology
+authority and can still emit `key_unavailable` for an omitted caller mapping. The canonical terminal
+path must make raw ontology/manifest/hypothesis verification and exact projection mandatory before
+prediction; until then the new verifier closes no activation gate.
+
 ## Core ports
 
 - `EvidenceSource.load_case`

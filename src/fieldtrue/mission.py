@@ -147,7 +147,7 @@ _REQUIRED_BOOTSTRAP_CLAIM_DIGESTS = {
         "c0eb605260b38961f5c69226859bf74049eab7b68b776c252b701bb492c8af1d"
     ),
     "implementation.iter001.shortcut-v2-primitives.v1": (
-        "0349ac8604002e6bd257090f023bf324f2cc0b4b074a3736452227ebf40a68b5"
+        "73296b847a98513900f67b2b6c7bb2d3a7821f1a18d0fcb961d2d04fa7705ed1"
     ),
     "implementation.inbar.credibility-controls.v1": (
         "309a6c216e95277625ac074bb6a99b6a465a2d7cace9441d7420c3be86cc0f5b"
@@ -192,23 +192,23 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 # can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
 # adequate semantic review boundary.
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
-    "CONTINUITY.md": ("3490da4f78ce37dfc7cbd247ebccc289df46207dac529f83899cc272b301ebab"),
+    "CONTINUITY.md": ("c3ed1f353c30a0c778b1f0d5f4ca725f09f72ffdfc7409003b15c441331644ca"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
-    "README.md": "ffb1ce17f8ae4ff407641c0bf031ec04d5b34c4c74656ae956777b3cbea842bf",
-    "docs/ARCHITECTURE.md": ("ea816aaafc01f5ff18a938cc6d457f2229871c3cd56444aed26880192ef37b44"),
+    "README.md": "f11de1829851d6b5ac2dbacbe4cb20690ba5edd716c2c1df1a0bb21031b5fa04",
+    "docs/ARCHITECTURE.md": ("f504b1c1cbadcc048cdda03691a2efd24a3361c62743aa16b08045209208d9f8"),
     "docs/CLAIM_BOUNDARIES.md": (
-        "d4343a0f2dfebe1e32d3e39cfdd0108209fd595daf256f048aa1ceb6ae500ab0"
+        "dc0105efc9be2fe458142f1709f3fd2552ffed7fc7f1300d6690f3e710244765"
     ),
     "docs/FRONTIER_RESEARCH_2026.md": (
         "0c9d2e6cc1bb9b34db8113bb3bcc62077d4f125126af280fa4bf456b90850621"
     ),
     "docs/MATHEMATICS.md": ("6e9a000430ed33606e46c730bc0e3a7b1f796354401f095af74f5cf8a25ce928"),
-    "docs/ROADMAP.md": ("0fceceac535a7583544c9b6649f4ed85e359bb4bf8cb8a976235ec255644adfd"),
+    "docs/ROADMAP.md": ("eea3de882e2fed3b0c403095cd2eaef83b6174d6fc697219a3b7c3fef2e84a54"),
     "docs/research/INBAR_FRONTIER_AUDIT_2026-07-19.md": (
         "903970b0fac03061d4d208fe09e6d4c0faee5f8514ecf82403bd9f2fe6c5b21a"
     ),
     "docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md": (
-        "8e92178ba3d300e445bb4423f2e4ac7bf33bcc5d68e8d34a24578aa7496c5ee8"
+        "1d0ff84d252d72fcd7a593bf3c3a51657d408c29451146ede6a8809c121cec30"
     ),
     "docs/research/ITER001_SOURCE_ROLE_AUDIT.md": (
         "39b814aa9a67decb1a564cb73f0df714caab5ae337e402ef058ff0935c0e505e"
@@ -253,6 +253,15 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     "protocol/schemas/engineering_validation_receipt.schema.json": (
         "6f673d3da17b0c29a25d876c255c67016cb352a698a88a4435c8f94ffb06a660"
     ),
+    "protocol/schemas/shortcut_v2_mechanism_ontology.schema.json": (
+        "627f49af40a50276e62cb2699c557f55959950f3427f08acbce9c08158ebdb7c"
+    ),
+    "protocol/schemas/shortcut_v2_ontology_assurance_report.schema.json": (
+        "8b37c23ff108d1422ec81e2d664aa1689a630d53f0dba00e3a06723b9235d952"
+    ),
+    "protocol/schemas/shortcut_v2_prediction_key_manifest.schema.json": (
+        "c8ca6c7f17cf90f95af825c04307117a0db4b4fbbeba1b39a40e6261372ab6a1"
+    ),
     "protocol/verification_authorities/iter000_verification_001.json": (
         "154dee03ea4dc30507b9b2bcd57d83617655da7d10501f9f0e881088a7ed5dd9"
     ),
@@ -268,16 +277,19 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "b17ac2b3e61ba1c43ca51870b3c0f22c0c15ada0c0503628c6c38f50715ec729"
     ),
     "src/fieldtrue/handoff.py": (
-        "64898ccd3455b4a6ffbc70cc0fe1287f5f0122b44e77e513c4833298ee0f8517"
+        "57545781fef32e5a1e93cdea881930d1d093a043712efe3a815c532a230f9b6f"
     ),
     "src/fieldtrue/schemas.py": (
-        "08ebfa17bd8d08e12598d3fb2ac894b0668cff5acf6cb1f9bd54d74b01ef0f5c"
+        "ba2b26fe6807de42bcba9b90f8e5d6309811bff2178f26ba13f81157c4ee2f86"
     ),
     "src/fieldtrue/susceptibility_replay.py": (
         "b51f2e447d460389cfd6ae92ae5e36800396dbd85d7198fc61fcc5b384107514"
     ),
     "src/fieldtrue/shortcut_v2_crossfit.py": (
         "4beb28f55c8903c10c1744ead56757dc3d3994cb56b4c3b1ba58faf742ea17e5"
+    ),
+    "src/fieldtrue/shortcut_v2_ontology.py": (
+        "67c6dcb3a1adc240cea79e3b32403a660a0550ac5899fd05f9092ead8ec4d0a2"
     ),
     "src/fieldtrue/shortcut_v2_release.py": (
         "64d334aedf633c353a3c3b10931b6cf4757de9b213f4d773cb776bf201243b50"
@@ -292,7 +304,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
     ),
     "tests/unit/test_handoff.py": (
-        "72f0b07ddbb11e50cdb7450571e423641587c1398ac46c1fcd5ff212a3aab8d2"
+        "587645e191b8988b76475c1a182b1ec65d1778803d2f76489ebd62d58217e22e"
     ),
     "tests/unit/test_mission.py": (
         "f366e097ca75ccdf8df5d212bc9c5d52b02756607b7377a6047e4c6271dda11e"
@@ -301,14 +313,17 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "e8d6d726eed62f1c4eb004f33ca22813d4ac0be96d7ec153157f7624ade208d1"
     ),
     "tests/unit/test_schemas_runtime.py": (
-        "30beab644cd2823911da3bd1e4a56a5a7241767dfcce913b9949fe8c615226c6"
+        "66797eee526c7832de57bd1e8d9c06c5769bf3a360972853ded5d72cb6703b4c"
+    ),
+    "tests/unit/test_shortcut_v2_ontology.py": (
+        "5a33e52f14f867122085fde6f83f7b5c61ec46508356688f8024ef719e172c8c"
     ),
     "tests/unit/test_susceptibility_replay.py": (
         "c00785959f15cebc9dae99a4c43c5c3cc692ed237cdf5eedd85b0f192baef9b7"
     ),
 }
 _REQUIRED_BOOTSTRAP_REGISTRY_SHA256 = (
-    "64d3454bdd234c287ac53c7f4a73a926aaee38c43a2870c03f33ce5f20390a4a"
+    "0407e9a05e6e5aa34daebf89bbd76b9dc530c6fecd59b9646cc3b7560bc3a53b"
 )
 _ITER000_GATE_FAILURE_CLASSES = {
     "source-integrity": "invalid",

@@ -83,6 +83,9 @@ def test_schema_export_detects_stale_missing_and_unexpected_files(tmp_path: Path
     assert "shortcut_owner_approval_receipt.schema.json" in documents
     assert "shortcut_v2_exact_gini_tree.schema.json" in documents
     assert "shortcut_v2_crossfit_fold_registry.schema.json" in documents
+    assert "shortcut_v2_mechanism_ontology.schema.json" in documents
+    assert "shortcut_v2_prediction_key_manifest.schema.json" in documents
+    assert "shortcut_v2_ontology_assurance_report.schema.json" in documents
     assert "shortcut_v2_target_envelope.schema.json" in documents
     assert "shortcut_implementation_authority_verification.schema.json" not in documents
     paths = export_schemas(tmp_path)
@@ -217,6 +220,44 @@ def test_shortcut_v2_schemas_require_explicit_authority_constants() -> None:
     assert prerequisite_map["additionalProperties"] is False
     assert prerequisite_map["propertyNames"] == {"pattern": r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}
 
+    ontology = json.loads(documents["shortcut_v2_mechanism_ontology.schema.json"])
+    mechanism_class = ontology["$defs"]["MechanismClassDefinition"]
+    assert {
+        "canonical_name",
+        "causal_locus",
+        "failure_mode",
+        "temporal_signature",
+        "directionality",
+        "definition",
+    } <= set(mechanism_class["required"])
+    assert ontology["properties"]["classes"]["minItems"] == 1
+
+    key_manifest = json.loads(documents["shortcut_v2_prediction_key_manifest.schema.json"])
+    case_manifest = key_manifest["$defs"]["SignedCasePredictionKeyManifest"]
+    assert case_manifest["properties"]["assignments"]["minItems"] == 2
+    assert {
+        "hypothesis_proposer_attestation",
+        "ontology_reviewer_attestation",
+    } <= set(case_manifest["required"])
+
+    ontology_report = json.loads(documents["shortcut_v2_ontology_assurance_report.schema.json"])
+    for field in (
+        "semantic_equivalence_verified",
+        "identity_proxy_exclusion_verified",
+        "real_independence_verified",
+        "independent_attestation",
+        "external_chronology_verified",
+        "target_manifest_chain_verified",
+        "freeze_receipt_chain_verified",
+        "gate_closed",
+    ):
+        assert ontology_report["properties"][field]["const"] is False
+    assert ontology_report["properties"]["manifest_artifact_hash_verified"]["const"] is True
+    assert (
+        ontology_report["properties"]["prediction_key_root_is_mapping_projection"]["const"] is True
+    )
+    assert ontology_report["properties"]["authority_effect"]["const"] == "none"
+
     for filename in (
         "shortcut_owner_approval_receipt.schema.json",
         "shortcut_attestation.schema.json",
@@ -225,6 +266,9 @@ def test_shortcut_v2_schemas_require_explicit_authority_constants() -> None:
         "shortcut_v2_crossfit_fold_registry.schema.json",
         "shortcut_v2_categorical_fitted_state.schema.json",
         "shortcut_v2_categorical_prediction_manifest.schema.json",
+        "shortcut_v2_mechanism_ontology.schema.json",
+        "shortcut_v2_ontology_assurance_report.schema.json",
+        "shortcut_v2_prediction_key_manifest.schema.json",
         "shortcut_v2_tree_fitted_state.schema.json",
         "shortcut_v2_tree_prediction.schema.json",
         "shortcut_v2_tree_prediction_manifest.schema.json",

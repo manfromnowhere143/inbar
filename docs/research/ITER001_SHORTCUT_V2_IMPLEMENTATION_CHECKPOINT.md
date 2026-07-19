@@ -61,6 +61,32 @@ fitted-state artifact bytes and hashes those raw bytes; a normalized or differen
 artifact is rejected. Aggregate validators independently revalidate registries, manifests, and root
 items before computing coverage or roots.
 
+### Shared prediction-key ontology
+
+`src/fieldtrue/shortcut_v2_ontology.py` implements the machine-checkable half of the shared
+mechanism ontology. Known classes use the exact six Amendment 001 fields and the flat
+`inbar.iter001.mechanism-class.v1` domain. Case identity and the historical
+`inbar.iter001.prediction-key-root.v1` projection are recomputed exactly. The raw-artifact
+verifier rejects duplicate JSON keys, raw-byte hash substitution, incomplete or positional case
+joins, missing or duplicated hypotheses, non-bijective local keys, unknown-key mismatches,
+caller-pinned signer or group collisions, invalid proposer or reviewer attestations, and declared
+chronology defects. Compact and pretty-printed JSON are both accepted only when the caller pins
+their exact raw bytes and the parsed object contains the fully materialized strict model. The
+verifier emits exact target-free local maps that can be consumed by the cross-fit predictors,
+where a genuinely absent class remains `key_unavailable` and `unknown` is a mapped hypothesis
+rather than an abstention.
+
+The assurance report is deliberately nonauthoritative. It records
+`independent_attestation = false`, `real_independence_verified = false`,
+`semantic_equivalence_verified = false`, `identity_proxy_exclusion_verified = false`,
+`external_chronology_verified = false`, `target_manifest_chain_verified = false`,
+`freeze_receipt_chain_verified = false`, `gate_closed = false`, and `authority_effect = none`. It
+records the exact raw manifest hash and labels the historical v1 root as a mapping projection. The
+implementation proves exact structural biconditionality over supplied definitions and caller-pinned
+inputs. It cannot decide whether two different prose definitions are semantically equivalent,
+whether prose contains an identity proxy by meaning, whether a declared role is genuinely
+independent, or whether a signed timestamp reflects real time.
+
 ### Recipient-scoped envelopes
 
 `src/fieldtrue/shortcut_v2_release.py` implements dormant cryptographic primitives for recipient
@@ -95,18 +121,21 @@ chronology, not signature failure.
 
 ## Candidate schemas
 
-Persisted owner receipt, attestation, tree, feature-vector, cross-fit, fitted-state, prediction,
-recipient, release-context, and target-envelope models are exported under `protocol/schemas`.
-These schemas are implementation candidates. They become scientific authority only when a future
-freeze receipt binds the complete schema root, implementation root, clean Git commit and tree,
-dependency lock, execution environment, trust registry, and all required input roots.
+Persisted owner receipt, attestation, ontology, prediction-key manifest, ontology assurance report,
+tree, feature-vector, cross-fit, fitted-state, prediction, recipient, release-context, and
+target-envelope models are exported under `protocol/schemas`. These schemas are implementation
+candidates. They become scientific authority only when a future freeze receipt binds the complete
+schema root, implementation root, clean Git commit and tree, dependency lock, execution environment,
+trust registry, and all required input roots.
 
 ## Deliberately unresolved gates
 
 Canonical sealing remains forbidden until all of the following are complete and independently
 falsified:
 
-1. Signed mechanism ontology, biconditional shared prediction keys, and per-case local mappings
+1. A real signed mechanism ontology, external semantic and identity-proxy review, genuinely
+   independent role custody, exact one-manifest enforcement through every mechanism target and the
+   hidden target-manifest commitment, and complete target/freeze/final-recomputation validation
 2. Exact closed mechanism-target and target-subset schemas committed before affected truth access
 3. Signed extractor registry, complete feature inventories, identity scanning, and opaque-media
    acquisition disposition
@@ -131,7 +160,7 @@ verdict, canonical seal, or publication transition has been created by this chec
 
 ## Research-engine extraction
 
-This checkpoint adds eleven requirements for the future standalone Daniel Wahnich research engine:
+This checkpoint adds fourteen requirements for the future standalone Daniel Wahnich research engine:
 
 1. A verification report is not a transferable capability. Trust boundaries rerun verification.
 2. Repository provenance must reject environment redirection, replacement objects, and grafted
@@ -149,3 +178,12 @@ This checkpoint adds eleven requirements for the future standalone Daniel Wahnic
     substitute for binding the file that was actually consumed.
 11. Algorithm correctness, execution provenance, and scientific authority are separate contracts
     and must never be collapsed into one status.
+12. A semantic root may intentionally project selected fields while a separately bound raw artifact
+    commits the complete record. Verify the full transitive chain before calling an omitted direct
+    field a binding defect.
+13. An execution-local key map is a lossy projection, not ontology authority. It must be derived
+    from exact manifest and hypothesis-set verification rather than accepted as an independent
+    caller assertion.
+14. Low-level cross-fit predictors still accept caller-supplied local maps. Until terminal
+    integration makes raw ontology verification the only reachable path, an omitted assignment can
+    still manufacture `key_unavailable` outside the verified projection path.

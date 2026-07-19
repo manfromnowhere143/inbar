@@ -19,6 +19,11 @@ No individual link is claimed as first or novel in isolation.
 - The susceptibility arithmetic is retrospectively reconstructed, but the confirmatory
   interpretation is `INCONCLUSIVE`. It is an engineering observation inside one deterministic
   simulator, not an active scientific or physical result.
+- The Shortcut V2 ontology code establishes exact structural hashing, coverage, signature-subject,
+  declared-group, declared-chronology, and local-map properties over synthetic or caller-bound
+  inputs only. It does not establish natural-language semantic equivalence, identity-proxy absence,
+  real reviewer independence, external chronology, a verified target/freeze/final-recomputation
+  chain, an enforced terminal prediction path, or Gate 1 closure.
 - No simulator document may be described as repairing approval chronology, independent custody,
   physical transfer, or a preregistered rule that was not executable from its frozen text.
 
