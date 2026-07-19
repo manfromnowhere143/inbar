@@ -101,6 +101,9 @@ _HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES = frozenset(
         # A producer tool, not an authority source: nothing in the renderer's import closure
         # depends on it, so it is captured as bound wrapper source rather than bound authority.
         "fieldtrue.memory_cycle",
+        # A retrospective engineering replay, not an authority source. Its tests preload it before
+        # handoff tests, so the renderer binds its wrapper bytes without importing or trusting it.
+        "fieldtrue.susceptibility_replay",
         "fieldtrue.validation_producer",
     }
 )
@@ -1545,20 +1548,18 @@ def _git_worktree_changed_paths(repo_root: Path, git: str) -> frozenset[str]:
     return frozenset(observed)
 
 
-def _verify_v2_finalization_topology(
+def _verify_v2_final_handoff_commit(
     repo_root: Path,
     git: str,
     evidence_commit: str,
-) -> bool:
-    head = _git_head(repo_root, git)
-    if head == evidence_commit:
-        return True
-    if _git_commit_parents(repo_root, git, head) != (evidence_commit,):
+    final_commit: str,
+) -> None:
+    if _git_commit_parents(repo_root, git, final_commit) != (evidence_commit,):
         raise HandoffError(
             "final handoff commit is not the single-parent child of the validation evidence commit"
         )
     expected_changes = frozenset({_MEMORY_PATH, _HANDOFF_PATH})
-    if _git_changed_paths(repo_root, git, evidence_commit, head) != expected_changes:
+    if _git_changed_paths(repo_root, git, evidence_commit, final_commit) != expected_changes:
         raise HandoffError(
             "final handoff commit does not contain exactly research memory and HANDOFF.md"
         )
@@ -1572,14 +1573,14 @@ def _verify_v2_finalization_topology(
     final_memory = _git_blob(
         repo_root,
         git,
-        head,
+        final_commit,
         _MEMORY_PATH,
         maximum_bytes=_MAX_INPUT_BYTES,
     )
     _git_blob(
         repo_root,
         git,
-        head,
+        final_commit,
         _HANDOFF_PATH,
         maximum_bytes=_MAX_INPUT_BYTES,
     )
@@ -1587,6 +1588,50 @@ def _verify_v2_finalization_topology(
         raise HandoffError(
             "final handoff memory is not a strict byte-prefix append of the evidence parent"
         )
+
+
+def _verify_v2_finalization_topology(
+    repo_root: Path,
+    git: str,
+    evidence_commit: str,
+) -> bool:
+    head = _git_head(repo_root, git)
+    if head == evidence_commit:
+        return True
+
+    parents = _git_commit_parents(repo_root, git, head)
+    if len(parents) == 1:
+        final_commit = head
+    elif len(parents) == 2:
+        integration_base, final_commit = parents
+        if integration_base == evidence_commit or not _git_is_ancestor(
+            repo_root,
+            git,
+            integration_base,
+            evidence_commit,
+        ):
+            raise HandoffError(
+                "integration wrapper first parent is not a proper ancestor "
+                "of the validation evidence commit"
+            )
+        if _git_commit_tree(repo_root, git, head) != _git_commit_tree(
+            repo_root,
+            git,
+            final_commit,
+        ):
+            raise HandoffError("integration wrapper tree differs from its final handoff parent")
+    else:
+        raise HandoffError(
+            "HEAD is neither the final handoff commit nor one transparent "
+            "two-parent integration wrapper"
+        )
+
+    _verify_v2_final_handoff_commit(
+        repo_root,
+        git,
+        evidence_commit,
+        final_commit,
+    )
     return False
 
 
@@ -2115,8 +2160,6 @@ def _verify_checkpoint_v2_receipt(
         raise HandoffError(
             "validation evidence commit is not the single-parent child of its subject"
         )
-    if not _git_is_ancestor(repo_root, git, evidence_commit, "HEAD"):
-        raise HandoffError("validation evidence commit is not an ancestor of HEAD")
     _verify_v2_finalization_topology(repo_root, git, evidence_commit)
     subject_tree = _git_commit_tree(repo_root, git, subject_commit)
     implementation_source_paths = _git_python_source_paths(

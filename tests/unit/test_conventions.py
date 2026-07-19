@@ -112,6 +112,61 @@ def test_guard_fails_when_a_superseded_claim_reappears(tmp_path: Path) -> None:
     assert problems, "the forbidden-phrase rule passed on a tree containing a superseded claim"
 
 
+@pytest.mark.parametrize(
+    ("surface", "phrase"),
+    [
+        ("README.md", "16 incidents"),
+        ("README.md", "Classical active fault diagnosis is sufficient for this laboratory."),
+        ("README.md", "The one result that survived."),
+        ("README.md", "Inbar makes the failure modes structurally impossible"),
+        ("CONTINUITY.md", "Treat this as settled for this\nlaboratory"),
+        (
+            "CHANGELOG.md",
+            "Established that the classical set-based rule ties the information-gain selector.",
+        ),
+        (
+            "docs/MATHEMATICS.md",
+            "denominator_floor`, whose current default is `1e-9` cost units",
+        ),
+        ("docs/ROADMAP.md", "The active-test milestone is closed as a null"),
+        (
+            "docs/ROADMAP.md",
+            "Existing benchmarks score whether an agent sought information, not",
+        ),
+        (
+            "src/fieldtrue/active_selection.py",
+            "This module exists under Amendment 006, ratified by owner-approval receipt",
+        ),
+        (
+            "src/fieldtrue/graded_laboratory.py",
+            "This module exists under Amendment 006, ratified by owner-approval receipt",
+        ),
+    ],
+)
+def test_evidence_correction_tripwires_can_each_fail(
+    tmp_path: Path, surface: str, phrase: str
+) -> None:
+    """Every newly corrected narrative has a known-bad recurrence fixture."""
+    module = _load_guard()
+
+    fake_root = tmp_path / "repo"
+    path = fake_root / surface
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{phrase}\n", encoding="utf-8")
+
+    original = module.REPO_ROOT
+    original_phrases = module.FORBIDDEN_PHRASES
+    module.REPO_ROOT = fake_root
+    module.FORBIDDEN_PHRASES = {surface: (phrase,)}
+    try:
+        problems = module.check_forbidden_phrases()
+    finally:
+        module.REPO_ROOT = original
+        module.FORBIDDEN_PHRASES = original_phrases
+
+    assert problems == [f"{surface} contains a superseded claim: {phrase!r}"]
+
+
 def test_grandfathered_trailer_set_is_closed() -> None:
     """The grandfathered set records published mistakes and may never grow.
 

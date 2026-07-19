@@ -2,6 +2,12 @@
 
 Status: RECORDED — PARTIALLY VOIDED BY ITS OWN FROZEN RULE
 
+> Current disposition: **CORRECTED — UNRECONSTRUCTED ENGINEERING OBSERVATION; A006 IMPLEMENTATION
+> COVERAGE `BLOCKED`.** No atomic family cells or executable result runner are retained, and
+> Amendment 006 does not bind the committed graded-laboratory bytes. The historical values remain
+> visible but do not establish compensator-family invariance. See
+> `AMENDMENT_006_EVIDENCE_DEFECT.md`.
+
 Gate: `ADJUDICATION_FREEZE_COMPENSATOR_FAMILY.md`, SHA-256
 `e97b50fbe8775cd2c08f5a69082eb4e849c0a35e4b748b49abdb13e31562791a`, committed at `92c392b`
 before any family was measured.

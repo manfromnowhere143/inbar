@@ -140,6 +140,9 @@ _REQUIRED_BOOTSTRAP_CLAIM_DIGESTS = {
     "correction.iter001.alfa-unit-wording.v1": (
         "766e6ed5de7048d7ddc27cb9ec2e7aa6c30001021589a53efd90672cc26e5d67"
     ),
+    "correction.iter001.a006-evidence-and-binding.v1": (
+        "263b1f60edfd2c0fe6aeec25744b83f34b51ab0798ab90097e1fc4818923b38a"
+    ),
     "implementation.iter001.bootstrap-admission.v1": (
         "c0eb605260b38961f5c69226859bf74049eab7b68b776c252b701bb492c8af1d"
     ),
@@ -162,7 +165,7 @@ _REQUIRED_BOOTSTRAP_CLAIM_DIGESTS = {
         "94e55d035d5dd01027c0d1f49cdb7b3dba167e93c76eda575a3157803c1cd05f"
     ),
     "novelty.integrated-loop.v1": (
-        "27b1eb125465eba59179e5e3edf4702a997b2d08d4304eea5fe160e9ba5dbd83"
+        "51bb2ffab5cd80625ca58eab4c2870932ba7093b1ba9878b9d38b8714e8f8e43"
     ),
 }
 _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
@@ -175,6 +178,7 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
     "screening.iter001.enumerated-source-sufficiency.v1": ClaimStatus.SUPPORTED,
     "state.iter001.qualifying-source-admission.v1": ClaimStatus.BLOCKED,
     "correction.iter001.alfa-unit-wording.v1": ClaimStatus.SUPPORTED,
+    "correction.iter001.a006-evidence-and-binding.v1": ClaimStatus.SUPPORTED,
     "implementation.iter001.bootstrap-admission.v1": ClaimStatus.SUPPORTED,
     "implementation.iter001.shortcut-v2-primitives.v1": ClaimStatus.SUPPORTED,
     "implementation.inbar.credibility-controls.v1": ClaimStatus.SUPPORTED,
@@ -188,18 +192,21 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 # can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
 # adequate semantic review boundary.
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
-    "CONTINUITY.md": ("6dfafb7111853782cda4b068c38cf252e79650756e029035122b02c015f454b8"),
+    "CONTINUITY.md": ("3490da4f78ce37dfc7cbd247ebccc289df46207dac529f83899cc272b301ebab"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
-    "README.md": "941d7549331f11963cdde733ee32afc21ec1e3a531106b677f7491fcf48a15c2",
-    "docs/ARCHITECTURE.md": ("30d6df5d3fda894fdb344c92f4df0330e2984ad54791689e94f9a0ad521ad05d"),
+    "README.md": "ffb1ce17f8ae4ff407641c0bf031ec04d5b34c4c74656ae956777b3cbea842bf",
+    "docs/ARCHITECTURE.md": ("ea816aaafc01f5ff18a938cc6d457f2229871c3cd56444aed26880192ef37b44"),
     "docs/CLAIM_BOUNDARIES.md": (
-        "6b21b47508462c0ccb5e199f00d51b7399cc11aee7199aa79a54b266f17ac85a"
+        "d4343a0f2dfebe1e32d3e39cfdd0108209fd595daf256f048aa1ceb6ae500ab0"
     ),
     "docs/FRONTIER_RESEARCH_2026.md": (
         "0c9d2e6cc1bb9b34db8113bb3bcc62077d4f125126af280fa4bf456b90850621"
     ),
-    "docs/MATHEMATICS.md": ("2e10eda460f4483c050ae61c379fcab30a34de8ec3222f2aa3dfabff0fa07551"),
-    "docs/ROADMAP.md": ("4114a39859d75b3bc9863506c03388c521f614ebac4474d2d639dc9b52cd21dd"),
+    "docs/MATHEMATICS.md": ("6e9a000430ed33606e46c730bc0e3a7b1f796354401f095af74f5cf8a25ce928"),
+    "docs/ROADMAP.md": ("0fceceac535a7583544c9b6649f4ed85e359bb4bf8cb8a976235ec255644adfd"),
+    "docs/research/INBAR_FRONTIER_AUDIT_2026-07-19.md": (
+        "903970b0fac03061d4d208fe09e6d4c0faee5f8514ecf82403bd9f2fe6c5b21a"
+    ),
     "docs/research/ITER001_SHORTCUT_V2_IMPLEMENTATION_CHECKPOINT.md": (
         "8e92178ba3d300e445bb4423f2e4ac7bf33bcc5d68e8d34a24578aa7496c5ee8"
     ),
@@ -218,6 +225,20 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     "experiments/iter001_physical_causal_evidence_acquisition/HYPOTHESIS.md": (
         "47a1920b1b5326601c7404d17a6aac0df3309c2433fa76f56f0dffedf2511ad8"
     ),
+    "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_006.md": (
+        "266d68f0f28b6474fbb09f971904bef394f8c1315b6fcb388eba88c4d0d5a741"
+    ),
+    (
+        "experiments/iter001_physical_causal_evidence_acquisition/AMENDMENT_006_EVIDENCE_DEFECT.md"
+    ): "e28f8b93f1baf25b55d90c731bd4ce4938989850211e6db5b01ecf81ee58ffbd",
+    (
+        "experiments/iter001_physical_causal_evidence_acquisition/"
+        "RESULT_SUSCEPTIBILITY_CONFIRMATORY.md"
+    ): "78515668b4dcbdce040ba88c7d76def7bf364d2fbd6a164ea46a9a720ef62036",
+    (
+        "experiments/iter001_physical_causal_evidence_acquisition/proof/"
+        "susceptibility_confirmatory_v1/reconstruction.json"
+    ): "99f6f08f5e2fc720606dcbc109988b7654dd223861dd212885e0a1e755770151",
     "mission/contract.json": ("97d0b2cf5281f386ab0986b7311dd83d8c36b246a6db5edd4b04b17a6b21d8f6"),
     "mission/loop.json": ("97274381a035513159927a17f08cdafa04a23b2b3a6b7f1f04daa7e9c1826cfe"),
     "protocol/acquisition/iter001_contract.json": (
@@ -227,7 +248,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "45d5d90c63bfda2b84bf962c9d7bf4c76db58fb241b7eb6d1b146a5535c7382c"
     ),
     "protocol/gate_controls/credibility_v1.json": (
-        "ea2c66a8e877877d4a9a0a456594893273eca87ae2078bede178f34c26584bf3"
+        "3d81eae41d13eae3d5e1d490fd8fd7c66b3ce8b480c8f70754221e9e24f80768"
     ),
     "protocol/schemas/engineering_validation_receipt.schema.json": (
         "6f673d3da17b0c29a25d876c255c67016cb352a698a88a4435c8f94ffb06a660"
@@ -240,11 +261,20 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "1db52fa08405ce5f28013715c34782475b57c814becd6e50aa0729353cc101ce"
     ),
     "src/fieldtrue/domain.py": ("7648d416e3843dac5d1cf9c3c3be81b8d7cba235ec33c135d2697383a3d8474a"),
+    "src/fieldtrue/active_selection.py": (
+        "a0c83eef760e66c23c124a42f2cb80f782473c514d804382d98f631cb8062de5"
+    ),
+    "src/fieldtrue/graded_laboratory.py": (
+        "b17ac2b3e61ba1c43ca51870b3c0f22c0c15ada0c0503628c6c38f50715ec729"
+    ),
     "src/fieldtrue/handoff.py": (
-        "fe3261dda40e9a23b3008f761c75f448fe601e3d5751f20c79218ed1f7d8fe94"
+        "64898ccd3455b4a6ffbc70cc0fe1287f5f0122b44e77e513c4833298ee0f8517"
     ),
     "src/fieldtrue/schemas.py": (
         "08ebfa17bd8d08e12598d3fb2ac894b0668cff5acf6cb1f9bd54d74b01ef0f5c"
+    ),
+    "src/fieldtrue/susceptibility_replay.py": (
+        "b51f2e447d460389cfd6ae92ae5e36800396dbd85d7198fc61fcc5b384107514"
     ),
     "src/fieldtrue/shortcut_v2_crossfit.py": (
         "4beb28f55c8903c10c1744ead56757dc3d3994cb56b4c3b1ba58faf742ea17e5"
@@ -262,10 +292,10 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
     ),
     "tests/unit/test_handoff.py": (
-        "c3c0021b0765bb77e3837a30190a7765d85a720d20287ae24ed1cef1ceea00da"
+        "72f0b07ddbb11e50cdb7450571e423641587c1398ac46c1fcd5ff212a3aab8d2"
     ),
     "tests/unit/test_mission.py": (
-        "09b6915f052f333f21889dc2c0e42cf3b0ad85b072d8cf15bc4394644b71b3da"
+        "f366e097ca75ccdf8df5d212bc9c5d52b02756607b7377a6047e4c6271dda11e"
     ),
     "tests/unit/test_release_contract.py": (
         "e8d6d726eed62f1c4eb004f33ca22813d4ac0be96d7ec153157f7624ade208d1"
@@ -273,9 +303,12 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     "tests/unit/test_schemas_runtime.py": (
         "30beab644cd2823911da3bd1e4a56a5a7241767dfcce913b9949fe8c615226c6"
     ),
+    "tests/unit/test_susceptibility_replay.py": (
+        "c00785959f15cebc9dae99a4c43c5c3cc692ed237cdf5eedd85b0f192baef9b7"
+    ),
 }
 _REQUIRED_BOOTSTRAP_REGISTRY_SHA256 = (
-    "ad9ccd235570c8fb6f863451095dad35127ff9c052d306c077e1d64c0f8490ee"
+    "64d3454bdd234c287ac53c7f4a73a926aaee38c43a2870c03f33ce5f20390a4a"
 )
 _ITER000_GATE_FAILURE_CLASSES = {
     "source-integrity": "invalid",

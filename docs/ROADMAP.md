@@ -68,30 +68,41 @@ correction required no change to a frozen contract.
 Milestone 6 named deterministic ambiguity baselines and milestone 7 named an active-test experiment.
 Both assumed the causal laboratory could measure a method. It could not, and the evidence for that is
 now committed: the Amendment 005 effect is an algebraic identity and its constant probe is
-structurally blind to a fault class. Amendment 006 rebuilt the laboratory so a method can fail in it.
+structurally blind to a fault class. The current source tree contains a later candidate laboratory
+intended to make method failure possible, but Amendment 006 does not cover its committed bytes.
 
-The active-test milestone is closed as a null rather than pursued. The classical set-based rule of
-Campbell and Nikoukhah (2004) ties the cost-aware information-gain selector at identical accuracy
-across a fiftyfold risk-weight sweep. Further investment in Bayesian action selection for this
-laboratory would be optimizing a component the evidence has already shown is not the bottleneck.
+The earlier version of this roadmap closed the active-test milestone as a null. That closure is
+corrected. No retained classical comparator implementation, atomic output, or executable sweep
+supports the reported comparison, and A006's bound source hashes do not match the committed
+implementation. The comparison is `INVALID` as retained evidence, not a settled null. Active-test
+comparison remains blocked pending a prospective, exactly bound, reconstructible experiment.
 
-What the work produced instead is an instrument: exact separability over an enumerable hypothesis
-space, able to state what is resolvable in principle before any method is scored. A 2026 review of
-the external literature identified three problems that require exactly that primitive and that no
-one currently owns.
+What the source tree contains is an unvalidated candidate instrument: exact separability over an
+enumerable hypothesis space, intended to state what is resolvable in principle before a method is
+scored. A later audit found substantial adjacent work in classical active fault diagnosis,
+fault-tolerant autonomy, spacecraft operations, and online belief-space planning. The three
+directions below remain research questions; none is unowned, novel, or authorized.
+
+The evidence update is retained in
+[`INBAR_FRONTIER_AUDIT_2026-07-19.md`](research/INBAR_FRONTIER_AUDIT_2026-07-19.md). Its proposed
+next experiment is bounded in
+[`INBAR_HIL_FALSIFIER_PACKET_2026-07-19.md`](research/INBAR_HIL_FALSIFIER_PACKET_2026-07-19.md);
+neither document grants execution authority.
 
 1. **Anomaly masking by autonomy.** JPL's Ops-for-Autonomy states that autonomous onboard decisions
    alter state in response to information the ground never sees, hiding anomalies from downlink
-   reconstruction. That programme ran FY2020 through FY2023 and appears closed. No taxonomy,
-   detection method, or dataset was found. Masking is measurable here as the separability index
-   computed on post-action rather than pre-action observation.
-2. **Probe-quality benchmarking.** Existing benchmarks score whether an agent sought information, not
-   whether the action it chose was the best available one. Scoring a chosen probe against an
-   oracle-optimal probe requires an enumerable candidate space, which this laboratory has.
-3. **Identifiability-aware diagnosis.** Published work reasons about reducing uncertainty, almost
-   none about irreducibility: recognising that two hypotheses cannot be separated by any available
-   observation and deriving what would separate them. The nearest prior art located is a position
-   paper.
+   reconstruction. That programme ran FY2020 through FY2023. The earlier statement that no relevant
+   taxonomy, detection method, or dataset was found was based on a non-systematic scan and is not a
+   novelty finding. The candidate laboratory expresses masking as a post-action rather than
+   pre-action separability comparison.
+2. **Probe-quality benchmarking.** The exploratory review did not establish whether existing
+   benchmarks already score regret against the best admissible diagnostic action. Any Inbar study
+   must treat that as an open review question, name the closest comparator, and freeze an enumerable
+   candidate space before scoring chosen-probe quality.
+3. **Identifiability-aware diagnosis.** Active fault diagnosis and auxiliary-signal design have long
+   studied separability and discriminating inputs. The open question for Inbar is narrower: whether
+   its evidence, authority, and open-world constraints yield a measurable advantage against strong
+   classical and modern comparators.
 
 These are candidate directions, not authorized work. Each requires a prospective amendment. Any
 novelty claim must distinguish itself explicitly from R2U2 runtime verification and from the 2026
@@ -100,34 +111,24 @@ that literature moved substantially within three months.
 
 ## Immediate next decision
 
-The screening contracts (Amendment 002) and the execution authority (Amendment 003) are implemented
-and their adversarial controls execute. Live retrieval has been exercised under a real owner-signed
-lease to validate the transport against the frozen frame; three of the first four domains returned
-bytes to an honestly-identified crawler and one refused it, which is recorded as an access datum.
-That is transport validation. The census itself has **not run to a verdict**: no `CensusReport`
-exists, no candidate has been screened against the twelve gates, and no verdict has been issued.
+The immediate task is not another simulator result or a hardware run. It is to retain the A006
+evidence correction and retrospective replay, then choose how to resolve the unchanged
+`iter001-acquisition-contract` blocker.
 
-Three decisions are now open and are not interchangeable.
+The screening machinery is implemented, and live retrieval was exercised only as transport
+validation. The census has **not run to a verdict**: no `CensusReport` exists, no candidate has been
+screened against the twelve gates, and no verdict has been issued. A new census session still needs
+its own valid lease and must preserve the frozen ceiling and source behavior, including refusals.
 
-1. Run the census to a verdict. Cheap, local, metadata-only, and bounded by the frozen ceiling under
-   a per-session lease. It resolves whether the mission has a subject among public sources. The
-   likely outcome is a defensible `CENSUS_NULL_WITHIN_FRAME`, because investigations rarely record a
-   pre-committed hypothesis set, an executed discriminating test, and independent outcome
-   adjudication in a machine-reconstructible, rights-clear form.
-2. Open the causal-laboratory plane. The source-role audit already froze a three-plane
-   architecture whose second plane is a legally cleared NOS3 or Basilisk simulator that executes
-   paired no-op, targeted, wrong-but-safe, recovery, and blocked-unsafe branches from identical
-   snapshots. This is where the method itself can be built and tested against injected ground truth
-   independent of whether public data qualifies, and it is the likeliest path to an actual result.
-   It requires its own prospective authority and does not begin before the census is settled.
-3. Confront the feasibility constraint the census made explicit. Amendment 002 condition C6 holds
-   that a reviewer who reads an investigation record has read its conclusion, so an exposed
-   extraction is contaminated and permanently ineligible for the incident floor. Combined with the
-   parent's role-independence gate, counted dossiers require a second, unexposed reviewer and a
-   producing authority whose governance documents role separation. Iteration 001 is therefore
-   unlikely to be completable by a single researcher regardless of the census outcome. That is a
-   recruiting and partnership question, not an engineering one, and no amount of implementation
-   resolves it.
+In parallel, Iteration 001 needs genuinely separate custody: an unexposed evidence reviewer, a
+producing authority whose records establish role separation, and later a distinct apparatus owner,
+executor, and outcome verifier. This is a recruiting or partnership constraint, not an engineering
+feature that one operator can implement away.
+
+Only after acquisition, role, source-binding, and domain-owner prerequisites are satisfied should a
+new amendment consider the paper design in
+[`INBAR_HIL_FALSIFIER_PACKET_2026-07-19.md`](research/INBAR_HIL_FALSIFIER_PACKET_2026-07-19.md).
+That packet explicitly grants no execution authority.
 
 Shortcut Authority V2 terminal integration remains milestone 2 and still requires its own
 prospective owner approval freezing interfaces, controls, allowed files, resource ceilings, and the

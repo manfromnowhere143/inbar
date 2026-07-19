@@ -2,6 +2,10 @@
 
 Status: EXPLORATORY
 
+> Current repository-wide disposition: historical exploratory simulator record with authority
+> effect `none`. Amendment 006 does not cover the committed graded-laboratory bytes. See
+> `AMENDMENT_006_EVIDENCE_DEFECT.md`.
+
 Authority effect: none. `iter001-acquisition-contract` remains the sole registered blocker.
 
 ## Standing before the result

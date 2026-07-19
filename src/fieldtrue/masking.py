@@ -12,9 +12,10 @@ triggered it?
 NASA JPL's Ops-for-Autonomy states the problem: onboard autonomy "may alter the spacecraft state in
 response to information that is not immediately available on the ground," so downlink teams must
 "identify anomalies that may otherwise be hidden by autonomous decisions." That programme ran FY2020
-through FY2023 and appears closed. A dated 2026 literature scan located no taxonomy of the
-phenomenon, no detection method, and no dataset. That scan was not systematic and cannot support an
-exhaustive novelty claim.
+through FY2023. An initial dated scan reported no taxonomy, detection method, or dataset, but it was
+not systematic. A later audit located substantial adjacent work in active fault diagnosis,
+fault-tolerant autonomy, and belief-space planning. This module supports no novelty, ownership, or
+exhaustiveness claim.
 
 Why this laboratory can measure it
 ----------------------------------

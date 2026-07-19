@@ -35,12 +35,16 @@ a* = argmax over a in A_safe:
 ```
 
 Information gain is the reduction from current hypothesis entropy to expected posterior entropy.
-`lambda` has cost-units-per-second units and `mu` has cost-units-per-risk-unit units. The executable
-planner represents these conversions as `PlannerWeights.time_weight` and `risk_weight`; it represents
-`epsilon` as `denominator_floor`, whose current default is `1e-9` cost units. A claim-bearing run must
-freeze the cost unit, normalization, risk scale, weights, and denominator floor before outcome
-inspection. The defaults specify numerical behavior only. Actions outside the frozen safety envelope
-are ineligible regardless of score.
+`lambda` has cost-units-per-second units and `mu` has cost-units-per-risk-unit units. Two executable
+planner types currently diverge. `fieldtrue.domain.PlannerWeights`, used by the general planning
+path, defaults `time_weight` to `1.0`, `risk_weight` to `1.0`, and `denominator_floor` to `1e-9`.
+`fieldtrue.active_selection.PlannerWeights`, used by the graded-laboratory selector and exported as
+`selection_planner_weights.schema.json`, defaults `time_weight` to `1.000000`, `risk_weight` to
+`10.000000`, and `denominator_floor` to `0.000001` (`1e-6`). Neither default is a scientific choice.
+A claim-bearing run must name the planner type and freeze the cost unit, normalization, risk scale,
+weights, and denominator floor before outcome inspection. No implementation may be described as
+matching one frozen numerical contract until both divergences are prospectively resolved. Actions
+outside the frozen safety envelope are ineligible regardless of score.
 
 ## Selective uncertainty
 

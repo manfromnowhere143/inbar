@@ -6,9 +6,8 @@ exceed what the prior actually contains, if selection depends on the order a cat
 written in, if the memoized forward model returns something the unmemoized one would not, or if a
 posterior stops being a distribution. Each control below pins one of those failures shut.
 
-These controls verify internal validity only. The selector is an implemented comparison arm, not a
-recommended method: a classical set-based rule matched it at equal accuracy and lower cost. Nothing
-here asserts anything about the physical world.
+These controls verify internal selector mechanics only. No retained classical comparison, method
+recommendation, or statement about the physical world follows from them.
 """
 
 from __future__ import annotations

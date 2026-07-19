@@ -10,6 +10,18 @@ The research target is the integrated chain:
 
 No individual link is claimed as first or novel in isolation.
 
+## Current simulator and approval boundary
+
+- Amendment 006 does not cover the committed graded-laboratory or active-selector bytes. Its
+  implementation coverage is `BLOCKED`.
+- The reported classical-selector comparison is `INVALID` as retained evidence. Its numerical
+  observation is unreconstructed, not refuted.
+- The susceptibility arithmetic is retrospectively reconstructed, but the confirmatory
+  interpretation is `INCONCLUSIVE`. It is an engineering observation inside one deterministic
+  simulator, not an active scientific or physical result.
+- No simulator document may be described as repairing approval chronology, independent custody,
+  physical transfer, or a preregistered rule that was not executable from its frozen text.
+
 ## Occupied claims
 
 Do not claim first multimodal diagnosis, physics-informed spacecraft diagnosis, active diagnosis,

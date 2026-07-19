@@ -15,6 +15,7 @@ import pytest
 from nacl.signing import SigningKey
 
 import fieldtrue.mission as mission_module
+import fieldtrue.verification as verification_module
 from fieldtrue.canonical import canonical_json, canonical_json_pretty, sha256_bytes, sha256_value
 from fieldtrue.domain import ClaimRecord
 from fieldtrue.memory import (
@@ -260,10 +261,69 @@ def _credibility_control_repo(
     return repo
 
 
-def test_real_mission_invariants_are_individually_reported() -> None:
+def test_mission_check_assembly_reports_invariants_individually(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     repo = _repo()
+    # Dedicated tests and the frozen mission-validation command execute these expensive
+    # verifiers. This test isolates check assembly, identifiers, and aggregate status.
+    monkeypatch.setattr(
+        mission_module,
+        "_verify_gate_control_registry",
+        lambda *_args: (True, "Historical gate controls verified."),
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_verify_credibility_gate_control_registry",
+        lambda *_args: (True, "Current credibility controls verified."),
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_verify_iteration_amendment_001",
+        lambda *_args: (True, "Historical amendment verified."),
+    )
+    monkeypatch.setattr(
+        verification_module,
+        "validate_iter000_verification_correction_surface",
+        lambda *_args: (True, "Historical correction verified."),
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_claim_registry_valid",
+        lambda *_args: (True, "Claim registry verified."),
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_verify_memory_git_anchors",
+        lambda *_args: (True, "Memory Git anchors verified."),
+    )
+
     validation = validate_mission(repo)
     checks = {check.check_id: check for check in validation.checks}
+    assert tuple(checks) == (
+        "owner-boundary",
+        "active-identity",
+        "execution-authority",
+        "mission-stage",
+        "research-engine-deferred",
+        "publication-gates",
+        "publication-transition-evidence",
+        "gate-falsification",
+        "gate-control-registry",
+        "preregistration-first",
+        "hypothesis-status",
+        "iter001-acquisition-contract",
+        "dataset-lock",
+        "iteration-amendment-001",
+        "verification-correction-001",
+        "claim-registry",
+        "research-memory",
+        "research-memory-git-anchors",
+        "signer-anchor",
+        "schemas",
+        "lockfile",
+        "provider-independence",
+    )
     assert checks["owner-boundary"].passed
     assert checks["active-identity"].passed
     assert checks["execution-authority"].passed
@@ -273,7 +333,9 @@ def test_real_mission_invariants_are_individually_reported() -> None:
     assert checks["claim-registry"].passed
     assert checks["gate-falsification"].passed
     assert checks["gate-control-registry"].passed
-    assert "research-memory-git-anchors" in checks
+    assert checks["iteration-amendment-001"].passed
+    assert checks["verification-correction-001"].passed
+    assert checks["research-memory-git-anchors"].passed
     assert checks["signer-anchor"].passed
     assert checks["provider-independence"].passed
     assert validation.passed == all(check.passed for check in validation.checks)
@@ -1344,6 +1406,19 @@ def test_gate_control_registry_requires_a_reproduced_passing_execution(
 ) -> None:
     repo = _repo()
     registry = repo / "protocol" / "gate_controls" / "v1.json"
+    runner = SimpleNamespace()
+    # This case classifies child execution failures. Dedicated tests construct, execute, and
+    # mutation-check the authenticated historical runner.
+    monkeypatch.setattr(
+        mission_module,
+        "_prepare_gate_control_runner",
+        lambda _snapshot_root: runner,
+    )
+    monkeypatch.setattr(
+        mission_module,
+        "_gate_control_runner_is_unchanged",
+        lambda _snapshot_root, candidate: candidate is runner,
+    )
 
     def timeout(*_args: object, **_kwargs: object) -> None:
         raise subprocess.TimeoutExpired(cmd="pytest", timeout=120)

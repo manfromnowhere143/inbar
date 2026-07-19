@@ -108,7 +108,7 @@ directory. Only that staged copy is executed or rebound. Its structured self-ver
 match the complete platform identity, including the intentionally absent Linux commit metadata, and
 the staged executable remains covered by the authenticated runner tree digest.
 
-## Laboratory falsifiability and the selection null
+## Laboratory falsifiability and the invalid selection comparison
 
 The Amendment 005 causal laboratory cannot produce a negative result. Its mechanisms are separated
 by two to three orders of magnitude more than its disturbance, its forward model is the simulator
@@ -118,36 +118,34 @@ algebraic identity, not a measurement: a parameter that multiplies the commanded
 unidentifiable when that input is zero, which `_mechanism_identifiable` already proves analytically.
 Do not cite that effect as evidence about any method.
 
-Amendment 006 adds a severity-graded laboratory that can defeat a method: continuous diagnosability,
-structural mismatch from unmodeled actuation lag, a latent nuisance offset, signal-proportional
-disturbance, and a deadband mechanism whose observability depends on the shape of the commanded
-action. Separating the deadband from nominal requires a command below its threshold; separating it
-from attenuation requires one above. No single action resolves every pair, which is what makes
-selection a real problem rather than a formality. The Amendment 005 constant probe scores 0.00
-against the deadband class.
+The source tree contains a severity-graded laboratory intended to defeat a method: continuous
+diagnosability, structural mismatch from unmodeled actuation lag, a latent nuisance offset,
+signal-proportional disturbance, and a deadband mechanism whose observability depends on the shape
+of the commanded action. Amendment 006 does not cover the committed implementation. Its bound
+source hashes match neither the first committed nor the current source, and no superseding amendment
+exists.
 
 The separability index is a property of the laboratory, not of any method. It exists so a campaign
 can report insufficient evidence separately from an incorrect method. A method that fails where the
 index is below one has not underperformed.
 
-The cost-aware information-gain selector earns nothing over the classical set-based rule of Campbell
-and Nikoukhah (2004). Identical accuracy, within 1.01 across a fiftyfold risk-weight sweep, with the
-sign of the cost difference reversing between plant revisions. Treat this as settled for this
-laboratory: do not rebuild the Bayesian selector expecting a different outcome, and do not report an
-advantage that does not exist. Two conditions absent from that comparison, a non-uniform mechanism
-prior and a variable budget permitting early stopping, are recorded as candidate hypotheses only and
-were identified after the adverse result, so they may not be tested as prospective claims except
-under an amendment that freezes design and analysis first.
+Amendment 006 records an outcome-informed observation that the information-gain selector tied a
+classical set-based rule. The repository retains no classical comparator implementation, atomic
+comparison output, or executable sweep, so the reported values cannot be reconstructed. Classify
+the comparison `INVALID`, not `NULL`; do not cite a tie, sufficiency conclusion, or selector
+disadvantage. A future historical reconstruction is exploratory. A claim-bearing comparison
+requires a prospectively frozen unseen run.
 
 That an active test outperforms passive observation on faults unidentifiable at rest is a known
 theorem, not a finding of this mission. Amendment 006 prohibits reporting it as one, permanently.
 
 Amendment 006 reversed the canonical propose-then-approve-then-implement order. Its laboratory
 design is therefore outcome-informed and no result produced against it may be reported as
-prospective. A claim-bearing result requires a superseding amendment that freezes the design,
-episode schedule, cost weights, and analysis before any further outcome is inspected. Amendment 006
-was also signed by the same agent that proposed it, under owner delegation without owner review, the
-fifth consecutive amendment in that condition; Amendments 002 through 005 each disclose the same.
+prospective. A claim-bearing result requires a superseding amendment that binds exact committed
+code, comparators, episode schedule, cost weights, atomic outputs, and analysis before any unseen
+outcome is inspected. Amendment 006 was also signed by the same agent that proposed it, under owner
+delegation without owner review, the fifth consecutive amendment in that condition; Amendments 002
+through 005 each disclose the same.
 
 ## Repeating defects, and why they must not recur
 
@@ -177,9 +175,12 @@ correctness check on the implementation, not a measurement.
 4. Three components — a quadratic curvature term, a first graded laboratory, a compensator — each
    described as doing something and each doing nothing.
 
-One effect survived the test: the susceptibility criterion at 0.9947, whose independence evidence is
-that it reproduces the exact command in only 44.53 percent of cells while reproducing the outcome in
-99.47 percent. A restatement scores 1.000 on both.
+No effect in this sequence is an active scientific claim. A retrospective susceptibility replay
+reproduces 746/750 informative outcomes while reproducing exact commands in 334/750 cells. It also
+shows that the frozen 0.90 threshold was below an always-non-masking comparator's 686/750 accuracy,
+and that F-S2 was not operationally machine-defined. The internal association remains an engineering
+observation: sensitivity 60/64, specificity 686/686, balanced accuracy 31/32. Its confirmatory
+interpretation is `INCONCLUSIVE`.
 
 **Standing rule: before reporting any effect, ask whether a computation that never touches the
 measurement can reproduce it. If yes at 100 percent, it is not a measurement.**
@@ -221,6 +222,9 @@ handoff whose CI never ran is an unverified recovery contract sitting in the his
 - `73679e1` has no CI and cannot acquire one without rewriting published history.
 - Amendment 006 was signed by its own drafter in direct violation of its own approval clause,
   recorded in `AMENDMENT_006_APPROVAL_DEFECT.md`. The owner's reading remains outstanding.
+- Amendment 006's bound source hashes match no committed implementation, and its classical-selector
+  comparison has no reconstructible retained evidence. `AMENDMENT_006_EVIDENCE_DEFECT.md` records
+  the implementation coverage as `BLOCKED` and the comparison as `INVALID`.
 - Amendment 006's laboratory design is outcome-informed, so no result from it may ever be reported as
   prospective.
 
@@ -265,30 +269,38 @@ but visibility changes only after the exact release commit has green clean-clone
 license, completed rights and secret scans, consistent identity and claim documents, and Daniel's
 approval.
 
-The repository exposes neither branch protection nor repository rulesets. Both were verified absent:
-the branch-protection endpoint returns 404 and the ruleset list is empty. GitHub Actions therefore
-provide auditable evidence but cannot enforce integration policy against a direct push or merge.
-Direct integration remains an operator-controlled action.
+Before 2026-07-19 the repository exposed neither branch protection nor repository rulesets. On
+2026-07-19 that defect was corrected for `main`: branch protection now requires the up-to-date
+GitHub Actions checks `ci-gate` and `base-controlled-history`, pins both contexts to GitHub Actions
+application ID 15368, requires pull-request integration and conversation resolution, enforces the
+rule for administrators, and disallows force pushes and deletion. The pull-request rule requires no
+approval because no independent reviewer is presently identified; same-actor approval would not
+create independence. No repository ruleset is present. These mutable repository settings are an
+integration control, not retained scientific evidence or scientific authority.
 
 Two gates this document set for publication were not satisfied before visibility changed: a
 protected integration path with required checks bound to the exact tested head, and a green
-clean-clone CI matrix on the release commit. Both remain outstanding on a repository that is already
-public. That is recorded here rather than reworded, and the paragraph above is retained unedited so
-the gate it stated is still legible.
+clean-clone CI matrix on the release commit. The first is now configured; the second remains
+outstanding on a repository that is already public until a protected candidate and its integrated
+commit both pass. That history is recorded here rather than erased.
 
-A further defect compounds this. `uv run inbar handoff check` cannot pass on a pull request, because
-the workflow checks out GitHub's synthetic two-parent merge ref while the handoff contract requires a
-single-parent topology. Every pull-request run in this repository's history fails on that step, and
-every green run is a direct push to `main`. The consequence is that a change cannot be verified by
-base-controlled CI before it is published: publishing is the only way to test. For work where the
-proposer, implementer, reviewer, and signer are the same actor, base-controlled CI on the exact
-candidate head was the last remaining independent check, and it is unavailable.
+Before the current correction, `uv run inbar handoff check` could not pass on a pull request because
+the workflow checks out GitHub's synthetic two-parent merge ref while the handoff contract accepted
+only the single-parent finalization commit. Every earlier pull-request run in this repository's
+history that reached this check failed on that topology, and no pull-request run has yet completed
+green. The verifier now accepts one integration wrapper only when its second parent is the exact
+validated final handoff, its first parent is a proper ancestor of the receipt-bound evidence, and
+its tree is identical to the final handoff tree. All receipt, finalization-path, regular-blob,
+strict-memory-append, clean-checkout, and repeated-state checks still apply. The protected GitHub
+event supplies the exact base and candidate identities; the graph predicate alone does not identify
+the intended integration tip. This makes base-controlled pull-request verification structurally
+possible; it does not itself attest that a run passed or grant scientific authority.
 
-Candidate branches must start from the current integration head because history verification requires
-the immutable event base to be an ancestor of the exact candidate head. Rebase a behind-base branch
-before review. After the initial bootstrap, normal candidate edges intentionally reject changes to
-workflows or `scripts/ci/verify_history.py`; any future policy change requires a separately audited
-policy-bootstrap and operator-controlled direct-integration ceremony.
+Candidate branches must start from the current integration head because history verification
+requires the immutable event base to be an ancestor of the exact candidate head. Rebase a
+behind-base branch before review. After the initial bootstrap, normal candidate edges intentionally
+reject changes to workflows or `scripts/ci/verify_history.py`; any future policy change requires a
+separately audited policy-bootstrap and operator-controlled direct-integration ceremony.
 
 Scientific authority may remain transparently blocked in an open-source code release. A public code
 checkpoint must not imply a scientific result.
@@ -320,6 +332,9 @@ results recorded in JUnit evidence, complete committed Python source coverage in
 observations, and mission inventory are recomputed from committed bytes. The final clean recovery
 commit must be its single-parent child, may change only the memory ledger and generated handoff,
 must strictly append the evidence parent's memory bytes, and must retain regular nonexecutable blobs.
+Only checkout `HEAD` may add one transparent two-parent integration wrapper around that exact
+single-parent final commit. The wrapper must preserve the final tree byte-for-byte and grants no
+receipt, evidence, approval, or scientific status.
 Prospective rendering at the
 evidence commit does not satisfy final checking. These controls establish same-operator
 candidate-tree consistency, not independent or base-controlled attestation, scientific evidence, or
