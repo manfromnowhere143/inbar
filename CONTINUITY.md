@@ -269,30 +269,38 @@ but visibility changes only after the exact release commit has green clean-clone
 license, completed rights and secret scans, consistent identity and claim documents, and Daniel's
 approval.
 
-The repository exposes neither branch protection nor repository rulesets. Both were verified absent:
-the branch-protection endpoint returns 404 and the ruleset list is empty. GitHub Actions therefore
-provide auditable evidence but cannot enforce integration policy against a direct push or merge.
-Direct integration remains an operator-controlled action.
+Before 2026-07-19 the repository exposed neither branch protection nor repository rulesets. On
+2026-07-19 that defect was corrected for `main`: branch protection now requires the up-to-date
+GitHub Actions checks `ci-gate` and `base-controlled-history`, pins both contexts to GitHub Actions
+application ID 15368, requires pull-request integration and conversation resolution, enforces the
+rule for administrators, and disallows force pushes and deletion. The pull-request rule requires no
+approval because no independent reviewer is presently identified; same-actor approval would not
+create independence. No repository ruleset is present. These mutable repository settings are an
+integration control, not retained scientific evidence or scientific authority.
 
 Two gates this document set for publication were not satisfied before visibility changed: a
 protected integration path with required checks bound to the exact tested head, and a green
-clean-clone CI matrix on the release commit. Both remain outstanding on a repository that is already
-public. That is recorded here rather than reworded, and the paragraph above is retained unedited so
-the gate it stated is still legible.
+clean-clone CI matrix on the release commit. The first is now configured; the second remains
+outstanding on a repository that is already public until a protected candidate and its integrated
+commit both pass. That history is recorded here rather than erased.
 
-A further defect compounds this. `uv run inbar handoff check` cannot pass on a pull request, because
-the workflow checks out GitHub's synthetic two-parent merge ref while the handoff contract requires a
-single-parent topology. Every pull-request run in this repository's history fails on that step, and
-every green run is a direct push to `main`. The consequence is that a change cannot be verified by
-base-controlled CI before it is published: publishing is the only way to test. For work where the
-proposer, implementer, reviewer, and signer are the same actor, base-controlled CI on the exact
-candidate head was the last remaining independent check, and it is unavailable.
+Before the current correction, `uv run inbar handoff check` could not pass on a pull request because
+the workflow checks out GitHub's synthetic two-parent merge ref while the handoff contract accepted
+only the single-parent finalization commit. Every earlier pull-request run in this repository's
+history that reached this check failed on that topology, and no pull-request run has yet completed
+green. The verifier now accepts one integration wrapper only when its second parent is the exact
+validated final handoff, its first parent is a proper ancestor of the receipt-bound evidence, and
+its tree is identical to the final handoff tree. All receipt, finalization-path, regular-blob,
+strict-memory-append, clean-checkout, and repeated-state checks still apply. The protected GitHub
+event supplies the exact base and candidate identities; the graph predicate alone does not identify
+the intended integration tip. This makes base-controlled pull-request verification structurally
+possible; it does not itself attest that a run passed or grant scientific authority.
 
-Candidate branches must start from the current integration head because history verification requires
-the immutable event base to be an ancestor of the exact candidate head. Rebase a behind-base branch
-before review. After the initial bootstrap, normal candidate edges intentionally reject changes to
-workflows or `scripts/ci/verify_history.py`; any future policy change requires a separately audited
-policy-bootstrap and operator-controlled direct-integration ceremony.
+Candidate branches must start from the current integration head because history verification
+requires the immutable event base to be an ancestor of the exact candidate head. Rebase a
+behind-base branch before review. After the initial bootstrap, normal candidate edges intentionally
+reject changes to workflows or `scripts/ci/verify_history.py`; any future policy change requires a
+separately audited policy-bootstrap and operator-controlled direct-integration ceremony.
 
 Scientific authority may remain transparently blocked in an open-source code release. A public code
 checkpoint must not imply a scientific result.
@@ -324,6 +332,9 @@ results recorded in JUnit evidence, complete committed Python source coverage in
 observations, and mission inventory are recomputed from committed bytes. The final clean recovery
 commit must be its single-parent child, may change only the memory ledger and generated handoff,
 must strictly append the evidence parent's memory bytes, and must retain regular nonexecutable blobs.
+Only checkout `HEAD` may add one transparent two-parent integration wrapper around that exact
+single-parent final commit. The wrapper must preserve the final tree byte-for-byte and grants no
+receipt, evidence, approval, or scientific status.
 Prospective rendering at the
 evidence commit does not satisfy final checking. These controls establish same-operator
 candidate-tree consistency, not independent or base-controlled attestation, scientific evidence, or

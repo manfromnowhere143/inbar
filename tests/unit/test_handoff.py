@@ -500,11 +500,19 @@ def _v2_validation_context(
     overlap_steps: bool = False,
     plan_override: tuple[str, tuple[str, ...]] | None = None,
     preexisting_validation_file: bool = False,
+    prior_integration_base: bool = False,
     pytest_counts: tuple[int, int, int, int] = (11, 0, 0, 0),
 ) -> SimpleNamespace:
     _git(repo, "init", "--quiet", "--initial-branch=main")
     _git(repo, "config", "user.name", "Inbar Validation Test")
     _git(repo, "config", "user.email", "validation@example.invalid")
+    if prior_integration_base:
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "--quiet", "-m", "prior integration base")
+        (repo / "implementation-subject.txt").write_text(
+            "implementation change\n",
+            encoding="utf-8",
+        )
     if preexisting_validation_file:
         preexisting = (
             repo / "evidence/validation/validation.fixture.v2/preexisting-unlisted-artifact.txt"
@@ -963,6 +971,22 @@ def _commit_v2_finalization(
     return _git(repo, "rev-parse", "HEAD")
 
 
+def _commit_tree_with_parents(
+    repo: Path,
+    *,
+    tree_commit: str,
+    parents: tuple[str, ...],
+) -> str:
+    tree = _git(repo, "rev-parse", "--verify", f"{tree_commit}^{{tree}}")
+    arguments = ["commit-tree", tree]
+    for parent in parents:
+        arguments.extend(("-p", parent))
+    arguments.extend(("-m", "integration wrapper fixture"))
+    commit = _git(repo, *arguments)
+    _git(repo, "reset", "--hard", commit)
+    return commit
+
+
 def test_checkpoint_v2_accepts_only_prospective_b_or_exact_final_c(
     handoff_repo: Path,
     memory_records: tuple[ResearchMemoryRecord, ...],
@@ -982,6 +1006,106 @@ def test_checkpoint_v2_accepts_only_prospective_b_or_exact_final_c(
         handoff_repo, git, context.evidence_commit
     )
     _verify_v2_context(handoff_repo, context)
+
+
+def test_checkpoint_v2_accepts_one_transparent_integration_wrapper(
+    handoff_repo: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    context = _v2_validation_context(
+        handoff_repo,
+        memory_records,
+        prior_integration_base=True,
+    )
+    git = handoff_module.trusted_repository_git(
+        handoff_repo,
+        handoff_module.TRUSTED_GIT_PATH,
+    )
+    final_commit = _commit_v2_finalization(handoff_repo)
+    integration_base = _git(
+        handoff_repo,
+        "rev-parse",
+        "--verify",
+        f"{context.subject_commit}^",
+    )
+    _commit_tree_with_parents(
+        handoff_repo,
+        tree_commit=final_commit,
+        parents=(integration_base, final_commit),
+    )
+
+    assert not handoff_module._verify_v2_finalization_topology(
+        handoff_repo,
+        git,
+        context.evidence_commit,
+    )
+    _verify_v2_context(handoff_repo, context)
+    handoff_module._verify_v2_checkout_state(
+        handoff_repo,
+        git,
+        context.evidence_commit,
+    )
+
+
+def test_checkpoint_v2_rejects_nontransparent_integration_wrappers(
+    tmp_path: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+) -> None:
+    scenarios = (
+        ("reversed-parents", "proper ancestor"),
+        ("three-parents", "one transparent two-parent"),
+        ("different-tree", "tree differs"),
+        ("unrelated-first-parent", "proper ancestor"),
+        ("evidence-first-parent", "proper ancestor"),
+        ("nested-wrapper", "single-parent child"),
+    )
+    for scenario, message in scenarios:
+        repo = _build_handoff_repo(tmp_path / scenario)
+        context = _v2_validation_context(repo, memory_records)
+        final_commit = _commit_v2_finalization(repo)
+        if scenario == "reversed-parents":
+            parents = (final_commit, context.subject_commit)
+            tree_commit = final_commit
+        elif scenario == "three-parents":
+            parents = (
+                context.subject_commit,
+                final_commit,
+                context.evidence_commit,
+            )
+            tree_commit = final_commit
+        elif scenario == "different-tree":
+            parents = (context.subject_commit, final_commit)
+            tree_commit = context.evidence_commit
+        elif scenario == "unrelated-first-parent":
+            final_tree = _git(repo, "rev-parse", "--verify", f"{final_commit}^{{tree}}")
+            unrelated = _git(
+                repo,
+                "commit-tree",
+                final_tree,
+                "-m",
+                "unrelated root fixture",
+            )
+            parents = (unrelated, final_commit)
+            tree_commit = final_commit
+        elif scenario == "evidence-first-parent":
+            parents = (context.evidence_commit, final_commit)
+            tree_commit = final_commit
+        else:
+            wrapper = _commit_tree_with_parents(
+                repo,
+                tree_commit=final_commit,
+                parents=(context.subject_commit, final_commit),
+            )
+            parents = (context.subject_commit, wrapper)
+            tree_commit = wrapper
+        _commit_tree_with_parents(
+            repo,
+            tree_commit=tree_commit,
+            parents=parents,
+        )
+
+        with pytest.raises(HandoffError, match=message):
+            _verify_v2_context(repo, context)
 
 
 @pytest.mark.parametrize(
@@ -1012,12 +1136,53 @@ def test_checkpoint_v2_rejects_rewritten_or_executable_finalization(
         _verify_v2_context(repo, context)
 
 
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"rewrite_memory": True}, "not a strict byte-prefix append"),
+        (
+            {"executable_path": handoff_module._MEMORY_PATH},
+            "tree entry is invalid",
+        ),
+        (
+            {"executable_path": handoff_module._HANDOFF_PATH},
+            "tree entry is invalid",
+        ),
+        (
+            {"extra_path": "unexpected-wrapper-content.txt"},
+            "does not contain exactly",
+        ),
+    ],
+)
+def test_checkpoint_v2_wrapper_preserves_finalization_controls(
+    tmp_path: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    options: dict[str, object],
+    message: str,
+) -> None:
+    repo = _build_handoff_repo(tmp_path / f"wrapper-{message.replace(' ', '-')}")
+    context = _v2_validation_context(repo, memory_records)
+    final_commit = _commit_v2_finalization(repo, **options)  # type: ignore[arg-type]
+    _commit_tree_with_parents(
+        repo,
+        tree_commit=final_commit,
+        parents=(context.subject_commit, final_commit),
+    )
+
+    with pytest.raises(HandoffError, match=message):
+        _verify_v2_context(repo, context)
+
+
 def test_handoff_check_requires_exact_clean_v2_finalization(
     handoff_repo: Path,
     memory_records: tuple[ResearchMemoryRecord, ...],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    context = _v2_validation_context(handoff_repo, memory_records)
+    context = _v2_validation_context(
+        handoff_repo,
+        memory_records,
+        prior_integration_base=True,
+    )
     _install_verified_dependencies(monkeypatch, context.records)
     monkeypatch.setattr(
         handoff_module,
@@ -1038,6 +1203,21 @@ def test_handoff_check_requires_exact_clean_v2_finalization(
         handoff_module._HANDOFF_PATH,
     )
     _git(handoff_repo, "commit", "--quiet", "-m", "finalize v2 handoff")
+    final_commit = _git(handoff_repo, "rev-parse", "HEAD")
+
+    check_handoff(handoff_repo)
+
+    integration_base = _git(
+        handoff_repo,
+        "rev-parse",
+        "--verify",
+        f"{context.subject_commit}^",
+    )
+    _commit_tree_with_parents(
+        handoff_repo,
+        tree_commit=final_commit,
+        parents=(integration_base, final_commit),
+    )
 
     check_handoff(handoff_repo)
 
@@ -1100,6 +1280,38 @@ def test_checkpoint_v2_checkout_requires_clean_c_and_bounds_prospective_changes(
     (handoff_repo / "README.md").write_text("dirty final checkout\n", encoding="utf-8")
     with pytest.raises(HandoffError, match="checkout is not clean"):
         handoff_module._verify_v2_checkout_state(handoff_repo, git, context.evidence_commit)
+
+
+@pytest.mark.parametrize("dirty_kind", ["unstaged", "staged", "untracked"])
+def test_checkpoint_v2_wrapper_requires_clean_checkout(
+    tmp_path: Path,
+    memory_records: tuple[ResearchMemoryRecord, ...],
+    dirty_kind: str,
+) -> None:
+    repo = _build_handoff_repo(tmp_path / f"wrapper-dirty-{dirty_kind}")
+    context = _v2_validation_context(repo, memory_records)
+    git = handoff_module.trusted_repository_git(
+        repo,
+        handoff_module.TRUSTED_GIT_PATH,
+    )
+    final_commit = _commit_v2_finalization(repo)
+    _commit_tree_with_parents(
+        repo,
+        tree_commit=final_commit,
+        parents=(context.subject_commit, final_commit),
+    )
+    if dirty_kind == "untracked":
+        (repo / "untracked-wrapper-state.txt").write_text(
+            "untracked\n",
+            encoding="utf-8",
+        )
+    else:
+        (repo / "README.md").write_text("dirty wrapper state\n", encoding="utf-8")
+        if dirty_kind == "staged":
+            _git(repo, "add", "README.md")
+
+    with pytest.raises(HandoffError, match="checkout is not clean"):
+        handoff_module._verify_v2_checkout_state(repo, git, context.evidence_commit)
 
 
 def test_recovery_materialization_rejects_ignored_and_untracked_regular_files(

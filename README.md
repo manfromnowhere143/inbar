@@ -331,6 +331,15 @@ suite on the exact head across Ubuntu and macOS and Python 3.11 through 3.14; th
 quality job enforces at least 90.01 percent branch-aware coverage. A green public checkpoint proves
 engineering discipline, not a scientific result.
 
+The receipt and final handoff remain exact single-parent commits. Pull-request and post-merge
+checkouts may add one transparent two-parent integration wrapper only when its first parent is a
+proper ancestor of the receipt evidence, its second parent is the validated final handoff, and its
+tree is byte-identical to that final parent. The wrapper grants no evidence, approval, or scientific
+authority. Protected `main` requires the up-to-date aggregate `ci-gate` and
+`base-controlled-history` GitHub Actions checks, pull-request integration, conversation resolution,
+and rejects force pushes and branch deletion, including for administrators. The pull-request rule
+requires no approval while no independent reviewer is identified.
+
 ## Repository map
 
 ```text

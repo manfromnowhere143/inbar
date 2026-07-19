@@ -108,10 +108,14 @@ The recovery verifier accepts a current receipt only when its commit is the sing
 the implementation subject and changes only the receipt and its named artifacts. A final clean
 recovery commit must in turn be the single-parent child of that evidence commit and change exactly
 the memory ledger and generated handoff. The memory blob must strictly append its evidence parent,
-and both final paths must remain regular nonexecutable blobs. The verifier re-parses every bound
-artifact, binds coverage to the complete committed Python source inventory, requires zero skipped
-tests and every registered credibility-control node to appear as a passed JUnit case, and recomputes
-the test counts, combined statement-plus-branch coverage, exact mission check inventory, and expected blocker.
+and both final paths must remain regular nonexecutable blobs. Checkout `HEAD` may wrap that final
+commit in one two-parent integration commit only when the integration base is a proper ancestor of
+the evidence commit and the wrapper tree is identical to the final commit tree. The wrapper does not
+become evidence and cannot relax the linear receipt or finalization edges. The verifier re-parses
+every bound artifact, binds coverage to the complete committed Python source inventory, requires
+zero skipped tests and every registered credibility-control node to appear as a passed JUnit case,
+and recomputes the test counts, combined statement-plus-branch coverage, exact mission check
+inventory, and expected blocker.
 Prospective rendering is permitted at the evidence commit, but final checking requires the exact
 clean recovery child. The receipt declares same-operator observation without independent
 attestation, scientific result, or authority effect. Bound logs and self-recorded exit codes are not

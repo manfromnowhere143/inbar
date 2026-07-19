@@ -77,6 +77,8 @@ changes and evidence.
   evidence, and an exact 90.01 percent statement-plus-branch coverage floor.
 - Required the final recovery ledger to be a strict byte-prefix append of its evidence parent and
   bound both final recovery files to regular nonexecutable Git blobs.
+- Accepted only a tree-identical two-parent integration wrapper around the exact validated final
+  handoff, without weakening the receipt, finalization, or clean-checkout invariants.
 - Aligned the public research state, acquisition thresholds, planner units, and product stages with
   executable boundaries. Added a prospective exposure-normalized value refinement that still
   requires a value-stage preregistration or amendment and does not modify the frozen master formula.
