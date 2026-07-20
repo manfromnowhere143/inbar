@@ -175,6 +175,10 @@ from fieldtrue.shortcut_v2_release import (
     TargetEnvelope,
     X25519RecipientIdentity,
 )
+from fieldtrue.shortcut_v2_target import (
+    SignedMechanismResolutionTarget,
+    TargetManifestCommitmentReceipt,
+)
 from fieldtrue.shortcut_v2_tree import (
     DepthTwoExactGiniTree,
     FeatureVector,
@@ -318,6 +322,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "shortcut_v2_fitted_state_root_item.schema.json": FittedStateRootItem,
     "shortcut_v2_local_hypothesis_map.schema.json": IncidentLocalHypothesisMap,
     "shortcut_v2_mechanism_ontology.schema.json": SignedMechanismOntology,
+    "shortcut_v2_mechanism_resolution_target.schema.json": (SignedMechanismResolutionTarget),
     "shortcut_v2_ontology_assurance_report.schema.json": (ShortcutOntologyAssuranceReport),
     "shortcut_v2_prediction_key_manifest.schema.json": PredictionKeyManifest,
     "shortcut_v2_prediction_root_item.schema.json": PredictionRootItem,
@@ -327,6 +332,7 @@ _SCHEMAS: dict[str, type[BaseModel]] = {
     "shortcut_v2_release_context.schema.json": ShortcutReleaseContext,
     "shortcut_v2_rule_axis_fold_subject.schema.json": RuleAxisFoldAuthoritySubject,
     "shortcut_v2_target_envelope.schema.json": TargetEnvelope,
+    "shortcut_v2_target_manifest_commitment_receipt.schema.json": (TargetManifestCommitmentReceipt),
     "shortcut_v2_tree_fitted_state.schema.json": TreeFittedState,
     "shortcut_v2_tree_prediction.schema.json": TreePrediction,
     "shortcut_v2_tree_prediction_manifest.schema.json": TreePredictionManifest,
