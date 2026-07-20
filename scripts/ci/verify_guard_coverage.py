@@ -40,6 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # fail this check until a broken subject reaches them.
 GUARDED_MODULES: dict[str, tuple[str, ...]] = {
     "src/fieldtrue/shortcut_v2_ontology.py": ("tests/unit/test_shortcut_v2_ontology.py",),
+    "src/fieldtrue/shortcut_v2_target.py": ("tests/unit/test_shortcut_v2_target.py",),
 }
 
 

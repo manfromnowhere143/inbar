@@ -1,0 +1,186 @@
+{
+  "$defs": {
+    "MechanismMappingEvidence": {
+      "additionalProperties": false,
+      "description": "Content-addressed physical mapping evidence bound to one mechanism target.",
+      "properties": {
+        "artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Artifact Sha256",
+          "type": "string"
+        },
+        "bytes_length": {
+          "minimum": 1,
+          "title": "Bytes Length",
+          "type": "integer"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.mechanism-mapping-evidence.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "uri": {
+          "minLength": 1,
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "uri",
+        "media_type",
+        "artifact_sha256",
+        "bytes_length"
+      ],
+      "title": "MechanismMappingEvidence",
+      "type": "object"
+    },
+    "ShortcutAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.shortcut-attestation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[0-9a-f]{128}$",
+          "title": "Signature",
+          "type": "string"
+        },
+        "signer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Signer Id",
+          "type": "string"
+        },
+        "signer_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signer Public Key",
+          "type": "string"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "signer_id",
+        "kind",
+        "subject_sha256",
+        "signer_public_key",
+        "signature"
+      ],
+      "title": "ShortcutAttestation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One truth-only mechanism target signed by the mechanism reviewer.\n\nEvery binding named in the frozen Amendment 001 target policy is required. The target plane is\ntruth-only: this artifact and its hash never enter a model-visible tree before authorized\nrelease, which is a custody obligation on the caller that no type can enforce.",
+  "properties": {
+    "attestation": {
+      "$ref": "#/$defs/ShortcutAttestation"
+    },
+    "case_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Case Key",
+      "type": "string"
+    },
+    "committed_at": {
+      "format": "date-time",
+      "title": "Committed At",
+      "type": "string"
+    },
+    "hypothesis_set_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Hypothesis Set Artifact Sha256",
+      "type": "string"
+    },
+    "incident_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Incident Id",
+      "type": "string"
+    },
+    "mapping_evidence": {
+      "$ref": "#/$defs/MechanismMappingEvidence"
+    },
+    "mechanism_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Mechanism Ids Sha256",
+      "type": "string"
+    },
+    "mechanism_reviewer_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Mechanism Reviewer Id",
+      "type": "string"
+    },
+    "ontology_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Ontology Artifact Sha256",
+      "type": "string"
+    },
+    "prediction_key_manifest_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prediction Key Manifest Artifact Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.mechanism-resolution-target.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "target_hypothesis_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Target Hypothesis Id",
+      "type": "string"
+    },
+    "target_kind": {
+      "enum": [
+        "known",
+        "unknown"
+      ],
+      "title": "Target Kind",
+      "type": "string"
+    },
+    "target_prediction_key": {
+      "pattern": "^(?:unknown|[0-9a-f]{64})$",
+      "title": "Target Prediction Key",
+      "type": "string"
+    },
+    "truth_record_artifact_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Truth Record Artifact Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "case_key",
+    "incident_id",
+    "truth_record_artifact_sha256",
+    "hypothesis_set_artifact_sha256",
+    "ontology_artifact_sha256",
+    "prediction_key_manifest_artifact_sha256",
+    "mechanism_ids_sha256",
+    "target_hypothesis_id",
+    "target_prediction_key",
+    "target_kind",
+    "mapping_evidence",
+    "committed_at",
+    "mechanism_reviewer_id",
+    "attestation"
+  ],
+  "title": "SignedMechanismResolutionTarget",
+  "type": "object"
+}

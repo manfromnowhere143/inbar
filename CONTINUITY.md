@@ -291,7 +291,18 @@ identity-proxy review, no verified target-manifest or freeze chain, and no autho
 Each future mechanism target directly binds the raw prediction-key manifest hash; the exact target
 manifest and its salted hiding commitment carry that binding through the later freeze and final
 reveal. A conforming implementation must enforce one manifest across all targets and reconstruct
-that entire chain. It is not implemented. The low-level cross-fit predictors also still accept
+that entire chain. `fieldtrue.shortcut_v2_target` now implements that enforcement: the signed
+mechanism resolution target carrying every binding the frozen Amendment 001 target policy names,
+the aggregate manifest root under `inbar.iter001.mechanism-target-root.v1`, the eligible-incident
+root under its own distinct `inbar.iter001.eligible-incident-ids.v1` domain, the salted hiding
+commitment, and a reveal check that recomputes root and commitment against the frozen receipt. One
+prediction-key manifest and one ontology are enforced across every target, exactly one target is
+required per eligible incident, and the public commitment receipt has no salt or manifest-root
+field at all, so the hiding property is structural rather than a check a caller could skip.
+
+That is machinery, not a closed gate. No real mechanism target exists, no corpus is admitted, the
+freeze receipt and release plan are not wired to it, and terminal integration has not been made
+mandatory. The low-level cross-fit predictors also still accept
 caller-supplied local maps, so an omitted caller mapping can manufacture `key_unavailable` outside
 the verified projection path. `IncidentLocalHypothesisMap` validates ordering and bijectivity but
 never provenance, so the same opening admits a strictly worse failure that this document previously

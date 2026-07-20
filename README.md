@@ -72,7 +72,11 @@ adjudicate the outcome.**
 > creates no real ontology and closes no gate. The v1 prediction-key root is intentionally a
 > mapping projection; complete metadata is bound by the raw manifest hash carried through future
 > mechanism targets and the hidden target-manifest commitment. That target/freeze/final-
-> recomputation chain is not implemented. The existing low-level predictors also still accept
+> recomputation chain is now implemented in `fieldtrue.shortcut_v2_target`: signed mechanism
+> targets, the aggregate manifest root, the salted hiding commitment whose public receipt
+> structurally cannot carry the salt or the root, one-manifest enforcement across every target, and
+> a reveal check that recomputes both. No real target exists and no gate is closed by it. The
+> existing low-level predictors also still accept
 > caller-supplied local maps, so verified projection is not yet an enforced terminal path: a caller
 > may omit a mapping to manufacture an abstention, or substitute one to obtain a confident wrong
 > answer. A subsequent audit also found that 42 of that module's 71 guards had no test that could

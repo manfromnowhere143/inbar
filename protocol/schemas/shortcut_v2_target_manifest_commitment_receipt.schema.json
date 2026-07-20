@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "ShortcutAttestation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "inbar.iter001.shortcut-attestation.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "pattern": "^[0-9a-f]{128}$",
+          "title": "Signature",
+          "type": "string"
+        },
+        "signer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+          "title": "Signer Id",
+          "type": "string"
+        },
+        "signer_public_key": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signer Public Key",
+          "type": "string"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "signer_id",
+        "kind",
+        "subject_sha256",
+        "signer_public_key",
+        "signature"
+      ],
+      "title": "ShortcutAttestation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The public commitment receipt, which structurally cannot carry the salt or the root.\n\nAmendment 001 fixes these seven fields exactly. The salt and the target-manifest root remain\ncustodian-only until final registry recomputation, so they are absent from this model rather\nthan validated out of it: a field that does not exist cannot be populated by mistake.",
+  "properties": {
+    "attestation": {
+      "$ref": "#/$defs/ShortcutAttestation"
+    },
+    "committed_at": {
+      "format": "date-time",
+      "title": "Committed At",
+      "type": "string"
+    },
+    "custodian_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "title": "Custodian Id",
+      "type": "string"
+    },
+    "eligible_incident_ids_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Eligible Incident Ids Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "inbar.iter001.target-manifest-commitment-receipt.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "target_count": {
+      "minimum": 1,
+      "title": "Target Count",
+      "type": "integer"
+    },
+    "target_manifest_hiding_commitment_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Target Manifest Hiding Commitment Sha256",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "target_manifest_hiding_commitment_sha256",
+    "target_count",
+    "eligible_incident_ids_sha256",
+    "committed_at",
+    "custodian_id",
+    "attestation"
+  ],
+  "title": "TargetManifestCommitmentReceipt",
+  "type": "object"
+}
