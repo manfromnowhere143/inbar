@@ -308,8 +308,19 @@ the verified projection path. `IncidentLocalHypothesisMap` validates ordering an
 never provenance, so the same opening admits a strictly worse failure that this document previously
 did not disclose: a caller may supply a map binding the proposed key to a different hypothesis and
 obtain a confident, wrong `selected_hypothesis_id` rather than an abstention. Omission degrades to
-silence; substitution degrades to a false answer. Terminal integration must make raw manifest
-verification and exact projection mandatory. Software cannot replace the separate external semantic review,
+silence; substitution degrades to a false answer. That substitution is no longer an assertion in
+this document: `test_substituted_caller_map_yields_a_confident_wrong_answer_on_the_primitive_path`
+swaps two hypothesis IDs between prediction keys, which leaves the map perfectly well formed, and
+the predictor returns a confident selection naming the wrong hypothesis with no abstention and no
+record that anything is wrong.
+
+`fieldtrue.shortcut_v2_terminal` is the boundary `CONTINUITY.md` required. Its entry points take no
+local-maps parameter at all, so a caller has nowhere to put a substituted projection; the
+projection is derived inside them from signed artifacts whose raw bytes, hashes, attestations, and
+role separation are verified first. The primitives are deliberately unchanged, because Amendment
+001 constrains a supplied manifest rather than forbidding one and they remain correct as
+primitives. What is closed is the terminal path. A caller who bypasses it and drives the
+primitives directly still holds the same opening, and nothing in software prevents that choice. Software cannot replace the separate external semantic review,
 identity-proxy review, or genuine role independence.
 
 Do not reinterpret V1 shortcut booleans, lower thresholds, treat synthetic fixtures as evidence, or
