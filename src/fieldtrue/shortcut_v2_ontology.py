@@ -801,16 +801,16 @@ def _verify_exact_hypothesis_membership(
     for assignment in case.assignments:
         if assignment.unknown:
             continue
-        definition = known_classes.get(assignment.prediction_key)
-        if definition is None:
+        if assignment.prediction_key not in known_classes:
             raise ShortcutOntologyError(
                 "known assignment names a key absent from the signed ontology"
             )
-        expected_key = mechanism_class_prediction_key(definition)
-        if assignment.class_definition_sha256 != expected_key:
-            raise ShortcutOntologyError(
-                "known assignment class-definition hash differs from its ontology class"
-            )
+        # The class-definition hash is deliberately not re-compared here. `known_classes` is keyed
+        # by `mechanism_class_prediction_key`, and `HypothesisPredictionKeyAssignment` already
+        # requires `class_definition_sha256 == prediction_key` for every known assignment, so any
+        # comparison at this point is equal by construction and can never fail. The invariant is
+        # enforced at the model boundary and exercised there by a broken subject; a copy here would
+        # be a guard that cannot fail, which is the defect `CONTINUITY.md` records.
 
 
 def _verify_prediction_key_manifest(

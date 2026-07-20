@@ -16,8 +16,8 @@ research memory. Do not hand-edit this file.
 - Iteration: `iter001_physical_causal_evidence_acquisition`
 - Lifecycle stage: `corpus_qualification`
 - Source-role verdict: `BLOCK_CURRENT_PUBLIC_SOURCE_ONLY_ROUTE`
-- Source verdict event: `iter001-current-public-source-route-verdict-v24`
-- Source verdict event hash: `0ae34cb920a141b474cdc47d1599fe7033c41d16240fdc8f7e083febdb87a664`
+- Source verdict event: `iter001-current-public-source-route-verdict-v25`
+- Source verdict event hash: `ad7c8c1bfb92557cf18994d39db8b982678dc4143a085ac031f554b481664a41`
 - Source verdict summary: The current protocol blocks the present public-source-only route and requires prospective review before any physical evidence is admitted.
 - Source architecture: physical admission, causal laboratory, independent reality and controls
 - Compute consequence: GPU training remains blocked.
@@ -27,8 +27,8 @@ research memory. Do not hand-edit this file.
 - Admissibility boundary: Existing real-world evidence remains admissible only after prospective review against every frozen field and independent-audit requirement.
 - Canonical control authority: `bootstrap`
 - Publication transition: `blocked`
-- Active handoff: `inbar-core-validation-handoff-v24` at sequence 241
-- Active handoff event hash: `67b89f9f7944dfe74a15db8ec9ac94367084499668f981926c127338bd4b30a8`
+- Active handoff: `inbar-core-validation-handoff-v25` at sequence 245
+- Active handoff event hash: `f808b9bc57aa3ca1ccbecc3802120c46e752f340ed58398101ced684681f28c2`
 - Handoff status: `blocked`
 - State: Inbar remains in bootstrap with iter001-acquisition-contract blocked and no mission authority active.
 
@@ -36,9 +36,9 @@ research memory. Do not hand-edit this file.
 
 ## Linked checkpoint
 
-- Checkpoint event: `inbar-core-validation-checkpoint-v24`
-- Checkpoint event hash: `064416191c402e866794b8991940b7101ecffc7be9d191a4bf87d1f7a1f72555`
-- Implementation commit: `51d1885eb9056c0b0da7c3ef7351816390c4eba7`
+- Checkpoint event: `inbar-core-validation-checkpoint-v25`
+- Checkpoint event hash: `c35958f00f4074d98aa6b9f0577e29117aa7ed1465511fddcc306b4f07157504`
+- Implementation commit: `0de21ef6c32dbba5e90f7c1e631e60095f006ef6`
 - Action: Hardened the deterministic Inbar recovery contract and verified its internal consistency.
 - Outcome: Recovery inputs and the blocked mission state are reproducibly bound to committed evidence.
 - Authority effect: No authority was granted; iter001-acquisition-contract remains blocked.
@@ -48,12 +48,12 @@ research memory. Do not hand-edit this file.
 These observations were recomputed from the exact committed receipt bundle. They are not an independent attestation or a scientific result.
 Bundle integrity does not prove command execution.
 
-- Receipt: `inbar-core-validation-20260719-v24`
-- Evidence commit: `510c76fb776fdcb0166333f86d6b2b7b98db74b9`
+- Receipt: `inbar-core-validation-20260720-v25`
+- Evidence commit: `3e0b8d8da294e283569c219d53d443a0566e83fd`
 - Assurance scope: `same-operator-engineering-observation-no-independent-attestation`
 - Independent attestation: `false`
-- Tests: 1541 passed, 0 failed, 0 errors, 0 skipped
-- Recomputed statement-plus-branch coverage: 91.07 percent
+- Tests: 1610 passed, 0 failed, 0 errors, 0 skipped
+- Recomputed statement-plus-branch coverage: 91.44 percent
 - Mission check inventory: 22
 - Resource measurement: `not_metered`
 - Scientific result: `not_evaluated`
@@ -63,11 +63,11 @@ Bundle integrity does not prove command execution.
 
 - Generated schemas: 154
 - Mission checks: 21 passed, 1 registered blocker
-- Research-memory events: 242
-- Research-memory head: `67b89f9f7944dfe74a15db8ec9ac94367084499668f981926c127338bd4b30a8`
+- Research-memory events: 246
+- Research-memory head: `f808b9bc57aa3ca1ccbecc3802120c46e752f340ed58398101ced684681f28c2`
 - Renderer contract: `inbar.generated-handoff.v5`
 - Renderer source SHA-256: `57545781fef32e5a1e93cdea881930d1d093a043712efe3a815c532a230f9b6f`
-- Generated-input digest: `5dd561b2977e7658c06a7dc5b36800d91ff9a9296f975e245f8a9d2b83c10b45`
+- Generated-input digest: `469b98233fabebfdd5f9a6202a6e360bbf972c99f99d94fd83b23690a91e41c4`
 
 ## Remaining Iteration 001 acquisition-authority gates
 

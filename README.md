@@ -73,7 +73,12 @@ adjudicate the outcome.**
 > mapping projection; complete metadata is bound by the raw manifest hash carried through future
 > mechanism targets and the hidden target-manifest commitment. That target/freeze/final-
 > recomputation chain is not implemented. The existing low-level predictors also still accept
-> caller-supplied local maps, so verified projection is not yet an enforced terminal path.
+> caller-supplied local maps, so verified projection is not yet an enforced terminal path: a caller
+> may omit a mapping to manufacture an abstention, or substitute one to obtain a confident wrong
+> answer. A subsequent audit also found that 42 of that module's 71 guards had no test that could
+> make them fire, including guards backing fields its assurance report asserts as verified. Every
+> guard is now exercised by a deliberately broken subject, one provably unreachable guard was
+> deleted, and the rule is measured by `scripts/ci/verify_guard_coverage.py` rather than asserted.
 > Genuinely external semantic review, identity-proxy review, and role independence remain absent.
 > Gate 1 therefore remains `blocked`.
 >
