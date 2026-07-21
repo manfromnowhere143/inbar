@@ -267,7 +267,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     ),
     "pyproject.toml": ("b30b947d7a36b9a4bf3d83b9df971cb34f2410d93b1c81fa5e0da601bb538f6c"),
     "src/fieldtrue/acquisition.py": (
-        "1db52fa08405ce5f28013715c34782475b57c814becd6e50aa0729353cc101ce"
+        "5f507fb7c0f3eeee46ef7342ad1a8778f3fa58a81241fd2c5766bf574bfc153d"
     ),
     "src/fieldtrue/domain.py": ("7648d416e3843dac5d1cf9c3c3be81b8d7cba235ec33c135d2697383a3d8474a"),
     "src/fieldtrue/active_selection.py": (
@@ -298,7 +298,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "8f5969d9723be0f694b27a594d7c3fe4dd254ee9d321382f3e16b6ea152d8119"
     ),
     "tests/unit/test_acquisition.py": (
-        "76b3dc4550c5948d5b1c92bf4255358a9c0425b29396a43339ab179439244ea4"
+        "7867742f9f6ba48e4d654a1983db9f035decd784f16dd26e015a582caec7819f"
     ),
     "tests/unit/test_domain.py": (
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
