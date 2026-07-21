@@ -94,9 +94,12 @@ def test_v28_scope_correction_binds_the_exact_checkpoint_and_evidence() -> None:
     assert predecessor["event_hash"] == _V28_SCOPE_CORRECTION.predecessor_handoff_hash
     assert predecessor["source_commit"] == _V28_SCOPE_CORRECTION.predecessor_handoff_source_commit
     assert predecessor["sequence"] == _V28_SCOPE_CORRECTION.predecessor_handoff_sequence == 261
-    assert records[-1] == predecessor
+    pretransition = records[: predecessor["sequence"] + 1]
+    assert pretransition[-1] == predecessor
+    assert [record["sequence"] for record in pretransition] == list(range(len(pretransition)))
     assert _V28_SCOPE_CORRECTION.event_id.endswith("-v30")
-    assert _V28_SCOPE_CORRECTION.event_id not in by_id
+    assert _V28_SCOPE_CORRECTION.event_id not in {record["event_id"] for record in pretransition}
+    assert by_id[_V28_SCOPE_CORRECTION.event_id]["corrects_event_id"] == target["event_id"]
     assert _V28_SCOPE_CORRECTION.corrected == (
         "Checkpoint v28's separation of acquisition from integrity failures was incomplete. It "
         "did not validate redirect authority before every hop or preserve the acquisition type "

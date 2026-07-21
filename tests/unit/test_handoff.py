@@ -83,6 +83,19 @@ def _git(repo: Path, *arguments: str) -> str:
     ).stdout.strip()
 
 
+def _v28_scope_pretransition_records() -> tuple[ResearchMemoryRecord, ...]:
+    """Return the exact ledger prefix frozen immediately before the v30 transition."""
+
+    records = load_memory_records(_project_root() / handoff_module._MEMORY_PATH)
+    cutoff = handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SEQUENCE
+    prefix = records[: cutoff + 1]
+    assert len(prefix) == cutoff + 1
+    assert tuple(record.sequence for record in prefix) == tuple(range(cutoff + 1))
+    assert prefix[-1].event_id == handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID
+    assert all(record.event_id != handoff_module.V28_SCOPE_CORRECTION_EVENT_ID for record in prefix)
+    return prefix
+
+
 def _v28_scope_transition_fixture(tmp_path: Path) -> SimpleNamespace:
     repo = tmp_path / "v28-scope-transition"
     subprocess.run(  # noqa: S603 - fixed Git and local test repository source
@@ -109,7 +122,7 @@ def _v28_scope_transition_fixture(tmp_path: Path) -> SimpleNamespace:
     _git(repo, "commit", "--quiet", "--allow-empty", "-m", "correction evidence subject")
     implementation_commit = _git(repo, "rev-parse", "HEAD")
 
-    existing = load_memory_records(_project_root() / handoff_module._MEMORY_PATH)
+    existing = _v28_scope_pretransition_records()
     by_id = {record.event_id: record for record in existing}
     target = by_id[handoff_module.V28_SCOPE_CORRECTION_TARGET_EVENT_ID]
     predecessor = by_id[handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID]
@@ -317,7 +330,7 @@ def _replace_transition_record(
 
 
 def test_v28_scope_correction_verifier_allows_the_exact_pretransition_state() -> None:
-    records = load_memory_records(_project_root() / handoff_module._MEMORY_PATH)
+    records = _v28_scope_pretransition_records()
     by_id = {record.event_id: record for record in records}
     predecessor = by_id[handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID]
 
@@ -350,7 +363,7 @@ def test_v28_scope_correction_verifier_rejects_historical_v29_predecessor_drift(
     field: str,
     value: object,
 ) -> None:
-    records = load_memory_records(_project_root() / handoff_module._MEMORY_PATH)
+    records = _v28_scope_pretransition_records()
     predecessor_id = handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID
     mutated = tuple(
         record.model_copy(update={field: value}) if record.event_id == predecessor_id else record
@@ -368,7 +381,7 @@ def test_v28_scope_correction_verifier_rejects_historical_v29_predecessor_drift(
 
 
 def test_v28_scope_correction_verifier_rejects_a_prospective_id_collision() -> None:
-    records = load_memory_records(_project_root() / handoff_module._MEMORY_PATH)
+    records = _v28_scope_pretransition_records()
     predecessor = records[-1]
     collision = predecessor.model_copy(
         update={
