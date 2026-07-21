@@ -1113,12 +1113,16 @@ class _ArtifactResponse:
     def __init__(self, url: str, payload: bytes) -> None:
         self._url = url
         self._payload = payload
+        self.closed = False
 
     def __enter__(self) -> _ArtifactResponse:
         return self
 
     def __exit__(self, *_args: object) -> None:
-        return None
+        self.close()
+
+    def close(self) -> None:
+        self.closed = True
 
     def geturl(self) -> str:
         return self._url
@@ -1148,7 +1152,11 @@ def test_authenticated_artifact_cache_is_advisory_and_repaired_atomically(
         downloads += 1
         return _ArtifactResponse(url, payload)
 
-    monkeypatch.setattr(mission_module.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(
+        mission_module.urllib.request,
+        "build_opener",
+        lambda *_handlers: SimpleNamespace(open=urlopen),
+    )
     assert (
         mission_module._authenticated_artifact_bytes(
             url=url,

@@ -17,9 +17,11 @@ from typing import NoReturn
 import fieldtrue.runner_trust as runner_trust
 from fieldtrue.canonical import canonical_json_pretty, sha256_bytes
 from fieldtrue.control_protocol import (
+    CONTROL_PRODUCER_FAILURE_CODE,
     CONTROL_PRODUCER_KEY_PATH,
     CONTROL_PRODUCER_PLATFORM_ENVIRONMENT,
     CONTROL_PRODUCER_RECEIPT_PATH,
+    CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE,
     CONTROL_PRODUCER_SNAPSHOT_PATHS,
     MAX_CONTROL_PRODUCER_RESPONSE_BYTES,
     ControlAuthorityError,
@@ -339,6 +341,40 @@ def _run_bounded_producer(
         stderr.close()
 
 
+def _validated_producer_response(
+    completed: subprocess.CompletedProcess[bytes],
+    request: ControlProducerRequest,
+    request_bytes: bytes,
+) -> ControlProducerResponse:
+    if completed.stderr:
+        raise ControlAuthorityError("authenticated producer rejected the request")
+    try:
+        response = ControlProducerResponse.model_validate_json(completed.stdout, strict=True)
+    except ValueError as error:
+        raise ControlAuthorityError("authenticated producer response is invalid") from error
+    if canonical_json_pretty(response) != completed.stdout:
+        raise ControlAuthorityError("authenticated producer response is not canonical")
+    if response.request_id != request.request_id or response.request_sha256 != sha256_bytes(
+        request_bytes
+    ):
+        raise ControlAuthorityError("authenticated producer response differs from the request")
+    if response.status == "rejected":
+        if completed.returncode != 1:
+            raise ControlAuthorityError(
+                "authenticated producer response differs from process status"
+            )
+        if response.failure_code == CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE:
+            raise RunnerAcquisitionError(
+                "authenticated producer runner acquisition could not be completed"
+            )
+        if response.failure_code == CONTROL_PRODUCER_FAILURE_CODE:
+            raise ControlAuthorityError("authenticated producer rejected the request")
+        raise ControlAuthorityError("authenticated producer response failure code is invalid")
+    if completed.returncode != 0:
+        raise ControlAuthorityError("authenticated producer response differs from process status")
+    return response
+
+
 def generate_admission_control_bundle(
     repo_root: Path,
     output_directory: Path,
@@ -398,21 +434,8 @@ def generate_admission_control_bundle(
             request=request_bytes,
             timeout_seconds=total_timeout,
         )
-        if completed.returncode != 0 or completed.stderr:
-            raise ControlAuthorityError("authenticated producer rejected the request")
-        try:
-            response = ControlProducerResponse.model_validate_json(completed.stdout, strict=True)
-        except ValueError as error:
-            raise ControlAuthorityError("authenticated producer response is invalid") from error
-        if canonical_json_pretty(response) != completed.stdout:
-            raise ControlAuthorityError("authenticated producer response is not canonical")
-        if (
-            response.request_id != request.request_id
-            or response.request_sha256 != sha256_bytes(request_bytes)
-            or response.status != "published"
-            or response.execution_commit != commit
-            or response.execution_tree != tree
-        ):
+        response = _validated_producer_response(completed, request, request_bytes)
+        if response.execution_commit != commit or response.execution_tree != tree:
             raise ControlAuthorityError("authenticated producer response differs from the request")
         if _clean_head(repo) != (commit, tree):
             raise ControlAuthorityError("repository identity changed during producer execution")

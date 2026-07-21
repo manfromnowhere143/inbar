@@ -14,6 +14,8 @@ from fieldtrue.domain import FrozenModel, GitObjectId, Identifier, Sha256
 CONTROL_PRODUCER_OPERATION = "generate-iter001-admission-controls"
 CONTROL_PRODUCER_RECEIPT_PATH = ".local/admission-controls/control_suite_receipt.json"
 CONTROL_PRODUCER_KEY_PATH = ".local/keys/iter001-control-fixture.ed25519"
+CONTROL_PRODUCER_FAILURE_CODE = "producer-rejected"
+CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE = "runner-acquisition-incomplete"
 CONTROL_PRODUCER_PLATFORM_ENVIRONMENT = (
     (("__CF_USER_TEXT_ENCODING", f"0x{os.getuid():X}:0:0"),) if sys.platform == "darwin" else ()
 )

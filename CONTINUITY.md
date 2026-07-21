@@ -159,6 +159,32 @@ differences, and an adversarial fixture presents multiple unexpected blockers in
 The handoff and test digests were rebound only after independent fail-closed review. This correction
 changes no mission status, validation threshold, or authority.
 
+A follow-up review found that the v28 implementation did not fully enforce its stated taxonomy.
+The default urllib opener could process an intermediate redirect before the final-URL check, and a
+malformed redirect that raised `ValueError` inside `urlopen` was collapsed into acquisition. The v30
+candidate uses a bounded redirect handler that checks every hop before it is followed, then
+independently rechecks the final URL. A malformed location, malformed authority,
+non-HTTPS hop, non-allowlisted host, user information, explicit port, fragment, or unsigned query is
+a trust rejection; network, TLS, HTTP, timeout, short-body, and redirect-exhaustion conditions remain
+acquisition incomplete. The retained v28 path also deferred downloaded-body length and digest
+classification until after response teardown, so a close failure could replace the primary
+short-body acquisition or wrong-body trust error. The v30 candidate classifies immediately after the
+bounded read and suppresses expected close failures only when preserving an existing primary error;
+a close failure after otherwise exact bytes remains acquisition incomplete. This narrows the
+proposed correction to the v28 checkpoint's mechanism summary; it does not turn that checkpoint or
+the correction into scientific evidence or action authority.
+
+The same review found that an acquisition condition raised while the producer child independently
+reconstructed its runner was previously collapsed into the generic child rejection. The child now
+emits only a fixed non-sensitive acquisition failure code inside its canonical typed response. The
+launcher reconstructs `RunnerAcquisitionError` only for an empty-stderr, exact-request-bound,
+canonical rejection that exits with status 1. A malformed, mismatched, noncanonical, unknown-code,
+zero-status, other-status, or stderr-bearing response remains a generic authority failure. No child
+exception text crosses the process boundary. The published v29 evidence, memory, and generated
+handoff contain no v28 scope-correction claim and remain unchanged. The exact correction is
+prospective for the first successor cycle, v30, after the frozen v29 handoff; neither memory nor
+`HANDOFF.md` is manually amended in this implementation checkpoint.
+
 ## Laboratory falsifiability and the invalid selection comparison
 
 The Amendment 005 causal laboratory cannot produce a negative result. Its mechanisms are separated

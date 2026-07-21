@@ -19,6 +19,7 @@ import zipfile
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import IO, Any
 from urllib.parse import unquote, urlsplit
 
 import certifi
@@ -135,6 +136,175 @@ class RunnerAcquisitionError(RuntimeError):
 
 class RunnerTrustError(RuntimeError):
     """A runner input, artifact, executable, or environment failed closed."""
+
+
+class _AuthenticatedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject an untrusted redirect target before urllib follows the hop."""
+
+    max_repeats = 2
+    max_redirections = 5
+
+    def __init__(
+        self,
+        *,
+        allowed_hosts: frozenset[str],
+        signed_query_hosts: frozenset[str],
+    ) -> None:
+        super().__init__()
+        self._allowed_hosts = allowed_hosts
+        self._signed_query_hosts = signed_query_hosts
+
+    def http_error_302(
+        self,
+        request: urllib.request.Request,
+        file_pointer: IO[bytes],
+        code: int,
+        message: str,
+        headers: http.client.HTTPMessage,
+    ) -> Any | None:
+        try:
+            if "location" in headers:
+                raw_location = headers["location"]
+            elif "uri" in headers:
+                raw_location = headers["uri"]
+            else:
+                return super().http_error_302(
+                    request,
+                    file_pointer,
+                    code,
+                    message,
+                    headers,
+                )
+            _validate_raw_redirect_location(raw_location)
+            return super().http_error_302(
+                request,
+                file_pointer,
+                code,
+                message,
+                headers,
+            )
+        except (RunnerTrustError, ValueError) as error:
+            with suppress(OSError, ValueError):
+                file_pointer.close()
+            if isinstance(error, RunnerTrustError):
+                raise
+            raise RunnerTrustError(
+                "authenticated artifact redirect authority is invalid"
+            ) from error
+
+    def http_error_301(
+        self,
+        request: urllib.request.Request,
+        file_pointer: IO[bytes],
+        code: int,
+        message: str,
+        headers: http.client.HTTPMessage,
+    ) -> Any | None:
+        return self.http_error_302(request, file_pointer, code, message, headers)
+
+    def http_error_303(
+        self,
+        request: urllib.request.Request,
+        file_pointer: IO[bytes],
+        code: int,
+        message: str,
+        headers: http.client.HTTPMessage,
+    ) -> Any | None:
+        return self.http_error_302(request, file_pointer, code, message, headers)
+
+    def http_error_307(
+        self,
+        request: urllib.request.Request,
+        file_pointer: IO[bytes],
+        code: int,
+        message: str,
+        headers: http.client.HTTPMessage,
+    ) -> Any | None:
+        return self.http_error_302(request, file_pointer, code, message, headers)
+
+    def http_error_308(
+        self,
+        request: urllib.request.Request,
+        file_pointer: IO[bytes],
+        code: int,
+        message: str,
+        headers: http.client.HTTPMessage,
+    ) -> Any | None:
+        return self.http_error_302(request, file_pointer, code, message, headers)
+
+    def redirect_request(
+        self,
+        request: urllib.request.Request,
+        file_pointer: Any,
+        code: int,
+        message: str,
+        headers: Any,
+        new_url: str,
+    ) -> urllib.request.Request | None:
+        _validate_redirect_target(
+            new_url,
+            allowed_hosts=self._allowed_hosts,
+            signed_query_hosts=self._signed_query_hosts,
+        )
+        return super().redirect_request(
+            request,
+            file_pointer,
+            code,
+            message,
+            headers,
+            new_url,
+        )
+
+
+def _validate_raw_redirect_location(location: object) -> None:
+    if (
+        not isinstance(location, str)
+        or not location
+        or location != location.strip()
+        or location.startswith("://")
+        or any(not 0x21 <= ord(character) <= 0x7E for character in location)
+    ):
+        raise RunnerTrustError("authenticated artifact redirect authority is invalid")
+    try:
+        parsed = urlsplit(location)
+    except ValueError as error:
+        raise RunnerTrustError("authenticated artifact redirect authority is invalid") from error
+    if parsed.scheme and parsed.scheme != "https":
+        raise RunnerTrustError("authenticated artifact redirect authority is invalid")
+
+
+def _validate_redirect_target(
+    url: str,
+    *,
+    allowed_hosts: frozenset[str],
+    signed_query_hosts: frozenset[str],
+) -> None:
+    try:
+        parsed = urlsplit(url)
+        authority_is_well_formed = (
+            parsed.scheme == "https"
+            and parsed.hostname is not None
+            and parsed.port is None
+            and ":" not in parsed.netloc.rsplit("@", 1)[-1]
+            and parsed.username is None
+            and parsed.password is None
+            and not parsed.fragment
+        )
+    except (TypeError, ValueError) as error:
+        raise RunnerTrustError("authenticated artifact redirect authority is invalid") from error
+    if not authority_is_well_formed:
+        raise RunnerTrustError("authenticated artifact redirect authority is invalid")
+    if parsed.hostname not in allowed_hosts or (
+        parsed.query and parsed.hostname not in signed_query_hosts
+    ):
+        raise RunnerTrustError("authenticated artifact redirected across authority")
+
+
+def _close_error_response(error: BaseException) -> None:
+    close = getattr(error, "close", None)
+    if callable(close):
+        with suppress(OSError, ValueError, http.client.HTTPException):
+            close()
 
 
 @dataclass(frozen=True)
@@ -728,6 +898,8 @@ def authenticated_artifact_bytes(
 ) -> bytes:
     """Load immutable artifact bytes while treating every persistent cache byte as hostile."""
 
+    if not url or any(not 0x21 <= ord(character) <= 0x7E for character in url):
+        raise RunnerTrustError("authenticated artifact URL is invalid")
     try:
         parsed = urlsplit(url)
         encoded_filename = PurePosixPath(parsed.path).name
@@ -736,14 +908,16 @@ def authenticated_artifact_bytes(
             parsed.scheme == "https"
             and parsed.hostname is not None
             and parsed.port is None
+            and ":" not in parsed.netloc.rsplit("@", 1)[-1]
             and parsed.username is None
             and parsed.password is None
         )
     except ValueError as error:
         raise RunnerTrustError("artifact URL authority is invalid") from error
+    if not valid_authority:
+        raise RunnerTrustError("artifact URL authority is invalid")
     if (
-        not valid_authority
-        or parsed.query
+        parsed.query
         or parsed.fragment
         or "/" in filename
         or "\\" in filename
@@ -754,7 +928,11 @@ def authenticated_artifact_bytes(
         or re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}", cache_namespace) is None
     ):
         raise RunnerTrustError("authenticated artifact contract is invalid")
-    redirect_hosts = allowed_redirect_hosts or frozenset({str(parsed.hostname)})
+    redirect_hosts = (
+        frozenset({str(parsed.hostname)})
+        if allowed_redirect_hosts is None
+        else allowed_redirect_hosts
+    )
     if (
         not redirect_hosts
         or any(
@@ -781,48 +959,63 @@ def authenticated_artifact_bytes(
     try:
         context = ssl.create_default_context(cafile=certifi.where())
         context.minimum_version = ssl.TLSVersion.TLSv1_2
-    except OSError as error:
+    except (OSError, ValueError) as error:
         raise RunnerAcquisitionError(
             "authenticated artifact acquisition could not be initialized"
         ) from error
     try:
-        response = urllib.request.urlopen(  # noqa: S310 - URL authority and digest are frozen above
-            url,
-            context=context,
-            timeout=download_timeout_seconds,
+        redirect_handler = _AuthenticatedRedirectHandler(
+            allowed_hosts=redirect_hosts,
+            signed_query_hosts=signed_query_redirect_hosts,
+        )
+        opener = urllib.request.build_opener(
+            redirect_handler,
+            urllib.request.HTTPSHandler(context=context),
         )
     except (OSError, ValueError, http.client.HTTPException) as error:
+        raise RunnerAcquisitionError(
+            "authenticated artifact acquisition could not be initialized"
+        ) from error
+    try:
+        response = opener.open(url, timeout=download_timeout_seconds)
+    except (OSError, ValueError, http.client.HTTPException) as error:
+        _close_error_response(error)
         raise RunnerAcquisitionError(
             "authenticated artifact acquisition could not be completed"
         ) from error
     try:
-        with response:
-            try:
-                final = urlsplit(response.geturl())
-                final_authority_is_valid = (
-                    final.scheme == "https"
-                    and final.hostname in redirect_hosts
-                    and final.port is None
-                    and final.username is None
-                    and final.password is None
-                    and not final.fragment
-                    and (not final.query or final.hostname in signed_query_redirect_hosts)
-                )
-            except ValueError as error:
-                raise RunnerTrustError(
-                    "authenticated artifact redirect authority is invalid"
-                ) from error
-            if not final_authority_is_valid:
-                raise RunnerTrustError("authenticated artifact redirected across authority")
-            downloaded = bytes(response.read(expected_size + 1))
-    except (OSError, http.client.HTTPException) as error:
+        try:
+            final_url = response.geturl()
+        except ValueError as error:
+            raise RunnerTrustError(
+                "authenticated artifact redirect authority is invalid"
+            ) from error
+        _validate_redirect_target(
+            final_url,
+            allowed_hosts=redirect_hosts,
+            signed_query_hosts=signed_query_redirect_hosts,
+        )
+        downloaded = bytes(response.read(expected_size + 1))
+        if len(downloaded) < expected_size:
+            raise RunnerAcquisitionError(
+                "authenticated artifact acquisition could not be completed"
+            )
+        if len(downloaded) > expected_size or sha256_bytes(downloaded) != expected_sha256:
+            raise RunnerTrustError("authenticated artifact bytes differ from the frozen digest")
+    except (RunnerTrustError, RunnerAcquisitionError):
+        _close_error_response(response)
+        raise
+    except (OSError, ValueError, http.client.HTTPException) as error:
+        _close_error_response(response)
         raise RunnerAcquisitionError(
             "authenticated artifact acquisition could not be completed"
         ) from error
-    if len(downloaded) < expected_size:
-        raise RunnerAcquisitionError("authenticated artifact acquisition could not be completed")
-    if len(downloaded) > expected_size or sha256_bytes(downloaded) != expected_sha256:
-        raise RunnerTrustError("authenticated artifact bytes differ from the frozen digest")
+    try:
+        response.close()
+    except (OSError, ValueError, http.client.HTTPException) as error:
+        raise RunnerAcquisitionError(
+            "authenticated artifact acquisition could not be completed"
+        ) from error
 
     temporary = namespace / f".{expected_sha256}.{secrets.token_hex(16)}.tmp"
     descriptor: int | None = None
@@ -847,7 +1040,8 @@ def authenticated_artifact_bytes(
         raise RunnerTrustError("authenticated artifact cache write failed") from error
     finally:
         if descriptor is not None:
-            os.close(descriptor)
+            with suppress(OSError):
+                os.close(descriptor)
         with suppress(OSError):
             temporary.unlink(missing_ok=True)
     if (

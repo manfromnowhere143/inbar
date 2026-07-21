@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import email.message
 import hashlib
 import http.client
 import io
@@ -8,7 +9,10 @@ import os
 import stat
 import subprocess
 import tomllib
+import urllib.request
+import urllib.response
 import zipfile
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,18 +27,95 @@ class _Response:
     def __init__(self, data: bytes, final_url: str) -> None:
         self._data = data
         self._final_url = final_url
+        self.closed = False
 
     def __enter__(self) -> _Response:
         return self
 
     def __exit__(self, *_args: object) -> None:
-        return None
+        self.close()
+
+    def close(self) -> None:
+        self.closed = True
 
     def geturl(self) -> str:
         return self._final_url
 
     def read(self, maximum: int) -> bytes:
         return self._data[:maximum]
+
+
+def _patch_artifact_open(
+    monkeypatch: pytest.MonkeyPatch,
+    callback: Callable[..., Any],
+) -> None:
+    class StubOpener:
+        def open(self, *args: Any, **kwargs: Any) -> Any:
+            return callback(*args, **kwargs)
+
+    monkeypatch.setattr(
+        trust.urllib.request,
+        "build_opener",
+        lambda *_handlers: StubOpener(),
+    )
+
+
+class _RedirectSequenceHandler(urllib.request.BaseHandler):
+    handler_order = 100
+
+    def __init__(
+        self,
+        responses: tuple[str | bytes, ...],
+        *,
+        redirect_status: int = 302,
+    ) -> None:
+        self.responses = list(responses)
+        self.requested_urls: list[str] = []
+        self.opened_responses: list[urllib.response.addinfourl] = []
+        self.redirect_status = redirect_status
+
+    def https_open(self, request: urllib.request.Request) -> Any:
+        self.requested_urls.append(request.full_url)
+        if not self.responses:
+            raise AssertionError("redirect fixture received an unexpected request")
+        response = self.responses.pop(0)
+        headers = email.message.Message()
+        if isinstance(response, str):
+            headers["Location"] = response
+            opened = urllib.response.addinfourl(
+                io.BytesIO(),
+                headers,
+                request.full_url,
+                self.redirect_status,
+            )
+            opened.msg = "Found"
+            self.opened_responses.append(opened)
+            return opened
+        opened = urllib.response.addinfourl(
+            io.BytesIO(response),
+            headers,
+            request.full_url,
+            200,
+        )
+        opened.msg = "OK"
+        self.opened_responses.append(opened)
+        return opened
+
+
+def _patch_redirect_sequence(
+    monkeypatch: pytest.MonkeyPatch,
+    responses: tuple[str | bytes, ...],
+    *,
+    redirect_status: int = 302,
+) -> _RedirectSequenceHandler:
+    real_build_opener = urllib.request.build_opener
+    transport = _RedirectSequenceHandler(responses, redirect_status=redirect_status)
+    monkeypatch.setattr(
+        trust.urllib.request,
+        "build_opener",
+        lambda *handlers: real_build_opener(transport, *handlers),
+    )
+    return transport
 
 
 def _executable_binding(path: Path) -> trust.ExecutableBinding:
@@ -112,11 +193,7 @@ def test_hostile_artifact_cache_is_rehashed_and_never_executed_as_trust(
     cache_path = namespace / f"{digest}-artifact.whl"
     cache_path.write_bytes(b"hostile-cache-bytes")
     url = "https://files.pythonhosted.org/packages/artifact.whl"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: _Response(data, url),
-    )
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: _Response(data, url))
 
     observed = trust.authenticated_artifact_bytes(
         url=url,
@@ -133,7 +210,7 @@ def test_hostile_artifact_cache_is_rehashed_and_never_executed_as_trust(
     def offline(*_args: Any, **_kwargs: Any) -> Any:
         raise OSError("network unavailable")
 
-    monkeypatch.setattr(trust.urllib.request, "urlopen", offline)
+    _patch_artifact_open(monkeypatch, offline)
     with pytest.raises(
         trust.RunnerAcquisitionError,
         match="acquisition could not be completed",
@@ -150,17 +227,22 @@ def test_hostile_artifact_cache_is_rehashed_and_never_executed_as_trust(
 
 @pytest.mark.parametrize(
     "failure",
-    [OSError("network unavailable"), TimeoutError("network timed out")],
+    [
+        OSError("network unavailable"),
+        TimeoutError("network timed out"),
+        http.client.BadStatusLine("invalid HTTP status"),
+        ValueError("proxy configuration unavailable"),
+    ],
 )
 def test_authenticated_artifact_transport_failures_are_acquisition_not_trust(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    failure: OSError,
+    failure: OSError | ValueError | http.client.HTTPException,
 ) -> None:
     def unavailable(*_args: Any, **_kwargs: Any) -> Any:
         raise failure
 
-    monkeypatch.setattr(trust.urllib.request, "urlopen", unavailable)
+    _patch_artifact_open(monkeypatch, unavailable)
     with pytest.raises(
         trust.RunnerAcquisitionError,
         match="acquisition could not be completed",
@@ -175,12 +257,44 @@ def test_authenticated_artifact_transport_failures_are_acquisition_not_trust(
     assert not isinstance(caught.value, trust.RunnerTrustError)
 
 
+@pytest.mark.parametrize(
+    "failure",
+    [OSError("opener unavailable"), ValueError("proxy configuration unavailable")],
+)
+def test_authenticated_artifact_opener_initialization_failures_are_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: OSError | ValueError,
+) -> None:
+    def unavailable(*_args: Any, **_kwargs: Any) -> Any:
+        raise failure
+
+    monkeypatch.setattr(trust.urllib.request, "build_opener", unavailable)
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="acquisition could not be initialized",
+    ) as caught:
+        trust.authenticated_artifact_bytes(
+            url="https://files.pythonhosted.org/packages/artifact.whl",
+            expected_sha256="a" * 64,
+            expected_size=1,
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [OSError("CA store unavailable"), ValueError("TLS floor unavailable")],
+)
 def test_authenticated_artifact_tls_initialization_failure_is_acquisition_not_trust(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    failure: OSError | ValueError,
 ) -> None:
     def unavailable(*_args: Any, **_kwargs: Any) -> Any:
-        raise OSError("CA store unavailable")
+        raise failure
 
     monkeypatch.setattr(trust.ssl, "create_default_context", unavailable)
     with pytest.raises(
@@ -208,11 +322,7 @@ def test_authenticated_artifact_incomplete_read_is_acquisition_not_trust(
         raise http.client.IncompleteRead(b"", 1)
 
     monkeypatch.setattr(response, "read", incomplete)
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: response,
-    )
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: response)
     with pytest.raises(
         trust.RunnerAcquisitionError,
         match="acquisition could not be completed",
@@ -235,11 +345,7 @@ def test_cold_github_redirect_is_explicit_and_percent_encoded_name_is_decoded(
     digest = hashlib.sha256(data).hexdigest()
     origin = "https://github.com/releases/python%2Bbuild.tar.gz"
     final = "https://release-assets.githubusercontent.com/asset/python.tar.gz?sig=frozen-hop"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: _Response(data, final),
-    )
+    transport = _patch_redirect_sequence(monkeypatch, (final, data))
 
     observed = trust.authenticated_artifact_bytes(
         url=origin,
@@ -251,21 +357,138 @@ def test_cold_github_redirect_is_explicit_and_percent_encoded_name_is_decoded(
         signed_query_redirect_hosts=frozenset({"release-assets.githubusercontent.com"}),
     )
     assert observed == data
+    assert transport.requested_urls == [origin, final]
     assert (tmp_path / "cache" / "20260623" / f"{digest}-python+build.tar.gz").read_bytes() == data
+
+
+@pytest.mark.parametrize("redirect_status", [301, 302, 303, 307, 308])
+def test_same_host_redirect_is_validated_before_follow(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    redirect_status: int,
+) -> None:
+    data = b"pinned-artifact"
+    origin = "https://files.pythonhosted.org/packages/origin.whl"
+    final = "https://files.pythonhosted.org/packages/final.whl"
+    transport = _patch_redirect_sequence(
+        monkeypatch,
+        (final, data),
+        redirect_status=redirect_status,
+    )
+
+    observed = trust.authenticated_artifact_bytes(
+        url=origin,
+        expected_sha256=hashlib.sha256(data).hexdigest(),
+        expected_size=len(data),
+        cache_root=tmp_path / "cache",
+        cache_namespace="lock",
+    )
+
+    assert observed == data
+    assert transport.requested_urls == [origin, final]
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "://bad",
+        "https://files.pythonhosted.org:invalid/artifact.whl",
+        "https://[invalid/artifact.whl",
+        "http://files.pythonhosted.org/artifact.whl",
+        "gopher://files.pythonhosted.org/artifact.whl",
+        "https://forbidden.example/artifact.whl",
+        "https://user@files.pythonhosted.org/artifact.whl",
+        "https://files.pythonhosted.org:443/artifact.whl",
+        "https://files.pythonhosted.org:/artifact.whl",
+        "https://files.pythonhosted.org/artifact.whl#fragment",
+        "https://files.pythonhosted.org/artifact.whl?unsigned=query",
+        "https://files.pythonhosted.org/a b.whl",
+        "https://files.pythonhosted.org/☃.whl",
+    ],
+)
+def test_redirect_hop_is_rejected_before_follow_and_cannot_return_to_allowlist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    location: str,
+) -> None:
+    data = b"pinned-artifact"
+    origin = "https://files.pythonhosted.org/packages/artifact.whl"
+    transport = _patch_redirect_sequence(monkeypatch, (location, origin, data))
 
     with pytest.raises(
         trust.RunnerTrustError,
-        match="redirected across authority",
+        match="redirect",
     ) as caught:
         trust.authenticated_artifact_bytes(
             url=origin,
-            expected_sha256=digest,
+            expected_sha256=hashlib.sha256(data).hexdigest(),
             expected_size=len(data),
-            cache_root=tmp_path / "second-cache",
-            cache_namespace="20260623",
-            allowed_redirect_hosts=frozenset({"github.com"}),
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
         )
     assert not isinstance(caught.value, trust.RunnerAcquisitionError)
+    assert transport.requested_urls == [origin]
+    assert transport.responses == [origin, data]
+    assert len(transport.opened_responses) == 1
+    assert transport.opened_responses[0].closed
+
+
+def test_redirect_count_is_bounded_as_acquisition_incomplete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = b"pinned-artifact"
+    origin = "https://files.pythonhosted.org/packages/origin.whl"
+    redirects = tuple(
+        f"https://files.pythonhosted.org/packages/hop-{index}.whl" for index in range(6)
+    )
+    transport = _patch_redirect_sequence(monkeypatch, (*redirects, data))
+
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="acquisition could not be completed",
+    ) as caught:
+        trust.authenticated_artifact_bytes(
+            url=origin,
+            expected_sha256=hashlib.sha256(data).hexdigest(),
+            expected_size=len(data),
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+    assert transport.requested_urls == [origin, *redirects[:5]]
+    assert all(response.closed for response in transport.opened_responses)
+
+
+def test_redirect_handler_converts_internal_url_resolution_failure_to_closed_trust_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def malformed_resolution(*_args: Any, **_kwargs: Any) -> Any:
+        raise ValueError("redirect resolution failed")
+
+    monkeypatch.setattr(
+        urllib.request.HTTPRedirectHandler,
+        "http_error_302",
+        malformed_resolution,
+    )
+    handler = trust._AuthenticatedRedirectHandler(
+        allowed_hosts=frozenset({"files.pythonhosted.org"}),
+        signed_query_hosts=frozenset(),
+    )
+    headers = email.message.Message()
+    headers["Location"] = "https://files.pythonhosted.org/final.whl"
+    response = urllib.response.addinfourl(io.BytesIO(), headers, "https://origin.invalid", 302)
+
+    with pytest.raises(trust.RunnerTrustError, match="redirect authority is invalid"):
+        handler.http_error_302(
+            urllib.request.Request("https://files.pythonhosted.org/origin.whl"),
+            response,
+            302,
+            "Found",
+            headers,
+        )
+
+    assert response.closed
 
 
 def test_malformed_final_redirect_authority_is_trust_not_acquisition(
@@ -274,9 +497,8 @@ def test_malformed_final_redirect_authority_is_trust_not_acquisition(
 ) -> None:
     data = b"pinned-artifact"
     origin = "https://files.pythonhosted.org/packages/artifact.whl"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
+    _patch_artifact_open(
+        monkeypatch,
         lambda *_args, **_kwargs: _Response(
             data,
             "https://files.pythonhosted.org:invalid/artifact.whl",
@@ -297,7 +519,47 @@ def test_malformed_final_redirect_authority_is_trust_not_acquisition(
     assert not isinstance(caught.value, trust.RunnerAcquisitionError)
 
 
-def test_malformed_redirect_policy_is_rejected_before_warm_cache_return(tmp_path: Path) -> None:
+def test_redirect_trust_rejection_survives_response_teardown_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class TeardownFailureResponse(_Response):
+        def __init__(self) -> None:
+            super().__init__(b"pinned-artifact", "https://forbidden.example/artifact.whl")
+            self.close_attempted = False
+
+        def close(self) -> None:
+            self.close_attempted = True
+            raise OSError("response teardown failed")
+
+    response = TeardownFailureResponse()
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: response)
+
+    with pytest.raises(trust.RunnerTrustError, match="redirected across authority") as caught:
+        trust.authenticated_artifact_bytes(
+            url="https://files.pythonhosted.org/artifact.whl",
+            expected_sha256=hashlib.sha256(b"pinned-artifact").hexdigest(),
+            expected_size=len(b"pinned-artifact"),
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+
+    assert not isinstance(caught.value, trust.RunnerAcquisitionError)
+    assert response.close_attempted
+
+
+@pytest.mark.parametrize(
+    ("allowed_hosts", "signed_hosts"),
+    [
+        (frozenset(), frozenset()),
+        (frozenset({"files.pythonhosted.org"}), frozenset({"unexpected.example"})),
+    ],
+)
+def test_malformed_redirect_policy_is_rejected_before_warm_cache_return(
+    tmp_path: Path,
+    allowed_hosts: frozenset[str],
+    signed_hosts: frozenset[str],
+) -> None:
     data = b"warm-cache"
     digest = hashlib.sha256(data).hexdigest()
     cache_root = tmp_path / "cache"
@@ -312,20 +574,63 @@ def test_malformed_redirect_policy_is_rejected_before_warm_cache_return(tmp_path
             expected_size=len(data),
             cache_root=cache_root,
             cache_namespace="lock",
-            allowed_redirect_hosts=frozenset({"files.pythonhosted.org"}),
-            signed_query_redirect_hosts=frozenset({"unexpected.example"}),
+            allowed_redirect_hosts=allowed_hosts,
+            signed_query_redirect_hosts=signed_hosts,
         )
 
 
-def test_authenticated_artifact_rejects_malformed_url_authority(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://[malformed/artifact.whl",
+        "https://files.pythonhosted.org:/artifact.whl",
+    ],
+)
+def test_authenticated_artifact_rejects_malformed_url_authority(
+    tmp_path: Path,
+    url: str,
+) -> None:
     with pytest.raises(trust.RunnerTrustError, match="URL authority"):
         trust.authenticated_artifact_bytes(
-            url="https://[malformed/artifact.whl",
+            url=url,
             expected_sha256="a" * 64,
             expected_size=1,
             cache_root=tmp_path / "cache",
             cache_namespace="lock",
         )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://files.pythonhosted.org/a\n/artifact.whl",
+        "https://files.pythonhosted.org/a\r/artifact.whl",
+        "https://files.pythonhosted.org/a\t/artifact.whl",
+        "https://files.pythonhosted.org/a b/artifact.whl",
+        "https://files.pythonhosted.org/☃/artifact.whl",
+        "https://files.pythonhosted.org/Ā/artifact.whl",
+    ],
+)
+def test_authenticated_artifact_rejects_noncanonical_raw_url_bytes(
+    tmp_path: Path,
+    url: str,
+) -> None:
+    with pytest.raises(trust.RunnerTrustError, match="artifact URL is invalid") as caught:
+        trust.authenticated_artifact_bytes(
+            url=url,
+            expected_sha256="a" * 64,
+            expected_size=1,
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+
+    assert not isinstance(caught.value, trust.RunnerAcquisitionError)
+
+
+@pytest.mark.parametrize("location", ["https://example.invalid/a\n", "relative path", "/☃"])
+def test_redirect_location_rejects_noncanonical_raw_characters(location: str) -> None:
+    with pytest.raises(trust.RunnerTrustError, match="redirect authority is invalid"):
+        trust._validate_raw_redirect_location(location)
 
 
 def test_authenticated_artifact_rejects_non_private_cache(
@@ -350,11 +655,7 @@ def test_authenticated_artifact_short_body_is_acquisition_not_trust(
 ) -> None:
     expected = b"expected-bytes"
     url = "https://files.pythonhosted.org/artifact.whl"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: _Response(b"short", url),
-    )
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: _Response(b"short", url))
 
     with pytest.raises(
         trust.RunnerAcquisitionError,
@@ -382,9 +683,8 @@ def test_authenticated_artifact_rejects_oversized_or_wrong_digest_as_trust(
     expected = b"expected-bytes"
     digest = hashlib.sha256(expected).hexdigest()
     url = "https://files.pythonhosted.org/artifact.whl"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
+    _patch_artifact_open(
+        monkeypatch,
         lambda *_args, **_kwargs: _Response(downloaded, url),
     )
 
@@ -399,6 +699,42 @@ def test_authenticated_artifact_rejects_oversized_or_wrong_digest_as_trust(
     assert not isinstance(caught.value, trust.RunnerAcquisitionError)
 
 
+@pytest.mark.parametrize(
+    "downloaded",
+    [b"x" * len(b"expected-bytes"), b"wrong-size-and-digest"],
+)
+def test_wrong_artifact_bytes_remain_trust_when_response_teardown_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    downloaded: bytes,
+) -> None:
+    class DigestAndTeardownFailureResponse(_Response):
+        def __init__(self) -> None:
+            super().__init__(downloaded, "https://files.pythonhosted.org/artifact.whl")
+            self.close_attempted = False
+
+        def close(self) -> None:
+            self.close_attempted = True
+            raise OSError("response teardown failed")
+
+    expected = b"expected-bytes"
+    response = DigestAndTeardownFailureResponse()
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: response)
+
+    with pytest.raises(trust.RunnerTrustError, match="frozen digest") as caught:
+        trust.authenticated_artifact_bytes(
+            url="https://files.pythonhosted.org/artifact.whl",
+            expected_sha256=hashlib.sha256(expected).hexdigest(),
+            expected_size=len(expected),
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+
+    assert not isinstance(caught.value, trust.RunnerAcquisitionError)
+    assert response.close_attempted
+    assert not tuple((tmp_path / "cache" / "lock").iterdir())
+
+
 def test_authenticated_artifact_rejects_zero_progress_cache_write(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -406,11 +742,7 @@ def test_authenticated_artifact_rejects_zero_progress_cache_write(
     data = b"authenticated"
     digest = hashlib.sha256(data).hexdigest()
     url = "https://files.pythonhosted.org/artifact.whl"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: _Response(data, url),
-    )
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: _Response(data, url))
     monkeypatch.setattr(trust.os, "write", lambda _descriptor, _view: 0)
 
     with pytest.raises(trust.RunnerTrustError, match="cache write failed"):
@@ -426,6 +758,36 @@ def test_authenticated_artifact_rejects_zero_progress_cache_write(
     assert not tuple(namespace.glob(".*.tmp"))
 
 
+def test_cache_cleanup_failure_cannot_replace_primary_trust_rejection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = b"authenticated"
+    digest = hashlib.sha256(data).hexdigest()
+    url = "https://files.pythonhosted.org/artifact.whl"
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: _Response(data, url))
+    monkeypatch.setattr(trust.os, "write", lambda _descriptor, _view: 0)
+    real_close = trust.os.close
+
+    def close_then_fail(descriptor: int) -> None:
+        real_close(descriptor)
+        raise OSError("descriptor teardown failed")
+
+    monkeypatch.setattr(trust.os, "close", close_then_fail)
+
+    with pytest.raises(trust.RunnerTrustError, match="cache write failed") as caught:
+        trust.authenticated_artifact_bytes(
+            url=url,
+            expected_sha256=digest,
+            expected_size=len(data),
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+
+    assert not isinstance(caught.value, trust.RunnerAcquisitionError)
+    assert not tuple((tmp_path / "cache" / "lock").glob(".*.tmp"))
+
+
 def test_authenticated_artifact_wraps_atomic_cache_replace_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -433,11 +795,7 @@ def test_authenticated_artifact_wraps_atomic_cache_replace_failure(
     data = b"authenticated"
     digest = hashlib.sha256(data).hexdigest()
     url = "https://files.pythonhosted.org/artifact.whl"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: _Response(data, url),
-    )
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: _Response(data, url))
 
     def fail_replace(_source: Path, _destination: Path) -> None:
         raise OSError("replace denied")
@@ -461,11 +819,7 @@ def test_authenticated_artifact_rejects_unstable_persisted_cache(
     data = b"authenticated"
     digest = hashlib.sha256(data).hexdigest()
     url = "https://files.pythonhosted.org/artifact.whl"
-    monkeypatch.setattr(
-        trust.urllib.request,
-        "urlopen",
-        lambda *_args, **_kwargs: _Response(data, url),
-    )
+    _patch_artifact_open(monkeypatch, lambda *_args, **_kwargs: _Response(data, url))
     monkeypatch.setattr(trust, "stable_regular_bytes", lambda *_args, **_kwargs: None)
 
     with pytest.raises(trust.RunnerTrustError, match="did not preserve exact bytes"):
