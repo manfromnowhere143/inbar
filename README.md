@@ -77,9 +77,11 @@ adjudicate the outcome.**
 > structurally cannot carry the salt or the root, one-manifest enforcement across every target, and
 > a reveal check that recomputes both. No real target exists and no gate is closed by it. The
 > existing low-level predictors also still accept
-> caller-supplied local maps, so verified projection is not yet an enforced terminal path: a caller
-> may omit a mapping to manufacture an abstention, or substitute one to obtain a confident wrong
-> answer. A subsequent audit also found that 42 of that module's 71 guards had no test that could
+> caller-supplied local maps: a caller may omit a mapping to manufacture an abstention, or
+> substitute one to obtain a confident wrong answer, which a committed test now demonstrates rather
+> than asserts. `fieldtrue.shortcut_v2_terminal` closes that on the terminal path by taking no
+> local-maps parameter at all and deriving the projection from verified signed artifacts; driving
+> the primitives directly still carries the opening. A subsequent audit also found that 42 of that module's 71 guards had no test that could
 > make them fire, including guards backing fields its assurance report asserts as verified. Every
 > guard is now exercised by a deliberately broken subject, one provably unreachable guard was
 > deleted, and the rule is measured by `scripts/ci/verify_guard_coverage.py` rather than asserted.

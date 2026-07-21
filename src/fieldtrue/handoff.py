@@ -106,6 +106,11 @@ _HANDOFF_ALLOWED_PRELOADED_MODULE_NAMES = frozenset(
         # A retrospective engineering replay, not an authority source. Its tests preload it before
         # handoff tests, so the renderer binds its wrapper bytes without importing or trusting it.
         "fieldtrue.susceptibility_replay",
+        # The terminal prediction boundary, not an authority source: nothing in the renderer's
+        # import closure reaches it, so listing it as authority would assert a module is bound that
+        # is not loaded. Its own tests preload it before handoff tests, so it is captured here as
+        # bound wrapper source rather than bound authority.
+        "fieldtrue.shortcut_v2_terminal",
         "fieldtrue.validation_producer",
     }
 )
