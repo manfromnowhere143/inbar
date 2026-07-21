@@ -192,10 +192,10 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 # can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
 # adequate semantic review boundary.
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
-    "CONTINUITY.md": ("5807b6201dc605560178ca965f4d3cc9c96b85c481763a329c8f81a70e9d7852"),
+    "CONTINUITY.md": ("8dd3f96f50311ee8a0b2cbfea104972442632906dbb2447ec8b672f3c449b192"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
     "README.md": "e1d801acd9d25a131193890825d5c959ebd66965406b06bc15a582fef4edc41e",
-    "docs/ARCHITECTURE.md": ("f504b1c1cbadcc048cdda03691a2efd24a3361c62743aa16b08045209208d9f8"),
+    "docs/ARCHITECTURE.md": ("53dbf9937a588b074e6424c67d73f70fc1ab86c888f902f38544e71dcd3363bc"),
     "docs/CLAIM_BOUNDARIES.md": (
         "dc0105efc9be2fe458142f1709f3fd2552ffed7fc7f1300d6690f3e710244765"
     ),
@@ -307,7 +307,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "f99e8edeaf74d3a24ff4bc51a9674b4edd79f14e3a1c5877993f95546009c427"
     ),
     "tests/unit/test_mission.py": (
-        "f366e097ca75ccdf8df5d212bc9c5d52b02756607b7377a6047e4c6271dda11e"
+        "2b85b2f38b14029d4ee48f849280dfea3182c00dc37e660dabc6695a5a6c78e6"
     ),
     "tests/unit/test_release_contract.py": (
         "e8d6d726eed62f1c4eb004f33ca22813d4ac0be96d7ec153157f7624ade208d1"
@@ -807,7 +807,21 @@ def _verify_credibility_gate_control_registry(repo_root: Path) -> tuple[bool, st
                     False,
                     f"Current credibility-control test changed during verification: {relative}.",
                 )
-    except (GitTrustError, OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+    except subprocess.TimeoutExpired:
+        return (
+            False,
+            "Current credibility-control registry verification timed out; "
+            "credibility trust was not established.",
+        )
+    except GitTrustError as error:
+        if isinstance(error.__cause__, subprocess.TimeoutExpired):
+            return (
+                False,
+                "Current credibility-control registry verification timed out; "
+                "credibility trust was not established.",
+            )
+        return False, "Current credibility-control registry cannot be reconstructed."
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
         return False, "Current credibility-control registry cannot be reconstructed."
     return (
         True,
@@ -1251,6 +1265,12 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
                 != registry_bytes
             ):
                 return False, "Gate control source or registry changed during execution."
+    except runner_trust.RunnerAcquisitionError:
+        return (
+            False,
+            "Gate control runner acquisition could not be completed; "
+            "runner trust was not established.",
+        )
     except (OSError, subprocess.SubprocessError) as error:
         return False, f"Gate control execution failed to run: {type(error).__name__}."
     result = {

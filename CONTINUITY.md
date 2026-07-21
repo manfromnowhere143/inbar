@@ -108,6 +108,28 @@ directory. Only that staged copy is executed or rebound. Its structured self-ver
 match the complete platform identity, including the intentionally absent Linux commit metadata, and
 the staged executable remains covered by the authenticated runner tree digest.
 
+Authenticated-artifact availability and runner integrity are distinct fail-closed conditions.
+Network, timeout, or HTTP-protocol failure before frozen artifact bytes are available raises
+`RunnerAcquisitionError`; validation reports that acquisition did not complete and that runner trust
+was not established. Invalid contracts or redirect authority, forbidden redirects, size or digest
+mismatch, unsafe cache custody, lock drift, executable drift, and environment drift remain
+`RunnerTrustError`. Neither condition permits execution or authority, and an acquisition condition
+is not described as retryable or as evidence that integrity probably passed.
+
+GitHub Actions run `29730569130` attempt 1 had one substantive job failure,
+`quality-contracts`; downstream `ci-gate` consequently failed. The historical registry and
+historical-runner tests failed while 1,650 sibling tests and every compatibility leg passed. Attempt
+2 passed. The GitHub Actions log contains the old collapsed `False` diagnostics, so it cannot prove
+which acquisition or trust subcondition fired. A cold authenticated-artifact path followed by the
+adversarial `HTTPS_PROXY` is a plausible code-level reconstruction of the paired signature, not
+retained transport telemetry. The integrity test no longer poisons proxy reachability because
+transport availability is not lock-integrity evidence. Deterministic broken transports now exercise
+network, timeout, short-body, and incomplete-read acquisition, while separate broken redirects,
+digests, caches, locks, and environments exercise trust rejection. The positive historical-runner
+tests still require live authenticated acquisition on an empty cache; this cycle makes an outage
+diagnostically distinct but does not make that positive path hermetic. This is an engineering
+diagnosis, not scientific evidence or authority.
+
 ## Laboratory falsifiability and the invalid selection comparison
 
 The Amendment 005 causal laboratory cannot produce a negative result. Its mechanisms are separated

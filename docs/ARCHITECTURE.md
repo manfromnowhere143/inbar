@@ -163,6 +163,12 @@ It materializes a clean committed snapshot, prepares the hash-authenticated runn
 typed request, and checks the returned request, commit, tree, and durable receipt-byte bindings. It
 does not import signing code, open a private key, assemble a receipt, or publish authority artifacts.
 
+Runner preparation preserves two distinct fail-closed outcomes. Failure to open or completely read a
+frozen remote artifact is an acquisition condition: no runner trust verdict is made because the
+required bytes were unavailable. A malformed or forbidden redirect, byte-binding mismatch, unsafe
+cache, or runner identity drift is a trust condition. The mission validator and launcher surface the
+acquisition condition separately, but both outcomes refuse execution and grant no approval.
+
 The fixture producer runs as a fresh isolated child under the committed launcher. It checks the exact
 committed snapshot census, distribution inventory, source closure, contract, Git identity, and
 preregistration ancestry and bytes; executes the frozen controls; assembles all signed fields; opens

@@ -1737,3 +1737,13 @@ def test_control_authority_cli_resolves_paths_and_reports_failures(
     monkeypatch.setattr(launcher, "generate_admission_control_bundle", fail_generation)
     with pytest.raises(SystemExit, match="producer failed: deliberate failure"):
         launcher.main(["--repo", str(tmp_path)])
+
+    def fail_acquisition(*_args: Any, **_kwargs: Any) -> Path:
+        raise launcher.RunnerAcquisitionError("fixture network timeout")
+
+    monkeypatch.setattr(launcher, "generate_admission_control_bundle", fail_acquisition)
+    with pytest.raises(
+        SystemExit,
+        match="runner acquisition failed: fixture network timeout",
+    ):
+        launcher.main(["--repo", str(tmp_path)])

@@ -32,6 +32,7 @@ from fieldtrue.runner_trust import (
     MAX_RUNNER_TREE_BYTES,
     MAX_RUNNER_TREE_ENTRIES,
     AuthenticatedRunner,
+    RunnerAcquisitionError,
     RunnerTrustError,
 )
 
@@ -451,6 +452,8 @@ def main(argv: list[str] | None = None) -> int:
             repo / CONTROL_PRODUCER_KEY_PATH,
             timeout_seconds=arguments.timeout_seconds,
         )
+    except RunnerAcquisitionError as error:
+        _die(f"admission-control runner acquisition failed: {error}")
     except (ControlAuthorityError, FileExistsError, OSError, subprocess.SubprocessError) as error:
         _die(f"admission-control producer failed: {error}")
     print(receipt)

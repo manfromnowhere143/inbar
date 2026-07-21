@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -133,7 +134,10 @@ def test_hostile_artifact_cache_is_rehashed_and_never_executed_as_trust(
         raise OSError("network unavailable")
 
     monkeypatch.setattr(trust.urllib.request, "urlopen", offline)
-    with pytest.raises(trust.RunnerTrustError, match="download failed"):
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="acquisition could not be completed",
+    ) as caught:
         trust.authenticated_artifact_bytes(
             url=url,
             expected_sha256=digest,
@@ -141,6 +145,86 @@ def test_hostile_artifact_cache_is_rehashed_and_never_executed_as_trust(
             cache_root=cache_root,
             cache_namespace="lock",
         )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [OSError("network unavailable"), TimeoutError("network timed out")],
+)
+def test_authenticated_artifact_transport_failures_are_acquisition_not_trust(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: OSError,
+) -> None:
+    def unavailable(*_args: Any, **_kwargs: Any) -> Any:
+        raise failure
+
+    monkeypatch.setattr(trust.urllib.request, "urlopen", unavailable)
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="acquisition could not be completed",
+    ) as caught:
+        trust.authenticated_artifact_bytes(
+            url="https://files.pythonhosted.org/packages/artifact.whl",
+            expected_sha256="a" * 64,
+            expected_size=1,
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+
+
+def test_authenticated_artifact_tls_initialization_failure_is_acquisition_not_trust(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("CA store unavailable")
+
+    monkeypatch.setattr(trust.ssl, "create_default_context", unavailable)
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="acquisition could not be initialized",
+    ) as caught:
+        trust.authenticated_artifact_bytes(
+            url="https://files.pythonhosted.org/packages/artifact.whl",
+            expected_sha256="a" * 64,
+            expected_size=1,
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+
+
+def test_authenticated_artifact_incomplete_read_is_acquisition_not_trust(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url = "https://files.pythonhosted.org/packages/artifact.whl"
+    response = _Response(b"", url)
+
+    def incomplete(_maximum: int) -> bytes:
+        raise http.client.IncompleteRead(b"", 1)
+
+    monkeypatch.setattr(response, "read", incomplete)
+    monkeypatch.setattr(
+        trust.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: response,
+    )
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="acquisition could not be completed",
+    ) as caught:
+        trust.authenticated_artifact_bytes(
+            url=url,
+            expected_sha256="a" * 64,
+            expected_size=1,
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
 
 
 def test_cold_github_redirect_is_explicit_and_percent_encoded_name_is_decoded(
@@ -169,7 +253,10 @@ def test_cold_github_redirect_is_explicit_and_percent_encoded_name_is_decoded(
     assert observed == data
     assert (tmp_path / "cache" / "20260623" / f"{digest}-python+build.tar.gz").read_bytes() == data
 
-    with pytest.raises(trust.RunnerTrustError, match="redirected across authority"):
+    with pytest.raises(
+        trust.RunnerTrustError,
+        match="redirected across authority",
+    ) as caught:
         trust.authenticated_artifact_bytes(
             url=origin,
             expected_sha256=digest,
@@ -178,6 +265,36 @@ def test_cold_github_redirect_is_explicit_and_percent_encoded_name_is_decoded(
             cache_namespace="20260623",
             allowed_redirect_hosts=frozenset({"github.com"}),
         )
+    assert not isinstance(caught.value, trust.RunnerAcquisitionError)
+
+
+def test_malformed_final_redirect_authority_is_trust_not_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data = b"pinned-artifact"
+    origin = "https://files.pythonhosted.org/packages/artifact.whl"
+    monkeypatch.setattr(
+        trust.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: _Response(
+            data,
+            "https://files.pythonhosted.org:invalid/artifact.whl",
+        ),
+    )
+
+    with pytest.raises(
+        trust.RunnerTrustError,
+        match="redirect authority is invalid",
+    ) as caught:
+        trust.authenticated_artifact_bytes(
+            url=origin,
+            expected_sha256=hashlib.sha256(data).hexdigest(),
+            expected_size=len(data),
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+    assert not isinstance(caught.value, trust.RunnerAcquisitionError)
 
 
 def test_malformed_redirect_policy_is_rejected_before_warm_cache_return(tmp_path: Path) -> None:
@@ -227,8 +344,37 @@ def test_authenticated_artifact_rejects_non_private_cache(
         )
 
 
-@pytest.mark.parametrize("downloaded", [b"short", b"wrong-size-and-digest"])
-def test_authenticated_artifact_rejects_downloaded_bytes_outside_frozen_binding(
+def test_authenticated_artifact_short_body_is_acquisition_not_trust(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = b"expected-bytes"
+    url = "https://files.pythonhosted.org/artifact.whl"
+    monkeypatch.setattr(
+        trust.urllib.request,
+        "urlopen",
+        lambda *_args, **_kwargs: _Response(b"short", url),
+    )
+
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="acquisition could not be completed",
+    ) as caught:
+        trust.authenticated_artifact_bytes(
+            url=url,
+            expected_sha256=hashlib.sha256(expected).hexdigest(),
+            expected_size=len(expected),
+            cache_root=tmp_path / "cache",
+            cache_namespace="lock",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+
+
+@pytest.mark.parametrize(
+    "downloaded",
+    [b"x" * len(b"expected-bytes"), b"wrong-size-and-digest"],
+)
+def test_authenticated_artifact_rejects_oversized_or_wrong_digest_as_trust(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     downloaded: bytes,
@@ -242,7 +388,7 @@ def test_authenticated_artifact_rejects_downloaded_bytes_outside_frozen_binding(
         lambda *_args, **_kwargs: _Response(downloaded, url),
     )
 
-    with pytest.raises(trust.RunnerTrustError, match="frozen digest"):
+    with pytest.raises(trust.RunnerTrustError, match="frozen digest") as caught:
         trust.authenticated_artifact_bytes(
             url=url,
             expected_sha256=digest,
@@ -250,6 +396,7 @@ def test_authenticated_artifact_rejects_downloaded_bytes_outside_frozen_binding(
             cache_root=tmp_path / "cache",
             cache_namespace="lock",
         )
+    assert not isinstance(caught.value, trust.RunnerAcquisitionError)
 
 
 def test_authenticated_artifact_rejects_zero_progress_cache_write(
@@ -801,6 +948,105 @@ def test_python_artifact_pins_are_complete_for_supported_platforms() -> None:
     assert set(trust.PINNED_UV_COMMIT_INFO) == supported
 
 
+def test_offline_pinned_python_install_timeout_is_acquisition_not_trust(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bindings = _directory_runner(tmp_path / "bindings")
+    root = tmp_path / "install"
+    root.mkdir(mode=0o700)
+    monkeypatch.setattr(
+        trust,
+        "authenticated_artifact_bytes",
+        lambda **_kwargs: b"authenticated-python-archive",
+    )
+    monkeypatch.setattr(trust, "host_tool_binding", lambda: bindings.host_tool)
+    monkeypatch.setattr(
+        trust,
+        "resolve_pinned_uv",
+        lambda *_args, **_kwargs: bindings.uv,
+    )
+
+    def timeout(*_args: Any, **_kwargs: Any) -> Any:
+        raise subprocess.TimeoutExpired(cmd="uv python install", timeout=120)
+
+    monkeypatch.setattr(trust.subprocess, "run", timeout)
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="offline pinned Python installation timed out",
+    ) as caught:
+        trust._install_pinned_python(
+            root,
+            uv=bindings.uv,
+            artifact_cache_root=tmp_path / "artifact-cache",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+
+
+def test_authenticated_runner_import_probe_timeout_is_acquisition_not_trust(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bindings = _directory_runner(tmp_path / "bindings")
+    root = tmp_path / "subject"
+    snapshot = root / "snapshot"
+    snapshot.mkdir(mode=0o700, parents=True)
+    root.chmod(0o700)
+    snapshot.chmod(0o700)
+    snapshot.joinpath("uv.lock").write_text("version = 1\n", encoding="utf-8")
+    interpreter_root = root / "python-install" / "target"
+    python_path = interpreter_root / "bin" / "python3.12"
+    python_path.parent.mkdir(mode=0o700, parents=True)
+    python_path.write_bytes(b"python")
+    scratch_root = root / "runner-scratch"
+    scratch_root.mkdir(mode=0o700)
+    python_binding = _executable_binding(python_path)
+
+    monkeypatch.setattr(trust, "stage_pinned_uv", lambda _root: bindings.uv)
+    monkeypatch.setattr(
+        trust,
+        "resolve_locked_wheels",
+        lambda *_args, **_kwargs: (),
+    )
+    monkeypatch.setattr(
+        trust,
+        "_install_pinned_python",
+        lambda *_args, **_kwargs: (
+            interpreter_root,
+            python_path,
+            scratch_root,
+            "a" * 64,
+            bindings.host_tool,
+        ),
+    )
+
+    def extract(_artifacts: object, site_packages: Path) -> None:
+        site_packages.mkdir(mode=0o700)
+
+    monkeypatch.setattr(trust, "extract_authenticated_wheels", extract)
+    monkeypatch.setattr(
+        trust,
+        "bind_executable",
+        lambda path, **_kwargs: python_binding if path == python_path else None,
+    )
+
+    def timeout(*_args: Any, **_kwargs: Any) -> Any:
+        raise subprocess.TimeoutExpired(cmd="authenticated import probe", timeout=30)
+
+    monkeypatch.setattr(trust.subprocess, "run", timeout)
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="authenticated runner import probe timed out",
+    ) as caught:
+        trust.prepare_authenticated_runner(
+            root,
+            snapshot,
+            root_distributions=frozenset({"pytest"}),
+            artifact_cache_root=tmp_path / "artifact-cache",
+        )
+    assert not isinstance(caught.value, trust.RunnerTrustError)
+
+
 def test_runner_distribution_version_is_canonical_and_unique(tmp_path: Path) -> None:
     runner = _directory_runner(tmp_path)
     assert runner.distribution_version("PyTest") == "test"
@@ -886,8 +1132,12 @@ def test_resolve_pinned_uv_fails_closed_across_platform_process_and_rebind(
         raise subprocess.TimeoutExpired("uv", 10)
 
     monkeypatch.setattr(trust.subprocess, "run", fail_run)
-    with pytest.raises(trust.RunnerTrustError, match="version identity"):
+    with pytest.raises(
+        trust.RunnerAcquisitionError,
+        match="version identity verification timed out",
+    ) as caught:
         trust.resolve_pinned_uv(candidate)
+    assert not isinstance(caught.value, trust.RunnerTrustError)
 
     completed = subprocess.CompletedProcess(
         args=(str(candidate), "self", "version", "--output-format", "json"),

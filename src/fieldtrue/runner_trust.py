@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import os
@@ -126,6 +127,10 @@ PINNED_UV_COMMIT_INFO: dict[tuple[str, str], dict[str, object] | None] = {
     ("linux", "aarch64"): None,
     ("linux", "x86_64"): None,
 }
+
+
+class RunnerAcquisitionError(RuntimeError):
+    """Runner acquisition or authenticated preparation did not complete; trust is unknown."""
 
 
 class RunnerTrustError(RuntimeError):
@@ -569,6 +574,8 @@ def resolve_pinned_uv(
             env={"HOME": "/nonexistent", "LC_ALL": "C", "PATH": os.defpath},
             timeout=10,
         )
+    except subprocess.TimeoutExpired as error:
+        raise RunnerAcquisitionError("uv version identity verification timed out") from error
     except (OSError, subprocess.SubprocessError) as error:
         raise RunnerTrustError("uv version identity cannot be verified") from error
     try:
@@ -771,29 +778,50 @@ def authenticated_artifact_bytes(
     ):
         return cached
 
-    context = ssl.create_default_context(cafile=certifi.where())
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
     try:
-        with urllib.request.urlopen(  # noqa: S310 - URL authority and digest are frozen above
+        context = ssl.create_default_context(cafile=certifi.where())
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+    except OSError as error:
+        raise RunnerAcquisitionError(
+            "authenticated artifact acquisition could not be initialized"
+        ) from error
+    try:
+        response = urllib.request.urlopen(  # noqa: S310 - URL authority and digest are frozen above
             url,
             context=context,
             timeout=download_timeout_seconds,
-        ) as response:
-            final = urlsplit(response.geturl())
-            if (
-                final.scheme != "https"
-                or final.hostname not in redirect_hosts
-                or final.port is not None
-                or final.username is not None
-                or final.password is not None
-                or final.fragment
-                or (final.query and final.hostname not in signed_query_redirect_hosts)
-            ):
+        )
+    except (OSError, ValueError, http.client.HTTPException) as error:
+        raise RunnerAcquisitionError(
+            "authenticated artifact acquisition could not be completed"
+        ) from error
+    try:
+        with response:
+            try:
+                final = urlsplit(response.geturl())
+                final_authority_is_valid = (
+                    final.scheme == "https"
+                    and final.hostname in redirect_hosts
+                    and final.port is None
+                    and final.username is None
+                    and final.password is None
+                    and not final.fragment
+                    and (not final.query or final.hostname in signed_query_redirect_hosts)
+                )
+            except ValueError as error:
+                raise RunnerTrustError(
+                    "authenticated artifact redirect authority is invalid"
+                ) from error
+            if not final_authority_is_valid:
                 raise RunnerTrustError("authenticated artifact redirected across authority")
             downloaded = bytes(response.read(expected_size + 1))
-    except (OSError, ValueError) as error:
-        raise RunnerTrustError("authenticated artifact download failed") from error
-    if len(downloaded) != expected_size or sha256_bytes(downloaded) != expected_sha256:
+    except (OSError, http.client.HTTPException) as error:
+        raise RunnerAcquisitionError(
+            "authenticated artifact acquisition could not be completed"
+        ) from error
+    if len(downloaded) < expected_size:
+        raise RunnerAcquisitionError("authenticated artifact acquisition could not be completed")
+    if len(downloaded) > expected_size or sha256_bytes(downloaded) != expected_sha256:
         raise RunnerTrustError("authenticated artifact bytes differ from the frozen digest")
 
     temporary = namespace / f".{expected_sha256}.{secrets.token_hex(16)}.tmp"
@@ -1594,6 +1622,8 @@ def _install_pinned_python(
             env=environment,
             timeout=120,
         )
+    except subprocess.TimeoutExpired as error:
+        raise RunnerAcquisitionError("offline pinned Python installation timed out") from error
     except (OSError, subprocess.SubprocessError) as error:
         raise RunnerTrustError("offline pinned Python installation failed") from error
     if (
@@ -1798,11 +1828,9 @@ def prepare_authenticated_runner(
         )
         identity = json.loads(probe_output.stdout)
         expected_prefix = str(interpreter_root.resolve(strict=True))
-    except (
-        OSError,
-        subprocess.SubprocessError,
-        json.JSONDecodeError,
-    ) as error:
+    except subprocess.TimeoutExpired as error:
+        raise RunnerAcquisitionError("authenticated runner import probe timed out") from error
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
         raise RunnerTrustError("authenticated runner import probe failed") from error
     if (
         not isinstance(identity, dict)

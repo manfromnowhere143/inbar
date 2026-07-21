@@ -1048,7 +1048,7 @@ def test_gate_control_runner_is_bound_to_the_historical_lock(
     monkeypatch.setenv("UV_PYTHON_DOWNLOADS_JSON_URL", "file:///tmp/hostile-python.json")
     monkeypatch.setenv("UV_PYTHON_INSTALL_MIRROR", "file:///tmp/hostile-mirror")
     monkeypatch.setenv("UV_ASTRAL_MIRROR_URL", "https://example.invalid")
-    monkeypatch.setenv("HTTPS_PROXY", "http://example.invalid:8080")
+    # Proxy reachability is an acquisition condition, not evidence of runner-integrity drift.
     monkeypatch.setenv("DYLD_INSERT_LIBRARIES", str(tmp_path / "hostile.dylib"))
     monkeypatch.setenv("LD_PRELOAD", str(tmp_path / "hostile.so"))
     snapshot = tmp_path / "snapshot"
@@ -1314,6 +1314,25 @@ def test_gate_control_registry_maps_historical_git_timeout_to_failure(
 
     assert not passed
     assert "TimeoutExpired" in detail
+
+
+def test_gate_control_registry_reports_runner_acquisition_without_lock_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable(_snapshot_root: Path) -> None:
+        raise mission_module.runner_trust.RunnerAcquisitionError("fixture timeout")
+
+    monkeypatch.setattr(mission_module, "_prepare_gate_control_runner", unavailable)
+    passed, detail = _verify_gate_control_registry(
+        _repo(),
+        _repo() / "protocol" / "gate_controls" / "v1.json",
+    )
+
+    assert not passed
+    assert detail == (
+        "Gate control runner acquisition could not be completed; runner trust was not established."
+    )
+    assert "does not match the frozen historical lock" not in detail
 
 
 def _write_registry_case(tmp_path: Path, name: str, value: object) -> Path:
@@ -1690,6 +1709,29 @@ def test_current_credibility_registry_binds_exact_claims_and_control_nodes(
         "Current credibility registry binds 4 gates, "
         f"{len(mission_module._REQUIRED_BOOTSTRAP_CLAIM_DIGESTS)} claims, "
         "and 12 control roles to committed tests."
+    )
+
+
+@pytest.mark.parametrize("wrapped_by_git_trust", [False, True])
+def test_current_credibility_registry_reports_timeout_without_trust_verdict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    wrapped_by_git_trust: bool,
+) -> None:
+    repo = _credibility_control_repo(tmp_path, monkeypatch)
+
+    def timeout(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.TimeoutExpired(cmd="git", timeout=10)
+
+    if not wrapped_by_git_trust:
+        monkeypatch.setattr(mission_module, "_trusted_git", lambda _repo: "git")
+    monkeypatch.setattr(mission_module.subprocess, "run", timeout)
+    passed, detail = _verify_credibility_gate_control_registry(repo)
+
+    assert not passed
+    assert detail == (
+        "Current credibility-control registry verification timed out; "
+        "credibility trust was not established."
     )
 
 
@@ -2129,6 +2171,45 @@ def test_gate_control_trust_adapters_fail_closed(
     monkeypatch.setattr(mission_module, "platform_tags", lambda: ())
 
     assert getattr(mission_module, wrapper)(**arguments) is expected
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "dependency", "arguments"),
+    [
+        (
+            "_authenticated_artifact_bytes",
+            "authenticated_artifact_bytes",
+            {
+                "url": "https://example.invalid/artifact.whl",
+                "expected_sha256": "0" * 64,
+                "expected_size": 1,
+                "cache_root": Path("cache"),
+                "cache_namespace": "fixture",
+            },
+        ),
+        (
+            "_prepare_gate_control_runner",
+            "prepare_authenticated_runner",
+            {"snapshot_root": Path("snapshot")},
+        ),
+    ],
+)
+def test_gate_control_acquisition_adapters_preserve_typed_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    wrapper: str,
+    dependency: str,
+    arguments: dict[str, object],
+) -> None:
+    def unavailable(*_args: object, **_kwargs: object) -> None:
+        raise mission_module.runner_trust.RunnerAcquisitionError("fixture acquisition")
+
+    monkeypatch.setattr(mission_module.runner_trust, dependency, unavailable)
+
+    with pytest.raises(
+        mission_module.runner_trust.RunnerAcquisitionError,
+        match="fixture acquisition",
+    ):
+        getattr(mission_module, wrapper)(**arguments)
 
 
 def test_gate_control_snapshot_and_source_seal_fail_closed(
