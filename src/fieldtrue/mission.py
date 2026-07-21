@@ -192,7 +192,7 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 # can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
 # adequate semantic review boundary.
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
-    "CONTINUITY.md": ("8dd3f96f50311ee8a0b2cbfea104972442632906dbb2447ec8b672f3c449b192"),
+    "CONTINUITY.md": ("667318b770f54810e1c1f13b02e97d0a79b5abec28b5a20c07ae123db9044952"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
     "README.md": "e1d801acd9d25a131193890825d5c959ebd66965406b06bc15a582fef4edc41e",
     "docs/ARCHITECTURE.md": ("53dbf9937a588b074e6424c67d73f70fc1ab86c888f902f38544e71dcd3363bc"),

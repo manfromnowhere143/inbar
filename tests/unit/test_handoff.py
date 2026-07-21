@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import os
@@ -1383,6 +1384,258 @@ def test_recovery_materialization_rejects_ignored_and_untracked_regular_files(
             head,
             dirty_tracked_manifest,
         )
+
+
+def test_git_batch_blob_bindings_verify_exact_binary_frames(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_blob = b"first\x00blob\n"
+    second_blob = b"\xffsecond blob"
+    first_frame = b"blob " + str(len(first_blob)).encode("ascii") + b"\x00" + first_blob
+    second_frame = b"blob " + str(len(second_blob)).encode("ascii") + b"\x00" + second_blob
+    first_id = hashlib.sha1(first_frame, usedforsecurity=False).hexdigest()
+    second_id = hashlib.sha256(second_frame).hexdigest()
+    metadata = (f"{first_id} blob {len(first_blob)}\n{second_id} blob {len(second_blob)}\n").encode(
+        "ascii"
+    )
+    content = (
+        f"{first_id} blob {len(first_blob)}\n".encode("ascii")
+        + first_blob
+        + b"\n"
+        + f"{second_id} blob {len(second_blob)}\n".encode("ascii")
+        + second_blob
+        + b"\n"
+    )
+    calls: list[dict[str, object]] = []
+
+    def bounded_output(
+        _repo_root: Path,
+        _git: str,
+        arguments: tuple[str, ...],
+        *,
+        maximum_bytes: int,
+        label: str,
+        input_bytes: bytes | None = None,
+    ) -> bytes:
+        calls.append(
+            {
+                "arguments": arguments,
+                "maximum_bytes": maximum_bytes,
+                "label": label,
+                "input_bytes": input_bytes,
+            }
+        )
+        return metadata if arguments[-1] == "--batch-check" else content
+
+    monkeypatch.setattr(handoff_module, "_git_bounded_output", bounded_output)
+
+    assert handoff_module._git_batch_blob_bindings(
+        tmp_path,
+        "/trusted/git",
+        (first_id, second_id),
+    ) == {
+        first_id: (len(first_blob), sha256_bytes(first_blob)),
+        second_id: (len(second_blob), sha256_bytes(second_blob)),
+    }
+    request = f"{first_id}\n{second_id}\n".encode("ascii")
+    assert calls == [
+        {
+            "arguments": ("--no-replace-objects", "cat-file", "--batch-check"),
+            "maximum_bytes": handoff_module._MAX_GIT_METADATA_BYTES,
+            "label": "tracked recovery blob metadata batch",
+            "input_bytes": request,
+        },
+        {
+            "arguments": ("--no-replace-objects", "cat-file", "--batch"),
+            "maximum_bytes": len(content),
+            "label": "tracked recovery blob content batch",
+            "input_bytes": request,
+        },
+    ]
+
+
+def test_git_bounded_output_streams_input_and_enforces_live_output_cap(tmp_path: Path) -> None:
+    program = "import sys;sys.stdout.buffer.write(sys.stdin.buffer.read()[::-1])"
+    assert (
+        handoff_module._git_bounded_output(
+            tmp_path,
+            sys.executable,
+            ("-c", program),
+            maximum_bytes=4,
+            label="bounded subprocess fixture",
+            input_bytes=b"a\x00bc",
+        )
+        == b"cb\x00a"
+    )
+
+    with pytest.raises(HandoffError, match="exceeds its verification bound"):
+        handoff_module._git_bounded_output(
+            tmp_path,
+            sys.executable,
+            (
+                "-c",
+                "import os,threading;os.write(1,b'1234');threading.Event().wait()",
+            ),
+            maximum_bytes=3,
+            label="bounded subprocess fixture",
+        )
+    with pytest.raises(HandoffError, match="invalid verification bound"):
+        handoff_module._git_bounded_output(
+            tmp_path,
+            sys.executable,
+            ("-c", "raise SystemExit(0)"),
+            maximum_bytes=-1,
+            label="bounded subprocess fixture",
+        )
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("missing", "header is invalid"),
+        ("wrong-object", "header is invalid"),
+        ("non-blob", "header is invalid"),
+        ("noncanonical-size", "size is invalid"),
+        ("oversized", "per-file limit"),
+        ("metadata-truncated", "metadata batch is truncated"),
+        ("content-wrong-object", "header is invalid"),
+        ("size-changed", "size changed"),
+        ("truncated", "content batch is truncated"),
+        ("bad-frame", "framing is invalid"),
+        ("body-mismatch", "does not match its object ID"),
+        ("trailing", "trailing output"),
+    ],
+)
+def test_git_batch_blob_bindings_reject_malformed_output(
+    failure: str,
+    message: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    object_id = "c1b0730e0133447badcfd47fd144e254807b06e1"
+    valid_metadata = f"{object_id} blob 1\n".encode("ascii")
+    outputs = {
+        "missing": (f"{object_id} missing\n".encode("ascii"), b""),
+        "wrong-object": (f"{'2' * 40} blob 1\n".encode("ascii"), b""),
+        "non-blob": (f"{object_id} tree 1\n".encode("ascii"), b""),
+        "noncanonical-size": (f"{object_id} blob 01\n".encode("ascii"), b""),
+        "oversized": (
+            f"{object_id} blob {handoff_module._MAX_INPUT_BYTES + 1}\n".encode("ascii"),
+            b"",
+        ),
+        "metadata-truncated": (f"{object_id} blob 1".encode("ascii"), b""),
+        "content-wrong-object": (
+            valid_metadata,
+            f"{'2' * 40} blob 1\nx\n".encode("ascii"),
+        ),
+        "size-changed": (
+            valid_metadata,
+            f"{object_id} blob 2\nxx\n".encode("ascii"),
+        ),
+        "truncated": (
+            f"{object_id} blob 2\n".encode("ascii"),
+            f"{object_id} blob 2\nx".encode("ascii"),
+        ),
+        "bad-frame": (valid_metadata, f"{object_id} blob 1\nx!".encode("ascii")),
+        "body-mismatch": (valid_metadata, f"{object_id} blob 1\ny\n".encode("ascii")),
+        "trailing": (
+            valid_metadata,
+            f"{object_id} blob 1\nx\nextra".encode("ascii"),
+        ),
+    }
+
+    def bounded_output(
+        _repo_root: Path,
+        _git: str,
+        arguments: tuple[str, ...],
+        **_kwargs: object,
+    ) -> bytes:
+        metadata, content = outputs[failure]
+        return metadata if arguments[-1] == "--batch-check" else content
+
+    monkeypatch.setattr(handoff_module, "_git_bounded_output", bounded_output)
+
+    with pytest.raises(HandoffError, match=message):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", (object_id,))
+
+
+def test_git_blob_object_id_matches_git_sha1_and_sha256() -> None:
+    assert handoff_module._git_blob_object_id(b"", 40) == "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    assert (
+        handoff_module._git_blob_object_id(b"", 64)
+        == "473a0f4c3be8a93681a267e3b1e9a7dcda1185436fe141f7749120a303721813"
+    )
+    with pytest.raises(HandoffError, match="object ID length is invalid"):
+        handoff_module._git_blob_object_id(b"", 32)
+
+
+def test_git_batch_blob_bindings_reject_ambiguous_requests(tmp_path: Path) -> None:
+    object_id = "1" * 40
+
+    with pytest.raises(HandoffError, match="empty or ambiguous"):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", ())
+    with pytest.raises(HandoffError, match="empty or ambiguous"):
+        handoff_module._git_batch_blob_bindings(
+            tmp_path,
+            "/trusted/git",
+            (object_id, object_id),
+        )
+    with pytest.raises(HandoffError, match="invalid object ID"):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", ("g" * 40,))
+
+
+def test_git_recovery_binding_counts_duplicate_blob_paths_toward_total_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    object_id = "1" * 40
+    inventory = (
+        f"100644 blob {object_id}\tfirst.txt".encode("ascii")
+        + b"\x00"
+        + f"100644 blob {object_id}\tsecond.txt".encode("ascii")
+        + b"\x00"
+    )
+    monkeypatch.setattr(
+        handoff_module,
+        "_git_bounded_output",
+        lambda *_args, **_kwargs: inventory,
+    )
+    monkeypatch.setattr(
+        handoff_module,
+        "_git_batch_blob_bindings",
+        lambda *_args, **_kwargs: {object_id: (2, sha256_bytes(b"xx"))},
+    )
+    monkeypatch.setattr(handoff_module, "_MAX_RECOVERY_INPUT_BYTES", 3)
+
+    with pytest.raises(HandoffError, match="blobs exceed the total input limit"):
+        handoff_module._git_eligible_recovery_files(tmp_path, "/trusted/git", "2" * 40)
+
+
+def test_git_batch_blob_bindings_enforce_request_and_total_bounds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_id = "1" * 40
+    second_id = "2" * 40
+    metadata = f"{first_id} blob 2\n{second_id} blob 2\n".encode("ascii")
+    monkeypatch.setattr(
+        handoff_module,
+        "_git_bounded_output",
+        lambda *_args, **_kwargs: metadata,
+    )
+    monkeypatch.setattr(handoff_module, "_MAX_RECOVERY_INPUT_BYTES", 3)
+
+    with pytest.raises(HandoffError, match="batch exceeds the total input limit"):
+        handoff_module._git_batch_blob_bindings(
+            tmp_path,
+            "/trusted/git",
+            (first_id, second_id),
+        )
+
+    monkeypatch.setattr(handoff_module, "_MAX_GIT_METADATA_BYTES", len(first_id))
+    with pytest.raises(HandoffError, match="request exceeds its verification bound"):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", (first_id,))
 
 
 def test_validation_lineage_path_inventory_disables_rename_detection(

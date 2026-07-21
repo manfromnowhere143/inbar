@@ -130,6 +130,24 @@ tests still require live authenticated acquisition on an empty cache; this cycle
 diagnostically distinct but does not make that positive path hermetic. This is an engineering
 diagnosis, not scientific evidence or authority.
 
+PR `#13` run `29822269367` then exposed a separate scaling defect on
+`compatibility-macos-15-py3.14`: the unchanged
+`test_snapshot_worker_rejects_source_changed_after_authority_preload` exhausted its 120-second
+outer harness while 1,664 sibling tests and every substantive sibling job passed. The killed child
+retained no internal phase telemetry, so the CI log alone does not identify the slow operation.
+Isolated Python 3.14 tracing reconstructed it without network access: the v28 recovery tree held 867
+eligible files, and each of the two snapshot-binding passes launched both `git cat-file -s` and
+`git cat-file blob` per file, producing 3,470 Git children. Of a 71.68-second local render, 65.71
+seconds were spent in those binding passes; the fresh worker took 1.11 seconds and the injected
+mission sentinel fired before historical-runner acquisition. The binding implementation now sends
+the deduplicated exact object IDs through a bounded `git cat-file --batch-check` metadata phase and
+an exact-size, incrementally capped `git cat-file --batch` content phase per pass, both with
+replacement objects disabled. It strictly verifies the echoed ID, blob type, canonical size, exact
+framing, recomputed native Git object ID, recovery SHA-256 digest, and all per-file and aggregate
+bounds, while duplicate paths still count separately toward the aggregate limit. The end-to-end
+stale-parent/fresh-child test is unchanged. No Git, test, snapshot-worker, or runner timeout or retry
+allowance changed. This is an engineering scaling correction, not a scientific result or authority.
+
 ## Laboratory falsifiability and the invalid selection comparison
 
 The Amendment 005 causal laboratory cannot produce a negative result. Its mechanisms are separated

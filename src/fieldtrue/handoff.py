@@ -3,24 +3,28 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import html
 import json
 import math
 import os
 import re
+import selectors
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping, Sequence
+from contextlib import suppress
 from importlib.abc import MetaPathFinder
 from importlib.machinery import ModuleSpec
 from pathlib import Path, PurePosixPath
 from types import CodeType, ModuleType
-from typing import Any, Literal, NamedTuple, NoReturn, Self
+from typing import IO, Any, Literal, NamedTuple, NoReturn, Self
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -1235,31 +1239,79 @@ def _git_bounded_output(
     *,
     maximum_bytes: int,
     label: str,
+    input_bytes: bytes | None = None,
 ) -> bytes:
+    if maximum_bytes < 0:
+        raise HandoffError(f"Git {label} has an invalid verification bound")
+    process: subprocess.Popen[bytes] | None = None
+    output_pipe: IO[bytes] | None = None
+    selector: selectors.BaseSelector | None = None
     try:
-        with tempfile.TemporaryFile() as output:
-            result = subprocess.run(  # noqa: S603 - fixed trusted Git with validated arguments
+        with tempfile.TemporaryFile() as request:
+            if input_bytes is not None:
+                request.write(input_bytes)
+                request.seek(0)
+            process = subprocess.Popen(  # noqa: S603 - fixed trusted Git and validated arguments
                 [git, *arguments],
                 cwd=repo_root,
-                check=False,
-                stdout=output,
+                stdin=request,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 env=git_environment(),
-                timeout=30,
+                bufsize=0,
             )
-            if result.returncode != 0:
+            output_pipe = process.stdout
+            if output_pipe is None:
                 raise HandoffError(f"Git could not verify {label}")
-            size = output.tell()
-            if size > maximum_bytes:
-                raise HandoffError(f"Git {label} exceeds its verification bound")
-            output.seek(0)
-            data = output.read(maximum_bytes + 1)
+            os.set_blocking(output_pipe.fileno(), False)
+            selector = selectors.DefaultSelector()
+            selector.register(output_pipe, selectors.EVENT_READ)
+            deadline = time.monotonic() + 30
+            captured = bytearray()
+            while selector.get_map():
+                remaining_seconds = deadline - time.monotonic()
+                if remaining_seconds <= 0:
+                    raise subprocess.TimeoutExpired([git, *arguments], 30)
+                events = selector.select(remaining_seconds)
+                if not events:
+                    raise subprocess.TimeoutExpired([git, *arguments], 30)
+                for key, _event_mask in events:
+                    read_bytes = min(64 * 1024, maximum_bytes - len(captured) + 1)
+                    try:
+                        chunk = os.read(key.fd, read_bytes)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        continue
+                    captured.extend(chunk)
+                    if len(captured) > maximum_bytes:
+                        raise HandoffError(f"Git {label} exceeds its verification bound")
+
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                raise subprocess.TimeoutExpired([git, *arguments], 30)
+            try:
+                returncode = process.wait(timeout=remaining_seconds)
+            except subprocess.TimeoutExpired as error:
+                raise subprocess.TimeoutExpired([git, *arguments], 30) from error
+            if returncode != 0:
+                raise HandoffError(f"Git could not verify {label}")
+            data = bytes(captured)
     except HandoffError:
         raise
     except (OSError, subprocess.SubprocessError) as error:
         raise HandoffError(f"Git could not verify {label}") from error
-    if len(data) != size:
-        raise HandoffError(f"Git {label} changed while being read")
+    finally:
+        if process is not None:
+            if process.poll() is None:
+                with suppress(ProcessLookupError):
+                    process.kill()
+            process.wait()
+        if selector is not None:
+            selector.close()
+        if output_pipe is not None:
+            output_pipe.close()
     return data
 
 
@@ -1403,6 +1455,114 @@ def _git_python_source_paths(
     return frozenset(source_paths)
 
 
+def _git_batch_blob_size(header: bytes, expected_id: bytes) -> int:
+    fields = header.split(b" ")
+    if len(fields) != 3 or fields[0] != expected_id or fields[1] != b"blob":
+        raise HandoffError("tracked recovery blob batch header is invalid")
+    raw_size = fields[2]
+    if (
+        not raw_size
+        or not raw_size.isascii()
+        or not raw_size.isdigit()
+        or len(raw_size) > len(str(_MAX_INPUT_BYTES))
+    ):
+        raise HandoffError("tracked recovery blob batch size is invalid")
+    size = int(raw_size)
+    if raw_size != str(size).encode("ascii"):
+        raise HandoffError("tracked recovery blob batch size is invalid")
+    if size > _MAX_INPUT_BYTES:
+        raise HandoffError("tracked recovery blob exceeds the per-file limit")
+    return size
+
+
+def _git_blob_object_id(blob: bytes, hexadecimal_length: int) -> str:
+    framed = b"blob " + str(len(blob)).encode("ascii") + b"\x00" + blob
+    if hexadecimal_length == 40:
+        return hashlib.sha1(framed, usedforsecurity=False).hexdigest()
+    if hexadecimal_length == 64:
+        return hashlib.sha256(framed).hexdigest()
+    raise HandoffError("tracked recovery blob object ID length is invalid")
+
+
+def _git_batch_blob_bindings(
+    repo_root: Path,
+    git: str,
+    object_ids: Sequence[str],
+) -> dict[str, tuple[int, str]]:
+    if not object_ids or len(object_ids) != len(set(object_ids)):
+        raise HandoffError("tracked recovery blob request is empty or ambiguous")
+    if any(
+        len(object_id) not in {40, 64}
+        or any(character not in "0123456789abcdef" for character in object_id)
+        for object_id in object_ids
+    ):
+        raise HandoffError("tracked recovery blob request contains an invalid object ID")
+    encoded_ids = tuple(object_id.encode("ascii") for object_id in object_ids)
+    request = b"\n".join(encoded_ids) + b"\n"
+    if len(request) > _MAX_GIT_METADATA_BYTES:
+        raise HandoffError("tracked recovery blob request exceeds its verification bound")
+    metadata = _git_bounded_output(
+        repo_root,
+        git,
+        ("--no-replace-objects", "cat-file", "--batch-check"),
+        maximum_bytes=_MAX_GIT_METADATA_BYTES,
+        label="tracked recovery blob metadata batch",
+        input_bytes=request,
+    )
+
+    cursor = 0
+    total_bytes = 0
+    sizes: dict[str, int] = {}
+    for expected_id, encoded_id in zip(object_ids, encoded_ids, strict=True):
+        header_end = metadata.find(b"\n", cursor)
+        if header_end < 0:
+            raise HandoffError("tracked recovery blob metadata batch is truncated")
+        size = _git_batch_blob_size(metadata[cursor:header_end], encoded_id)
+        total_bytes += size
+        if total_bytes > _MAX_RECOVERY_INPUT_BYTES:
+            raise HandoffError("tracked recovery blob batch exceeds the total input limit")
+        sizes[expected_id] = size
+        cursor = header_end + 1
+    if cursor != len(metadata):
+        raise HandoffError("tracked recovery blob metadata batch has trailing output")
+
+    expected_output_bytes = sum(
+        len(encoded_id) + len(b" blob ") + len(str(sizes[object_id])) + 1 + sizes[object_id] + 1
+        for object_id, encoded_id in zip(object_ids, encoded_ids, strict=True)
+    )
+    output = _git_bounded_output(
+        repo_root,
+        git,
+        ("--no-replace-objects", "cat-file", "--batch"),
+        maximum_bytes=expected_output_bytes,
+        label="tracked recovery blob content batch",
+        input_bytes=request,
+    )
+    cursor = 0
+    bindings: dict[str, tuple[int, str]] = {}
+    for expected_id, encoded_id in zip(object_ids, encoded_ids, strict=True):
+        header_end = output.find(b"\n", cursor)
+        if header_end < 0:
+            raise HandoffError("tracked recovery blob content batch is truncated")
+        size = _git_batch_blob_size(output[cursor:header_end], encoded_id)
+        if size != sizes[expected_id]:
+            raise HandoffError("tracked recovery blob size changed between batch phases")
+        content_start = header_end + 1
+        content_end = content_start + size
+        if content_end >= len(output):
+            raise HandoffError("tracked recovery blob content batch is truncated")
+        if output[content_end : content_end + 1] != b"\n":
+            raise HandoffError("tracked recovery blob content batch framing is invalid")
+        blob = output[content_start:content_end]
+        if _git_blob_object_id(blob, len(expected_id)) != expected_id:
+            raise HandoffError("tracked recovery blob content does not match its object ID")
+        bindings[expected_id] = (size, sha256_bytes(blob))
+        cursor = content_end + 1
+    if cursor != len(output):
+        raise HandoffError("tracked recovery blob content batch has trailing output")
+    return bindings
+
+
 def _git_eligible_recovery_files(
     repo_root: Path,
     git: str,
@@ -1448,40 +1608,21 @@ def _git_eligible_recovery_files(
     if not objects:
         raise HandoffError("tracked recovery file inventory is empty")
 
-    sizes: dict[str, int] = {}
+    object_bindings = _git_batch_blob_bindings(
+        repo_root,
+        git,
+        tuple(dict.fromkeys(object_id for _executable, object_id in objects.values())),
+    )
     total_bytes = 0
-    for path, (_executable, object_id) in objects.items():
-        size_text = _git_metadata_text(
-            repo_root,
-            git,
-            ("cat-file", "-s", object_id),
-            f"tracked recovery blob size {path}",
-        ).strip()
-        if not size_text.isascii() or not size_text.isdecimal():
-            raise HandoffError(f"tracked recovery blob has an invalid size: {path}")
-        size = int(size_text)
-        if size > _MAX_INPUT_BYTES:
-            raise HandoffError(f"tracked recovery blob exceeds the per-file limit: {path}")
+    files: dict[str, _TrackedRecoveryFileBinding] = {}
+    for path, (executable, object_id) in objects.items():
+        size, digest = object_bindings[object_id]
         total_bytes += size
         if total_bytes > _MAX_RECOVERY_INPUT_BYTES:
             raise HandoffError("tracked recovery blobs exceed the total input limit")
-        sizes[path] = size
-
-    files: dict[str, _TrackedRecoveryFileBinding] = {}
-    for path, (executable, object_id) in objects.items():
-        size = sizes[path]
-        blob = _git_bounded_output(
-            repo_root,
-            git,
-            ("cat-file", "blob", object_id),
-            maximum_bytes=size,
-            label=f"tracked recovery blob {path}",
-        )
-        if len(blob) != size:
-            raise HandoffError(f"tracked recovery blob size changed during verification: {path}")
         files[path] = _TrackedRecoveryFileBinding(
             executable=executable,
-            sha256=sha256_bytes(blob),
+            sha256=digest,
             size=size,
         )
     return files
