@@ -64,7 +64,7 @@ def test_direct_blocked_audit_preserves_full_result(tmp_path: Path) -> None:
     assert read_json(output_root / "admission_report.json")["verdict"] == "BLOCKED_ACQUISITION"
 
 
-def test_canonical_authority_rejects_synthetic_test_root(tmp_path: Path) -> None:
+def test_v1_canonical_authority_rejects_synthetic_test_root(tmp_path: Path) -> None:
     input_root = tmp_path / "input"
     synthetic_contract = build_acquisition_tree(input_root)
     canonical_contract = load_acquisition_contract(CONTRACT_PATH)
@@ -72,15 +72,12 @@ def test_canonical_authority_rejects_synthetic_test_root(tmp_path: Path) -> None
     assert synthetic_contract.trust_anchor_public_key != canonical_contract.trust_anchor_public_key
     with pytest.raises(
         AcquisitionAuditError,
-        match="acquisition trust or control authority is invalid",
-    ) as error:
+        match=r"^V1 shortcut reports cannot authorize a canonical verdict$",
+    ):
         audit_acquisition(canonical_contract, input_root)
 
-    assert isinstance(error.value.__cause__, AcquisitionAuditError)
-    assert str(error.value.__cause__) == "control suite authority profile differs from the contract"
 
-
-def test_production_cli_fails_closed_for_synthetic_test_root(
+def test_production_cli_denies_v1_canonical_authority_without_terminal_output(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -114,7 +111,7 @@ def test_production_cli_fails_closed_for_synthetic_test_root(
     captured = capsys.readouterr()
     assert error.value.code == 3
     assert captured.out == ""
-    assert captured.err.strip() == "acquisition trust or control authority is invalid"
+    assert captured.err.strip() == "V1 shortcut reports cannot authorize a canonical verdict"
     assert not output_root.exists()
 
 

@@ -1247,11 +1247,29 @@ def _replace_model_streams_with_identity_normalized_content(
     _refresh_model_visible_leakage_scan(root, dossier_path)
 
 
+def _set_v1_shortcut_resolution(root: Path) -> None:
+    path = root / "shortcut_baseline.json"
+    body = read_json(path)
+    body.pop("attestation")
+    body["results"][0]["resolves_mechanism_without_action"] = True
+    report = _signed_model(
+        ShortcutBaselineReport,
+        body,
+        subject_kind=AttestationSubjectKind.SHORTCUT_BASELINE,
+        signing_key=ACTOR_KEYS[RoleKind.STATISTICIAN],
+        signer_id=f"actor-{RoleKind.STATISTICIAN.value}",
+        attestation_id="negative-control-resolving-shortcut",
+        issued_at=_aware(body["evaluated_at"]),
+    )
+    write_json(path, report)
+
+
 def test_complete_conjunctive_pilot_passes(tmp_path: Path) -> None:
     contract = build_acquisition_tree(tmp_path)
     report = audit_acquisition(contract, tmp_path)
     record_control_observation(tmp_path, report)
 
+    assert report.authority_profile == "test_fixture"
     assert report.verdict == "PASS_PILOT"
     assert len(report.eligible_incident_ids) == 30
     assert {gate.status for gate in report.gates} == {"pass"}
@@ -1264,17 +1282,79 @@ def test_complete_conjunctive_pilot_passes(tmp_path: Path) -> None:
     assert coverage.observed["maximum_share"] == 0.4
 
 
-def test_audit_rejects_fixture_receipt_under_a_different_authority_profile(
+def test_v1_audit_rejects_canonical_authority_before_shortcut_consumption(
     tmp_path: Path,
 ) -> None:
-    contract = build_acquisition_tree(tmp_path)
+    contract = acquisition_contract()
     mismatched = contract.model_copy(update={"authority_profile": "canonical"})
 
-    with pytest.raises(AcquisitionAuditError, match="trust or control authority") as error:
+    assert not (tmp_path / "shortcut_baseline.json").exists()
+    with pytest.raises(
+        AcquisitionAuditError,
+        match=r"^V1 shortcut reports cannot authorize a canonical verdict$",
+    ):
         audit_acquisition(mismatched, tmp_path)
+
+
+def test_audit_rejects_fixture_receipt_under_a_different_authority_profile(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    control_suite = AdmissionControlSuiteReceipt.model_validate(
+        read_json(tmp_path / "control_suite_receipt.json")
+    )
+    mismatched = control_suite.model_copy(update={"authority_profile": "canonical"})
+    monkeypatch.setattr(
+        AdmissionControlSuiteReceipt,
+        "model_validate",
+        classmethod(lambda _cls, _value: mismatched),
+    )
+
+    with pytest.raises(AcquisitionAuditError, match="trust or control authority") as error:
+        audit_acquisition(contract, tmp_path)
 
     assert isinstance(error.value.__cause__, AcquisitionAuditError)
     assert str(error.value.__cause__) == "control suite authority profile differs from the contract"
+
+
+@pytest.mark.parametrize(
+    ("resolves_shortcut", "expected_verdict"),
+    [(False, "PASS_PILOT"), (True, "KILL_CONSTRUCT")],
+)
+def test_v1_admission_report_rejects_canonical_terminal_verdicts(
+    tmp_path: Path,
+    *,
+    resolves_shortcut: bool,
+    expected_verdict: str,
+) -> None:
+    contract = build_acquisition_tree(tmp_path)
+    if resolves_shortcut:
+        _set_v1_shortcut_resolution(tmp_path)
+    report = audit_acquisition(contract, tmp_path)
+    assert report.verdict == expected_verdict
+
+    forged = report.model_dump(mode="json")
+    forged["authority_profile"] = "canonical"
+    with pytest.raises(
+        ValidationError,
+        match="V1 shortcut reports cannot authorize a canonical verdict",
+    ):
+        AcquisitionAdmissionReport.model_validate(forged)
+
+
+def test_v1_shortcut_report_rejects_fake_v2_schema_relabel(tmp_path: Path) -> None:
+    build_acquisition_tree(tmp_path)
+    relabelled = read_json(tmp_path / "shortcut_baseline.json")
+    relabelled["schema_version"] = "fieldtrue.shortcut-baseline-report.v2"
+
+    with pytest.raises(ValidationError) as error:
+        ShortcutBaselineReport.model_validate(relabelled)
+
+    assert any(
+        item["loc"] == ("schema_version",) and item["type"] == "literal_error"
+        for item in error.value.errors()
+    )
 
 
 def test_29_complete_dossiers_are_blocked_not_promoted_by_rows(tmp_path: Path) -> None:
@@ -2210,23 +2290,11 @@ def test_validly_resigned_settled_outcome_cannot_swap_diagnostic_chain(
 
 def test_resolving_shortcut_kills_the_construct(tmp_path: Path) -> None:
     contract = build_acquisition_tree(tmp_path)
-    path = tmp_path / "shortcut_baseline.json"
-    body = read_json(path)
-    body.pop("attestation")
-    body["results"][0]["resolves_mechanism_without_action"] = True
-    report_model = _signed_model(
-        ShortcutBaselineReport,
-        body,
-        subject_kind=AttestationSubjectKind.SHORTCUT_BASELINE,
-        signing_key=ACTOR_KEYS[RoleKind.STATISTICIAN],
-        signer_id=f"actor-{RoleKind.STATISTICIAN.value}",
-        attestation_id="negative-control-resolving-shortcut",
-        issued_at=_aware(body["evaluated_at"]),
-    )
-    write_json(path, report_model)
+    _set_v1_shortcut_resolution(tmp_path)
 
     report = audit_acquisition(contract, tmp_path)
     record_control_observation(tmp_path, report)
+    assert report.authority_profile == "test_fixture"
     assert report.verdict == "KILL_CONSTRUCT"
     shortcut = next(gate for gate in report.gates if gate.gate_id == "shortcut-baseline")
     assert shortcut.observed["resolving_rules"] == ["source-identity"]
