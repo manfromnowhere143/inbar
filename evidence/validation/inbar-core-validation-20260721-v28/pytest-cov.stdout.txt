@@ -1,0 +1,42 @@
+........................................................................ [  4%]
+........................................................................ [  8%]
+........................................................................ [ 12%]
+........................................................................ [ 17%]
+........................................................................ [ 21%]
+........................................................................ [ 25%]
+........................................................................ [ 30%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 43%]
+........................................................................ [ 47%]
+........................................................................ [ 51%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+........................................................................ [ 64%]
+........................................................................ [ 69%]
+........................................................................ [ 73%]
+........................................................................ [ 77%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+........................................................................ [ 90%]
+........................................................................ [ 95%]
+........................................................................ [ 99%]
+.........                                                                [100%]
+=============================== warnings summary ===============================
+tests/unit/test_shortcut_v2_ontology.py::test_strict_revalidation_guard_rejects_a_construct_bypassed_model
+  /Users/danielwahnich/workspace/fieldtrue/.venv/lib/python3.12/site-packages/pydantic/main.py:475: UserWarning: Pydantic serializer warnings:
+    PydanticSerializationUnexpectedValue(Expected `str` - serialized value may not be as expected [field_name='canonical_name', input_value=17, input_type=int])
+    return self.__pydantic_serializer__.to_python(
+
+tests/unit/test_shortcut_v2_target.py::test_strict_revalidation_guard_rejects_a_construct_bypassed_model
+  /Users/danielwahnich/workspace/fieldtrue/.venv/lib/python3.12/site-packages/pydantic/main.py:475: UserWarning: Pydantic serializer warnings:
+    PydanticSerializationUnexpectedValue(Expected `str` - serialized value may not be as expected [field_name='case_key', input_value=17, input_type=int])
+    return self.__pydantic_serializer__.to_python(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+______________ coverage: platform darwin, python 3.12.13-final-0 _______________
+
+Coverage JSON written to file evidence/validation/inbar-core-validation-20260721-v28/coverage.json
+Required test coverage of 90.01% reached. Total coverage: 91.52%
+1665 passed, 2 warnings in 850.49s (0:14:10)

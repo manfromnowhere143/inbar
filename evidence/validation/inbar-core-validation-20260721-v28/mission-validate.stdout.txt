@@ -1,0 +1,115 @@
+{
+  "checks": [
+    {
+      "check_id": "owner-boundary",
+      "detail": "Mission owner must remain Daniel Wahnich.",
+      "passed": true
+    },
+    {
+      "check_id": "active-identity",
+      "detail": "Current mission surfaces must identify Inbar while preserving the legacy protocol namespace.",
+      "passed": true
+    },
+    {
+      "check_id": "execution-authority",
+      "detail": "v0 permits replay/simulator/testbed and explicitly forbids flight.",
+      "passed": true
+    },
+    {
+      "check_id": "mission-stage",
+      "detail": "Current stage must be a unique registered lifecycle stage.",
+      "passed": true
+    },
+    {
+      "check_id": "research-engine-deferred",
+      "detail": "The standalone research engine remains deferred and separate.",
+      "passed": true
+    },
+    {
+      "check_id": "publication-gates",
+      "detail": "Publication requires scientific, external-review, venue, rights, and artifact gates.",
+      "passed": true
+    },
+    {
+      "check_id": "publication-transition-evidence",
+      "detail": "Publication remains explicitly blocked pending signed, anchored evidence.",
+      "passed": true
+    },
+    {
+      "check_id": "gate-falsification",
+      "detail": "Every claim-bearing gate requires preregistered positive, negative, and executable sensitivity controls.",
+      "passed": true
+    },
+    {
+      "check_id": "gate-control-registry",
+      "detail": "Executed and verified 16 distinct controls against the sealed result. Current credibility registry binds 4 gates, 18 claims, and 12 control roles to committed tests.",
+      "passed": true
+    },
+    {
+      "check_id": "preregistration-first",
+      "detail": "The root commit must contain only the iteration-000 hypothesis.",
+      "passed": true
+    },
+    {
+      "check_id": "hypothesis-status",
+      "detail": "Iteration 000 must byte-match its root-commit preregistration.",
+      "passed": true
+    },
+    {
+      "check_id": "iter001-acquisition-contract",
+      "detail": "Iteration 001 acquisition contract failed: canonical control authority is not sealed",
+      "passed": false
+    },
+    {
+      "check_id": "dataset-lock",
+      "detail": "NASA ADAPT bytes and exact expected file count are frozen.",
+      "passed": true
+    },
+    {
+      "check_id": "iteration-amendment-001",
+      "detail": "Historical attempt 001 execution and its immutable proof verify against exact Git objects; current verifier code is evaluated under a separate authority.",
+      "passed": true
+    },
+    {
+      "check_id": "verification-correction-001",
+      "detail": "Verification correction receipt is signed, complete, and proof-bound.",
+      "passed": true
+    },
+    {
+      "check_id": "claim-registry",
+      "detail": "Claim registry binds 18 exact claim contracts and 49 evidence files to Git HEAD.",
+      "passed": true
+    },
+    {
+      "check_id": "research-memory",
+      "detail": "Research-engine extraction memory verifies (254 events).",
+      "passed": true
+    },
+    {
+      "check_id": "research-memory-git-anchors",
+      "detail": "Research memory Git anchors verify (254 events).",
+      "passed": true
+    },
+    {
+      "check_id": "signer-anchor",
+      "detail": "Iteration 000 must use the Git-pinned execution-ledger signer.",
+      "passed": true
+    },
+    {
+      "check_id": "schemas",
+      "detail": "Committed schemas match Pydantic contracts. ",
+      "passed": true
+    },
+    {
+      "check_id": "lockfile",
+      "detail": "A committed uv.lock is required before execution.",
+      "passed": true
+    },
+    {
+      "check_id": "provider-independence",
+      "detail": "Core has no Aweb/cloud SDK import or placeholder Aweb adapter.",
+      "passed": true
+    }
+  ],
+  "passed": false
+}
