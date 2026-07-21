@@ -181,14 +181,19 @@ def test_mission_observation_records_unexpected_blockers(tmp_path: Path) -> None
     report = {
         "checks": [
             {"check_id": "iter001-acquisition-contract", "passed": False},
+            {"check_id": "gate-control-registry", "passed": False},
             {"check_id": "claim-registry", "passed": False},
             {"check_id": "schemas", "passed": True},
         ]
     }
     _write(evidence / "mission-validate.stdout.txt", json.dumps(report))
     observed = _observe_mission(tmp_path, RECEIPT_ID)
-    assert observed.observed_blockers == ("iter001-acquisition-contract", "claim-registry")
-    assert observed.unexpected_blockers == ("claim-registry",)
+    assert observed.observed_blockers == (
+        "iter001-acquisition-contract",
+        "gate-control-registry",
+        "claim-registry",
+    )
+    assert observed.unexpected_blockers == ("claim-registry", "gate-control-registry")
     assert observed.missing_expected_blockers == ()
 
 

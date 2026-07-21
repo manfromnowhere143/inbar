@@ -148,6 +148,17 @@ bounds, while duplicate paths still count separately toward the aggregate limit.
 stale-parent/fresh-child test is unchanged. No Git, test, snapshot-worker, or runner timeout or retry
 allowance changed. This is an engineering scaling correction, not a scientific result or authority.
 
+The first v29 frozen-validation attempt produced no receipt or commit. Its mission observation
+correctly found that the reviewed-evidence digests still named the pre-correction
+`src/fieldtrue/handoff.py` and `tests/unit/test_handoff.py` bytes, raising both `claim-registry` and
+`gate-control-registry` alongside the expected acquisition blocker. That legitimate double-blocker
+also exposed a receipt-producer canonicalization defect: observed blockers retained mission order,
+but the typed unexpected-blocker derivation requires sorted set order, so receipt construction
+raised instead of recording the failed observation. The producer now sorts both derived blocker
+differences, and an adversarial fixture presents multiple unexpected blockers in noncanonical order.
+The handoff and test digests were rebound only after independent fail-closed review. This correction
+changes no mission status, validation threshold, or authority.
+
 ## Laboratory falsifiability and the invalid selection comparison
 
 The Amendment 005 causal laboratory cannot produce a negative result. Its mechanisms are separated
