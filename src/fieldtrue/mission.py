@@ -192,7 +192,7 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 # can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
 # adequate semantic review boundary.
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
-    "CONTINUITY.md": ("a698fcc3f45831f0d3603a06b0d9a0fe6220771b127b27a42c0644c8c5b5508c"),
+    "CONTINUITY.md": ("db6f00cf7cadee3e97238d66814df4cb0f81da0e2c28b3d453551aca11571ac8"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
     "README.md": "e1d801acd9d25a131193890825d5c959ebd66965406b06bc15a582fef4edc41e",
     "docs/ARCHITECTURE.md": ("13c71d409ae351f98df137684d053feabebfd51c434d634a5f68488e5aa74798"),
@@ -267,7 +267,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
     ),
     "pyproject.toml": ("b30b947d7a36b9a4bf3d83b9df971cb34f2410d93b1c81fa5e0da601bb538f6c"),
     "src/fieldtrue/acquisition.py": (
-        "1db52fa08405ce5f28013715c34782475b57c814becd6e50aa0729353cc101ce"
+        "5f507fb7c0f3eeee46ef7342ad1a8778f3fa58a81241fd2c5766bf574bfc153d"
     ),
     "src/fieldtrue/domain.py": ("7648d416e3843dac5d1cf9c3c3be81b8d7cba235ec33c135d2697383a3d8474a"),
     "src/fieldtrue/active_selection.py": (
@@ -298,7 +298,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "8f5969d9723be0f694b27a594d7c3fe4dd254ee9d321382f3e16b6ea152d8119"
     ),
     "tests/unit/test_acquisition.py": (
-        "76b3dc4550c5948d5b1c92bf4255358a9c0425b29396a43339ab179439244ea4"
+        "7867742f9f6ba48e4d654a1983db9f035decd784f16dd26e015a582caec7819f"
     ),
     "tests/unit/test_domain.py": (
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"

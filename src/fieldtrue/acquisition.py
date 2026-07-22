@@ -1549,6 +1549,8 @@ _ACTIONS = {
     ),
 }
 
+_V1_SHORTCUT_CANONICAL_AUTHORITY_ERROR = "V1 shortcut reports cannot authorize a canonical verdict"
+
 
 class AcquisitionAdmissionReport(FrozenModel):
     schema_version: Literal["fieldtrue.acquisition-admission-report.v1"] = (
@@ -1615,6 +1617,11 @@ class AcquisitionAdmissionReport(FrozenModel):
         )
         if self.verdict != derived_verdict:
             raise ValueError("admission verdict does not follow from gate statuses")
+        if self.authority_profile == "canonical" and self.verdict in {
+            "PASS_PILOT",
+            "KILL_CONSTRUCT",
+        }:
+            raise ValueError(_V1_SHORTCUT_CANONICAL_AUTHORITY_ERROR)
         if (
             self.verdict in {"PASS_PILOT", "KILL_CONSTRUCT"}
             and len(self.eligible_incident_ids) < 30
@@ -3135,7 +3142,10 @@ def audit_acquisition(
     contract: AcquisitionContract,
     input_root: Path,
 ) -> AcquisitionAdmissionReport:
-    """Audit one immutable input tree without executing data acquisition or physical actions."""
+    """Audit one immutable V1 tree without acquisition or physical action execution."""
+
+    if contract.authority_profile == "canonical":
+        raise AcquisitionAuditError(_V1_SHORTCUT_CANONICAL_AUTHORITY_ERROR)
 
     source_root = input_root / "sources"
     dossier_root = input_root / "dossiers"

@@ -159,6 +159,14 @@ differences, and an adversarial fixture presents multiple unexpected blockers in
 The handoff and test digests were rebound only after independent fail-closed review. This correction
 changes no mission status, validation threshold, or authority.
 
+PR `#12` run `29821026490` then failed only `contracts-preflight`; immutable-history and schema
+checks passed, and the downstream matrix was skipped by design. Mission validation retained the
+expected acquisition blocker but also rejected `src/fieldtrue/acquisition.py` because the reviewed
+content table still named the pre-change acquisition and acquisition-control-test bytes. The
+correction rebinds only those two reviewed SHA-256 values after inspection of the exact changed
+artifacts. It changes no claim record, blocker, threshold, scientific status, or authority, and the
+red run remains part of the engineering record.
+
 A follow-up review found that the v28 implementation did not fully enforce its stated taxonomy.
 The default urllib opener could process an intermediate redirect before the final-URL check, and a
 malformed redirect that raised `ValueError` inside `urlopen` was collapsed into acquisition. The v30
