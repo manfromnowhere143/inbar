@@ -162,8 +162,8 @@ def _observe_mission(repo_root: Path, receipt_id: str) -> EngineeringValidationM
         mission_check_ids=tuple(check["check_id"] for check in checks),
         expected_blockers=EXPECTED_BLOCKERS,
         observed_blockers=observed,
-        missing_expected_blockers=tuple(b for b in EXPECTED_BLOCKERS if b not in observed),
-        unexpected_blockers=tuple(b for b in observed if b not in EXPECTED_BLOCKERS),
+        missing_expected_blockers=tuple(sorted(b for b in EXPECTED_BLOCKERS if b not in observed)),
+        unexpected_blockers=tuple(sorted(b for b in observed if b not in EXPECTED_BLOCKERS)),
     )
 
 

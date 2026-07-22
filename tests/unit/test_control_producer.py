@@ -19,14 +19,16 @@ import fieldtrue.control_producer as producer
 from fieldtrue.acquisition import AcquisitionContract
 from fieldtrue.canonical import canonical_json_pretty, read_json, sha256_bytes
 from fieldtrue.control_protocol import (
+    CONTROL_PRODUCER_FAILURE_CODE,
     CONTROL_PRODUCER_KEY_PATH,
     CONTROL_PRODUCER_RECEIPT_PATH,
+    CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE,
     ControlAuthorityError,
     ControlProducerRequest,
     ControlProducerResponse,
 )
 from fieldtrue.receipts import load_or_create_signing_key
-from fieldtrue.runner_trust import AuthenticatedRunner
+from fieldtrue.runner_trust import AuthenticatedRunner, RunnerAcquisitionError
 
 ZERO_HASH = "0" * 64
 ZERO_BLOB = "0" * 40
@@ -688,7 +690,7 @@ def test_launcher_binds_response_to_snapshot_and_durable_receipt(
                 "request_id": parsed_request.request_id,
                 "request_sha256": sha256_bytes(request),
                 "status": "rejected",
-                "failure_code": "producer-rejected",
+                "failure_code": CONTROL_PRODUCER_FAILURE_CODE,
             }
         response = ControlProducerResponse.model_validate(values)
         stdout = canonical_json_pretty(response)
@@ -815,9 +817,221 @@ def test_child_failure_response_exposes_only_stable_rejection(
     assert producer.producer_child_main() == 1
     response = ControlProducerResponse.model_validate_json(stdout.getvalue(), strict=True)
     assert response.status == "rejected"
-    assert response.failure_code == "producer-rejected"
+    assert response.failure_code == CONTROL_PRODUCER_FAILURE_CODE
     assert response.request_sha256 == sha256_bytes(raw)
     assert b"private" not in stdout.getvalue()
+
+
+def test_child_runner_acquisition_failure_is_stable_bound_and_non_sensitive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = ControlProducerRequest(
+        request_id=ZERO_HASH,
+        repository_root=str(tmp_path.resolve()),
+        execution_commit=ZERO_BLOB,
+        execution_tree="1" * 40,
+        timeout_seconds=30,
+    )
+    raw = canonical_json_pretty(request)
+    stdout = io.BytesIO()
+    monkeypatch.setattr(producer.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(raw)))
+    monkeypatch.setattr(producer.sys, "stdout", SimpleNamespace(buffer=stdout))
+
+    def acquisition_failure() -> AuthenticatedRunner:
+        raise RunnerAcquisitionError("sensitive /private/cache/path and remote detail")
+
+    monkeypatch.setattr(producer, "_reconstruct_runner", acquisition_failure)
+    monkeypatch.setattr(
+        producer,
+        "_produce_fixture_bundle",
+        lambda *_args, **_kwargs: pytest.fail("acquisition failure reached production"),
+    )
+
+    assert producer.producer_child_main() == 1
+    response_bytes = stdout.getvalue()
+    response = ControlProducerResponse.model_validate_json(response_bytes, strict=True)
+    assert response_bytes == canonical_json_pretty(response)
+    assert response.request_id == request.request_id
+    assert response.request_sha256 == sha256_bytes(raw)
+    assert response.status == "rejected"
+    assert response.failure_code == CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE
+    assert b"sensitive" not in response_bytes
+    assert b"private" not in response_bytes
+
+
+def test_child_bundle_acquisition_failure_preserves_the_typed_response(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = ControlProducerRequest(
+        request_id=ZERO_HASH,
+        repository_root=str(tmp_path.resolve()),
+        execution_commit=ZERO_BLOB,
+        execution_tree="1" * 40,
+        timeout_seconds=30,
+    )
+    raw = canonical_json_pretty(request)
+    stdout = io.BytesIO()
+    monkeypatch.setattr(producer.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(raw)))
+    monkeypatch.setattr(producer.sys, "stdout", SimpleNamespace(buffer=stdout))
+    monkeypatch.setattr(
+        producer,
+        "_reconstruct_runner",
+        lambda: cast(AuthenticatedRunner, object()),
+    )
+
+    def acquisition_failure(*_args: Any, **_kwargs: Any) -> Any:
+        raise RunnerAcquisitionError("sensitive /private/bundle/path and remote detail")
+
+    monkeypatch.setattr(producer, "_produce_fixture_bundle", acquisition_failure)
+
+    assert producer.producer_child_main() == 1
+    response_bytes = stdout.getvalue()
+    response = ControlProducerResponse.model_validate_json(response_bytes, strict=True)
+    assert response_bytes == canonical_json_pretty(response)
+    assert response.status == "rejected"
+    assert response.failure_code == CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE
+    assert response.request_sha256 == sha256_bytes(raw)
+    assert b"sensitive" not in response_bytes
+    assert b"private" not in response_bytes
+
+
+def test_launcher_reconstructs_only_exact_child_runner_acquisition_failure(
+    tmp_path: Path,
+) -> None:
+    request = ControlProducerRequest(
+        request_id=ZERO_HASH,
+        repository_root=str(tmp_path.resolve()),
+        execution_commit=ZERO_BLOB,
+        execution_tree="1" * 40,
+        timeout_seconds=30,
+    )
+    request_bytes = canonical_json_pretty(request)
+    response = ControlProducerResponse(
+        request_id=request.request_id,
+        request_sha256=sha256_bytes(request_bytes),
+        status="rejected",
+        failure_code=CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE,
+    )
+    completed = subprocess.CompletedProcess(
+        args=(),
+        returncode=1,
+        stdout=canonical_json_pretty(response),
+        stderr=b"",
+    )
+
+    with pytest.raises(
+        RunnerAcquisitionError,
+        match="producer runner acquisition could not be completed",
+    ) as caught:
+        launcher._validated_producer_response(completed, request, request_bytes)
+    assert "private" not in str(caught.value)
+
+
+def test_launcher_preserves_an_exact_generic_child_rejection(
+    tmp_path: Path,
+) -> None:
+    request = ControlProducerRequest(
+        request_id=ZERO_HASH,
+        repository_root=str(tmp_path.resolve()),
+        execution_commit=ZERO_BLOB,
+        execution_tree="1" * 40,
+        timeout_seconds=30,
+    )
+    request_bytes = canonical_json_pretty(request)
+    response = ControlProducerResponse(
+        request_id=request.request_id,
+        request_sha256=sha256_bytes(request_bytes),
+        status="rejected",
+        failure_code=CONTROL_PRODUCER_FAILURE_CODE,
+    )
+    completed = subprocess.CompletedProcess(
+        args=(),
+        returncode=1,
+        stdout=canonical_json_pretty(response),
+        stderr=b"",
+    )
+
+    with pytest.raises(ControlAuthorityError, match="producer rejected") as caught:
+        launcher._validated_producer_response(completed, request, request_bytes)
+    assert not isinstance(caught.value, RunnerAcquisitionError)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "zero-status",
+        "other-status",
+        "stderr",
+        "request-id",
+        "request-sha256",
+        "noncanonical",
+        "unknown-code",
+        "malformed",
+        "published-nonzero",
+    ],
+)
+def test_launcher_does_not_reconstruct_spoofed_child_acquisition_failure(
+    tmp_path: Path,
+    fault: str,
+) -> None:
+    request = ControlProducerRequest(
+        request_id=ZERO_HASH,
+        repository_root=str(tmp_path.resolve()),
+        execution_commit=ZERO_BLOB,
+        execution_tree="1" * 40,
+        timeout_seconds=30,
+    )
+    request_bytes = canonical_json_pretty(request)
+    values: dict[str, Any] = {
+        "request_id": request.request_id,
+        "request_sha256": sha256_bytes(request_bytes),
+        "status": "rejected",
+        "failure_code": CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE,
+    }
+    returncode = 1
+    stderr = b""
+    if fault == "zero-status":
+        returncode = 0
+    elif fault == "other-status":
+        returncode = 2
+    elif fault == "stderr":
+        stderr = b"sensitive /private/child/path"
+    elif fault == "request-id":
+        values["request_id"] = "1" * 64
+    elif fault == "request-sha256":
+        values["request_sha256"] = "2" * 64
+    elif fault == "unknown-code":
+        values["failure_code"] = "unknown-child-failure"
+    elif fault == "published-nonzero":
+        values = {
+            "request_id": request.request_id,
+            "request_sha256": sha256_bytes(request_bytes),
+            "status": "published",
+            "execution_commit": request.execution_commit,
+            "execution_tree": request.execution_tree,
+            "receipt_sha256": "3" * 64,
+            "published_path": CONTROL_PRODUCER_RECEIPT_PATH,
+            "control_count": 22,
+        }
+    response = ControlProducerResponse.model_validate(values)
+    stdout = canonical_json_pretty(response)
+    if fault == "noncanonical":
+        stdout += b"\n"
+    elif fault == "malformed":
+        stdout = b"{"
+    completed = subprocess.CompletedProcess(
+        args=(),
+        returncode=returncode,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    with pytest.raises(ControlAuthorityError) as caught:
+        launcher._validated_producer_response(completed, request, request_bytes)
+    assert not isinstance(caught.value, RunnerAcquisitionError)
+    assert "private" not in str(caught.value)
 
 
 def test_child_success_response_binds_request_identity_and_receipt_bytes(

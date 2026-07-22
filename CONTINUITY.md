@@ -108,6 +108,83 @@ directory. Only that staged copy is executed or rebound. Its structured self-ver
 match the complete platform identity, including the intentionally absent Linux commit metadata, and
 the staged executable remains covered by the authenticated runner tree digest.
 
+Authenticated-artifact availability and runner integrity are distinct fail-closed conditions.
+Network, timeout, or HTTP-protocol failure before frozen artifact bytes are available raises
+`RunnerAcquisitionError`; validation reports that acquisition did not complete and that runner trust
+was not established. Invalid contracts or redirect authority, forbidden redirects, size or digest
+mismatch, unsafe cache custody, lock drift, executable drift, and environment drift remain
+`RunnerTrustError`. Neither condition permits execution or authority, and an acquisition condition
+is not described as retryable or as evidence that integrity probably passed.
+
+GitHub Actions run `29730569130` attempt 1 had one substantive job failure,
+`quality-contracts`; downstream `ci-gate` consequently failed. The historical registry and
+historical-runner tests failed while 1,650 sibling tests and every compatibility leg passed. Attempt
+2 passed. The GitHub Actions log contains the old collapsed `False` diagnostics, so it cannot prove
+which acquisition or trust subcondition fired. A cold authenticated-artifact path followed by the
+adversarial `HTTPS_PROXY` is a plausible code-level reconstruction of the paired signature, not
+retained transport telemetry. The integrity test no longer poisons proxy reachability because
+transport availability is not lock-integrity evidence. Deterministic broken transports now exercise
+network, timeout, short-body, and incomplete-read acquisition, while separate broken redirects,
+digests, caches, locks, and environments exercise trust rejection. The positive historical-runner
+tests still require live authenticated acquisition on an empty cache; this cycle makes an outage
+diagnostically distinct but does not make that positive path hermetic. This is an engineering
+diagnosis, not scientific evidence or authority.
+
+PR `#13` run `29822269367` then exposed a separate scaling defect on
+`compatibility-macos-15-py3.14`: the unchanged
+`test_snapshot_worker_rejects_source_changed_after_authority_preload` exhausted its 120-second
+outer harness while 1,664 sibling tests and every substantive sibling job passed. The killed child
+retained no internal phase telemetry, so the CI log alone does not identify the slow operation.
+Isolated Python 3.14 tracing reconstructed it without network access: the v28 recovery tree held 867
+eligible files, and each of the two snapshot-binding passes launched both `git cat-file -s` and
+`git cat-file blob` per file, producing 3,470 Git children. Of a 71.68-second local render, 65.71
+seconds were spent in those binding passes; the fresh worker took 1.11 seconds and the injected
+mission sentinel fired before historical-runner acquisition. The binding implementation now sends
+the deduplicated exact object IDs through a bounded `git cat-file --batch-check` metadata phase and
+an exact-size, incrementally capped `git cat-file --batch` content phase per pass, both with
+replacement objects disabled. It strictly verifies the echoed ID, blob type, canonical size, exact
+framing, recomputed native Git object ID, recovery SHA-256 digest, and all per-file and aggregate
+bounds, while duplicate paths still count separately toward the aggregate limit. The end-to-end
+stale-parent/fresh-child test is unchanged. No Git, test, snapshot-worker, or runner timeout or retry
+allowance changed. This is an engineering scaling correction, not a scientific result or authority.
+
+The first v29 frozen-validation attempt produced no receipt or commit. Its mission observation
+correctly found that the reviewed-evidence digests still named the pre-correction
+`src/fieldtrue/handoff.py` and `tests/unit/test_handoff.py` bytes, raising both `claim-registry` and
+`gate-control-registry` alongside the expected acquisition blocker. That legitimate double-blocker
+also exposed a receipt-producer canonicalization defect: observed blockers retained mission order,
+but the typed unexpected-blocker derivation requires sorted set order, so receipt construction
+raised instead of recording the failed observation. The producer now sorts both derived blocker
+differences, and an adversarial fixture presents multiple unexpected blockers in noncanonical order.
+The handoff and test digests were rebound only after independent fail-closed review. This correction
+changes no mission status, validation threshold, or authority.
+
+A follow-up review found that the v28 implementation did not fully enforce its stated taxonomy.
+The default urllib opener could process an intermediate redirect before the final-URL check, and a
+malformed redirect that raised `ValueError` inside `urlopen` was collapsed into acquisition. The v30
+candidate uses a bounded redirect handler that checks every hop before it is followed, then
+independently rechecks the final URL. A malformed location, malformed authority,
+non-HTTPS hop, non-allowlisted host, user information, explicit port, fragment, or unsigned query is
+a trust rejection; network, TLS, HTTP, timeout, short-body, and redirect-exhaustion conditions remain
+acquisition incomplete. The retained v28 path also deferred downloaded-body length and digest
+classification until after response teardown, so a close failure could replace the primary
+short-body acquisition or wrong-body trust error. The v30 candidate classifies immediately after the
+bounded read and suppresses expected close failures only when preserving an existing primary error;
+a close failure after otherwise exact bytes remains acquisition incomplete. This narrows the
+proposed correction to the v28 checkpoint's mechanism summary; it does not turn that checkpoint or
+the correction into scientific evidence or action authority.
+
+The same review found that an acquisition condition raised while the producer child independently
+reconstructed its runner was previously collapsed into the generic child rejection. The child now
+emits only a fixed non-sensitive acquisition failure code inside its canonical typed response. The
+launcher reconstructs `RunnerAcquisitionError` only for an empty-stderr, exact-request-bound,
+canonical rejection that exits with status 1. A malformed, mismatched, noncanonical, unknown-code,
+zero-status, other-status, or stderr-bearing response remains a generic authority failure. No child
+exception text crosses the process boundary. The published v29 evidence, memory, and generated
+handoff contain no v28 scope-correction claim and remain unchanged. The exact correction is
+prospective for the first successor cycle, v30, after the frozen v29 handoff; neither memory nor
+`HANDOFF.md` is manually amended in this implementation checkpoint.
+
 ## Laboratory falsifiability and the invalid selection comparison
 
 The Amendment 005 causal laboratory cannot produce a negative result. Its mechanisms are separated

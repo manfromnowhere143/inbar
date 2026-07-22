@@ -163,6 +163,26 @@ It materializes a clean committed snapshot, prepares the hash-authenticated runn
 typed request, and checks the returned request, commit, tree, and durable receipt-byte bindings. It
 does not import signing code, open a private key, assemble a receipt, or publish authority artifacts.
 
+Runner preparation preserves two distinct fail-closed outcomes. Failure to open or completely read a
+frozen remote artifact is an acquisition condition: no runner trust verdict is made because the
+required bytes were unavailable. A malformed or forbidden redirect, byte-binding mismatch, unsafe
+cache, or runner identity drift is a trust condition. The mission validator and launcher surface the
+acquisition condition separately, but both outcomes refuse execution and grant no approval.
+
+Authenticated downloads use a dedicated redirect handler with a five-hop total bound and a
+two-repeat per-target bound. Before each hop, it requires HTTPS and an allowlisted host; rejects user
+information, explicit ports, and fragments; and permits a query only on a separately allowlisted
+signed-query host. It rechecks the returned final URL under the same policy. Redirect loops and
+HTTP, TLS, network, timeout, or incomplete-body failures mean acquisition did not complete;
+malformed or forbidden redirect authority remains a trust rejection.
+
+After its bounded read, the v30 candidate classifies downloaded-body length and digest before
+response teardown. A short body remains acquisition incomplete; an oversized or digest-mismatched
+body is a trust rejection. When either primary classification raises, expected close failures are
+suppressed so teardown cannot replace it. A close failure after otherwise exact bytes remains an
+acquisition condition. This ordering preserves error precedence; it does not attest transport or
+artifact availability.
+
 The fixture producer runs as a fresh isolated child under the committed launcher. It checks the exact
 committed snapshot census, distribution inventory, source closure, contract, Git identity, and
 preregistration ancestry and bytes; executes the frozen controls; assembles all signed fields; opens
@@ -170,6 +190,20 @@ the fixed fixture key only after final rebinding; and publishes an exact bundle 
 descriptor-relative no-replace semantics. Producer V1 receipts use V2 wire schemas, are structurally
 `test_fixture`, use a distinct signer and key path, and reject the canonical trust anchor. The
 canonical `bootstrap` contract cannot reach key access or publication.
+
+If independent runner reconstruction inside the producer child cannot acquire a required runner
+input, the child emits a fixed non-sensitive failure code in the typed response and exits 1. The
+launcher reconstructs the acquisition type only after strict response parsing, canonical-byte and
+exact request bindings, empty stderr, and that exact status/code pair. Every malformed, mismatched,
+unknown, or status-incoherent response fails as a generic authority rejection, and raw child
+diagnostics are never reflected across the IPC boundary.
+
+The additive scope correction is prospective, not backdated into the published v29 cycle. Its
+verifier independently freezes the original v28 checkpoint and the later exact v29 handoff, then
+requires the first successor to be the contiguous v30 source, correction, resource, checkpoint, and
+handoff topology with the v30 validation receipt. Missing, substituted, collided, disconnected, or
+out-of-order records fail closed. The historical v29 evidence, ledger prefix, and generated handoff
+remain byte-preserved.
 
 The snapshot materializer preserves committed `0644/0755` semantics while narrowing filesystem
 access to owner-only `0400/0500`. The producer is the only production call site that opts into the

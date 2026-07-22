@@ -3,24 +3,28 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import html
 import json
 import math
 import os
 import re
+import selectors
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 import xml.etree.ElementTree as ET
 from collections.abc import Mapping, Sequence
+from contextlib import suppress
 from importlib.abc import MetaPathFinder
 from importlib.machinery import ModuleSpec
 from pathlib import Path, PurePosixPath
 from types import CodeType, ModuleType
-from typing import Any, Literal, NamedTuple, NoReturn, Self
+from typing import IO, Any, Literal, NamedTuple, NoReturn, Self
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -42,6 +46,7 @@ from fieldtrue.git_trust import (
 )
 from fieldtrue.memory import (
     AccessClass,
+    EpistemicPhase,
     LabelAccess,
     MemoryEventType,
     MemoryStatus,
@@ -131,10 +136,59 @@ _SOURCE_VERDICT_EVENT_ID = "iter001-public-substrate-verdict-v1"
 _ENGINE_BOUNDARY_EVENT_ID = "future-research-engine-shortcut-v2-lessons-v1"
 _LEGACY_CHECKPOINT_EVENT_ID = "iter001-shortcut-v2-implementation-checkpoint-v1"
 _LEGACY_HANDOFF_EVENT_ID = "iter001-shortcut-v2-activation-gates-v1"
+_LEGACY_HANDOFF_EVENT_HASH = "7cf4b08958ca2a5e6995775bf9058432ca9fd14be6230e656fd325ee30c0864a"
 _RECOVERY_CHECKPOINT_CONTRACT = "inbar.handoff-checkpoint.v1"
 _RECOVERY_CHECKPOINT_CONTRACT_V2 = "inbar.handoff-checkpoint.v2"
 _RECOVERY_HANDOFF_CONTRACT = "inbar.handoff-state.v1"
 _RECOVERY_STAGE = "mission-handoff"
+V28_SCOPE_CORRECTION_TARGET_EVENT_ID = "inbar-core-validation-checkpoint-v28"
+V28_SCOPE_CORRECTION_TARGET_EVENT_HASH = (
+    "c44665f0e5a6a78dbbd06fda354f3b3454699a1c541fa441d20bb568d753a6b0"
+)
+V28_SCOPE_CORRECTION_TARGET_SOURCE_COMMIT = "7ae63d0439c2aa7b0d93f927540a31e1fa76b8d4"
+V28_SCOPE_CORRECTION_TARGET_SEQUENCE = 256
+V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID = "inbar-core-validation-handoff-v29"
+V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_HASH = (
+    "15d1def0cc3ae1d38e489c155a7303d8e735b86b54bb933fb8f3cf12b99bc510"
+)
+V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SOURCE_COMMIT = "efee1669cf864db980e1f675f62afcb5af7b3828"
+V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SEQUENCE = 261
+V28_SCOPE_CORRECTION_PREDECESSOR_FINAL_COMMIT = "74fbe8edb115f47ce9f72a9c6c197f9fafe3cd11"
+V28_SCOPE_CORRECTION_RECEIPT_ID = "inbar-core-validation-20260721-v30"
+V28_SCOPE_CORRECTION_SOURCE_EVENT_ID = "iter001-current-public-source-route-verdict-v30"
+V28_SCOPE_CORRECTION_EVENT_ID = "inbar-core-validation-checkpoint-v28-scope-correction-v30"
+V28_SCOPE_CORRECTION_RESOURCE_EVENT_ID = "inbar-core-validation-resource-observation-v30"
+V28_SCOPE_CORRECTION_CHECKPOINT_EVENT_ID = "inbar-core-validation-checkpoint-v30"
+V28_SCOPE_CORRECTION_HANDOFF_EVENT_ID = "inbar-core-validation-handoff-v30"
+V28_SCOPE_CORRECTION_SUMMARY = "Corrected the retained mechanism scope of the v28 checkpoint."
+V28_SCOPE_CORRECTION_OLD = (
+    "Separated authenticated-runner acquisition failures from runner-integrity failures "
+    "while preserving fail-closed gate behavior and the frozen trust boundary."
+)
+V28_SCOPE_CORRECTION_CORRECTED = (
+    "Checkpoint v28's separation of acquisition from integrity failures was incomplete. It did "
+    "not validate redirect authority before every hop or preserve the acquisition type across the "
+    "isolated producer IPC boundary. It also deferred downloaded-body length and digest "
+    "classification until after response teardown, so a teardown failure could replace the "
+    "primary acquisition or trust error. Those three omissions made its mechanism scope "
+    "incomplete; fail-closed execution and the blocked authority boundary remained in force."
+)
+V28_SCOPE_CORRECTION_EVIDENCE = (
+    ("src/fieldtrue/runner_trust.py", "text/x-python", "source"),
+    ("src/fieldtrue/control_protocol.py", "text/x-python", "source"),
+    ("src/fieldtrue/control_producer.py", "text/x-python", "source"),
+    ("src/fieldtrue/control_launcher.py", "text/x-python", "source"),
+    ("tests/unit/test_runner_trust.py", "text/x-python", "verifier"),
+    ("tests/unit/test_control_producer.py", "text/x-python", "verifier"),
+)
+V28_SCOPE_CORRECTION_EVIDENCE_SHA256 = (
+    "1b85794d9447b110b6127515778e7a755908f2ba43510af256afe4d7e16f6d66",
+    "136bdd4aa000fb2dc8006d34810e681a46cef227d26c8f4d8e29b26c3ae723b2",
+    "f1f8a47ad45165fa0e7d31cc1e32394516bcf61406e281d6a8eec17455908a89",
+    "37a7916c32d1f78f5771f6e01533e1b88c916621265622cd85b818d0199f28f1",
+    "76bc8c6e3667e2da4ba0a53924386e865f7e0828f2592669e0c491abe7a1714b",
+    "9910e3d9411a8a17bf871377a80b4bf97f0d3adb8e596a37c8a88950d5cb0a2f",
+)
 _EXPECTED_BOOTSTRAP_BLOCKERS = ("iter001-acquisition-contract",)
 _EXPECTED_BOOTSTRAP_DETAIL = (
     "Iteration 001 acquisition contract failed: canonical control authority is not sealed"
@@ -1168,6 +1222,204 @@ def _exact_event(
     return record
 
 
+def _verify_v28_scope_correction_transition(
+    repo_root: Path,
+    records: tuple[ResearchMemoryRecord, ...],
+    by_id: dict[str, ResearchMemoryRecord],
+    latest_handoff: ResearchMemoryRecord,
+) -> None:
+    target = by_id.get(V28_SCOPE_CORRECTION_TARGET_EVENT_ID)
+    if target is None:
+        if (
+            latest_handoff.event_id == _LEGACY_HANDOFF_EVENT_ID
+            and latest_handoff.event_hash == _LEGACY_HANDOFF_EVENT_HASH
+        ):
+            return
+        raise HandoffError("versioned handoff is missing the frozen v28 transition target")
+    if (
+        target.event_type != MemoryEventType.EXECUTION
+        or target.status != MemoryStatus.PASS
+        or target.event_hash != V28_SCOPE_CORRECTION_TARGET_EVENT_HASH
+        or target.source_commit != V28_SCOPE_CORRECTION_TARGET_SOURCE_COMMIT
+        or target.sequence != V28_SCOPE_CORRECTION_TARGET_SEQUENCE
+        or target.summary != V28_SCOPE_CORRECTION_OLD
+    ):
+        raise HandoffError("v28 scope-correction target differs from its frozen event")
+
+    predecessor_handoff = by_id.get(V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID)
+    if (
+        predecessor_handoff is None
+        or predecessor_handoff.event_type != MemoryEventType.HANDOFF
+        or predecessor_handoff.status != MemoryStatus.BLOCKED
+        or predecessor_handoff.event_hash != V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_HASH
+        or predecessor_handoff.source_commit
+        != V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SOURCE_COMMIT
+        or predecessor_handoff.sequence != V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SEQUENCE
+    ):
+        raise HandoffError("v28 scope-correction predecessor handoff differs")
+
+    corrections = tuple(
+        record
+        for record in records
+        if record.corrects_event_id == V28_SCOPE_CORRECTION_TARGET_EVENT_ID
+    )
+    correction_id_records = tuple(
+        record for record in records if record.event_id == V28_SCOPE_CORRECTION_EVENT_ID
+    )
+    if correction_id_records and (
+        len(correction_id_records) != 1
+        or correction_id_records[0].corrects_event_id != V28_SCOPE_CORRECTION_TARGET_EVENT_ID
+    ):
+        raise HandoffError("the prospective v30 scope-correction event ID collides")
+    successors = tuple(
+        sorted(
+            (
+                record
+                for record in records
+                if record.mission_id == "inbar"
+                and record.event_type == MemoryEventType.HANDOFF
+                and record.sequence > predecessor_handoff.sequence
+            ),
+            key=lambda record: record.sequence,
+        )
+    )
+    if not successors:
+        if (
+            latest_handoff.event_id != predecessor_handoff.event_id
+            or corrections
+            or correction_id_records
+        ):
+            raise HandoffError("the frozen v29 pre-correction handoff state is inconsistent")
+        return
+    if len(corrections) != 1:
+        raise HandoffError("the first post-v29 handoff requires exactly one v28 scope correction")
+
+    correction = corrections[0]
+    successor_handoff = successors[0]
+    successor_checkpoint = _linked_checkpoint(successor_handoff, by_id)
+    checkpoint = _parse_payload(
+        _CheckpointPayload,
+        successor_checkpoint.payload,
+        "first post-v29 implementation checkpoint",
+    )
+    handoff = _parse_payload(
+        _HandoffPayload,
+        successor_handoff.payload,
+        "first post-v29 handoff",
+    )
+    assert isinstance(checkpoint, _CheckpointPayload)
+    assert isinstance(handoff, _HandoffPayload)
+    if (
+        _validate_recovery_contract(
+            successor_handoff,
+            successor_checkpoint,
+            handoff,
+            checkpoint,
+        )
+        or checkpoint.handoff_contract != _RECOVERY_CHECKPOINT_CONTRACT_V2
+    ):
+        raise HandoffError("the first post-v29 handoff is not an exact V2 recovery pair")
+
+    source_id = successor_handoff.links.get("source_verdict")
+    source = by_id.get(source_id) if source_id is not None else None
+    resource_id = successor_checkpoint.links.get("resource_observation")
+    resource = by_id.get(resource_id) if resource_id is not None else None
+    if (
+        source is None
+        or source.event_type != MemoryEventType.FINDING
+        or source.status != MemoryStatus.NEGATIVE
+        or source.event_id != V28_SCOPE_CORRECTION_SOURCE_EVENT_ID
+        or resource is None
+        or resource.event_type != MemoryEventType.RESOURCE
+        or resource.status != MemoryStatus.RECORDED
+        or resource.event_id != V28_SCOPE_CORRECTION_RESOURCE_EVENT_ID
+        or successor_checkpoint.event_id != V28_SCOPE_CORRECTION_CHECKPOINT_EVENT_ID
+        or successor_handoff.event_id != V28_SCOPE_CORRECTION_HANDOFF_EVENT_ID
+        or resource.links != {"source_verdict": source.event_id}
+        or source.sequence != predecessor_handoff.sequence + 1
+        or correction.sequence != source.sequence + 1
+        or correction.sequence + 1 != resource.sequence
+        or resource.sequence + 1 != successor_checkpoint.sequence
+        or successor_checkpoint.sequence + 1 != successor_handoff.sequence
+    ):
+        raise HandoffError("v30 v28 scope-correction topology differs")
+
+    expected_payload = {
+        "old": V28_SCOPE_CORRECTION_OLD,
+        "corrected": V28_SCOPE_CORRECTION_CORRECTED,
+        "authority_effect": "none",
+    }
+    if (
+        correction.event_type != MemoryEventType.CORRECTION
+        or correction.event_id != V28_SCOPE_CORRECTION_EVENT_ID
+        or correction.status != MemoryStatus.RECORDED
+        or correction.stage != "evidence-correction"
+        or correction.summary != V28_SCOPE_CORRECTION_SUMMARY
+        or correction.payload != expected_payload
+        or correction.links
+        or correction.schema_version != "daniel.research-memory.v2"
+        or correction.mission_id != "inbar"
+        or correction.access != AccessClass.INTERNAL
+        or correction.epistemic_phase != EpistemicPhase.RETROSPECTIVE
+        or correction.cost_usd != "0"
+        or correction.manual_minutes != 0.0
+        or correction.recurrence_key is not None
+        or correction.engine_requirement is not None
+        or correction.occurred_at != correction.recorded_at
+        or correction.source_commit != checkpoint.implementation_commit
+        or checkpoint.validation_receipt is None
+        or checkpoint.validation_receipt.receipt_id != V28_SCOPE_CORRECTION_RECEIPT_ID
+        or correction.actor.kind != "agent"
+        or correction.actor != source.actor
+        or correction.actor != resource.actor
+        or correction.actor != successor_checkpoint.actor
+        or correction.actor != successor_handoff.actor
+        or len(correction.evidence) != len(V28_SCOPE_CORRECTION_EVIDENCE)
+    ):
+        raise HandoffError("retained v28 scope correction differs from its exact contract")
+
+    try:
+        git = trusted_repository_git(repo_root, TRUSTED_GIT_PATH)
+    except GitTrustError as error:
+        raise HandoffError("v28 scope-correction Git state is untrusted") from error
+    if (
+        checkpoint.implementation_commit == V28_SCOPE_CORRECTION_PREDECESSOR_FINAL_COMMIT
+        or not _git_is_ancestor(
+            repo_root,
+            git,
+            V28_SCOPE_CORRECTION_PREDECESSOR_FINAL_COMMIT,
+            checkpoint.implementation_commit,
+        )
+    ):
+        raise HandoffError("v28 scope correction is outside the frozen predecessor lineage")
+    for evidence, (uri, media_type, role), expected_sha256 in zip(
+        correction.evidence,
+        V28_SCOPE_CORRECTION_EVIDENCE,
+        V28_SCOPE_CORRECTION_EVIDENCE_SHA256,
+        strict=True,
+    ):
+        if (
+            evidence.uri != uri
+            or urlsplit(evidence.uri).scheme
+            or evidence.media_type != media_type
+            or evidence.role != role
+            or evidence.access != AccessClass.INTERNAL
+            or evidence.label_access != LabelAccess.NONE
+            or evidence.git_commit != checkpoint.implementation_commit
+            or evidence.sha256 != expected_sha256
+        ):
+            raise HandoffError("retained v28 scope-correction evidence differs")
+        committed = _git_blob(
+            repo_root,
+            git,
+            checkpoint.implementation_commit,
+            uri,
+            maximum_bytes=_MAX_INPUT_BYTES,
+        )
+        if not committed or sha256_bytes(committed) != expected_sha256:
+            raise HandoffError("retained v28 scope-correction evidence is not content-valid")
+
+
 def _parse_payload(model: type[_StrictModel], payload: dict[str, Any], label: str) -> _StrictModel:
     try:
         return model.model_validate(payload)
@@ -1235,31 +1487,79 @@ def _git_bounded_output(
     *,
     maximum_bytes: int,
     label: str,
+    input_bytes: bytes | None = None,
 ) -> bytes:
+    if maximum_bytes < 0:
+        raise HandoffError(f"Git {label} has an invalid verification bound")
+    process: subprocess.Popen[bytes] | None = None
+    output_pipe: IO[bytes] | None = None
+    selector: selectors.BaseSelector | None = None
     try:
-        with tempfile.TemporaryFile() as output:
-            result = subprocess.run(  # noqa: S603 - fixed trusted Git with validated arguments
+        with tempfile.TemporaryFile() as request:
+            if input_bytes is not None:
+                request.write(input_bytes)
+                request.seek(0)
+            process = subprocess.Popen(  # noqa: S603 - fixed trusted Git and validated arguments
                 [git, *arguments],
                 cwd=repo_root,
-                check=False,
-                stdout=output,
+                stdin=request,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 env=git_environment(),
-                timeout=30,
+                bufsize=0,
             )
-            if result.returncode != 0:
+            output_pipe = process.stdout
+            if output_pipe is None:
                 raise HandoffError(f"Git could not verify {label}")
-            size = output.tell()
-            if size > maximum_bytes:
-                raise HandoffError(f"Git {label} exceeds its verification bound")
-            output.seek(0)
-            data = output.read(maximum_bytes + 1)
+            os.set_blocking(output_pipe.fileno(), False)
+            selector = selectors.DefaultSelector()
+            selector.register(output_pipe, selectors.EVENT_READ)
+            deadline = time.monotonic() + 30
+            captured = bytearray()
+            while selector.get_map():
+                remaining_seconds = deadline - time.monotonic()
+                if remaining_seconds <= 0:
+                    raise subprocess.TimeoutExpired([git, *arguments], 30)
+                events = selector.select(remaining_seconds)
+                if not events:
+                    raise subprocess.TimeoutExpired([git, *arguments], 30)
+                for key, _event_mask in events:
+                    read_bytes = min(64 * 1024, maximum_bytes - len(captured) + 1)
+                    try:
+                        chunk = os.read(key.fd, read_bytes)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        continue
+                    captured.extend(chunk)
+                    if len(captured) > maximum_bytes:
+                        raise HandoffError(f"Git {label} exceeds its verification bound")
+
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                raise subprocess.TimeoutExpired([git, *arguments], 30)
+            try:
+                returncode = process.wait(timeout=remaining_seconds)
+            except subprocess.TimeoutExpired as error:
+                raise subprocess.TimeoutExpired([git, *arguments], 30) from error
+            if returncode != 0:
+                raise HandoffError(f"Git could not verify {label}")
+            data = bytes(captured)
     except HandoffError:
         raise
     except (OSError, subprocess.SubprocessError) as error:
         raise HandoffError(f"Git could not verify {label}") from error
-    if len(data) != size:
-        raise HandoffError(f"Git {label} changed while being read")
+    finally:
+        if process is not None:
+            if process.poll() is None:
+                with suppress(ProcessLookupError):
+                    process.kill()
+            process.wait()
+        if selector is not None:
+            selector.close()
+        if output_pipe is not None:
+            output_pipe.close()
     return data
 
 
@@ -1403,6 +1703,114 @@ def _git_python_source_paths(
     return frozenset(source_paths)
 
 
+def _git_batch_blob_size(header: bytes, expected_id: bytes) -> int:
+    fields = header.split(b" ")
+    if len(fields) != 3 or fields[0] != expected_id or fields[1] != b"blob":
+        raise HandoffError("tracked recovery blob batch header is invalid")
+    raw_size = fields[2]
+    if (
+        not raw_size
+        or not raw_size.isascii()
+        or not raw_size.isdigit()
+        or len(raw_size) > len(str(_MAX_INPUT_BYTES))
+    ):
+        raise HandoffError("tracked recovery blob batch size is invalid")
+    size = int(raw_size)
+    if raw_size != str(size).encode("ascii"):
+        raise HandoffError("tracked recovery blob batch size is invalid")
+    if size > _MAX_INPUT_BYTES:
+        raise HandoffError("tracked recovery blob exceeds the per-file limit")
+    return size
+
+
+def _git_blob_object_id(blob: bytes, hexadecimal_length: int) -> str:
+    framed = b"blob " + str(len(blob)).encode("ascii") + b"\x00" + blob
+    if hexadecimal_length == 40:
+        return hashlib.sha1(framed, usedforsecurity=False).hexdigest()
+    if hexadecimal_length == 64:
+        return hashlib.sha256(framed).hexdigest()
+    raise HandoffError("tracked recovery blob object ID length is invalid")
+
+
+def _git_batch_blob_bindings(
+    repo_root: Path,
+    git: str,
+    object_ids: Sequence[str],
+) -> dict[str, tuple[int, str]]:
+    if not object_ids or len(object_ids) != len(set(object_ids)):
+        raise HandoffError("tracked recovery blob request is empty or ambiguous")
+    if any(
+        len(object_id) not in {40, 64}
+        or any(character not in "0123456789abcdef" for character in object_id)
+        for object_id in object_ids
+    ):
+        raise HandoffError("tracked recovery blob request contains an invalid object ID")
+    encoded_ids = tuple(object_id.encode("ascii") for object_id in object_ids)
+    request = b"\n".join(encoded_ids) + b"\n"
+    if len(request) > _MAX_GIT_METADATA_BYTES:
+        raise HandoffError("tracked recovery blob request exceeds its verification bound")
+    metadata = _git_bounded_output(
+        repo_root,
+        git,
+        ("--no-replace-objects", "cat-file", "--batch-check"),
+        maximum_bytes=_MAX_GIT_METADATA_BYTES,
+        label="tracked recovery blob metadata batch",
+        input_bytes=request,
+    )
+
+    cursor = 0
+    total_bytes = 0
+    sizes: dict[str, int] = {}
+    for expected_id, encoded_id in zip(object_ids, encoded_ids, strict=True):
+        header_end = metadata.find(b"\n", cursor)
+        if header_end < 0:
+            raise HandoffError("tracked recovery blob metadata batch is truncated")
+        size = _git_batch_blob_size(metadata[cursor:header_end], encoded_id)
+        total_bytes += size
+        if total_bytes > _MAX_RECOVERY_INPUT_BYTES:
+            raise HandoffError("tracked recovery blob batch exceeds the total input limit")
+        sizes[expected_id] = size
+        cursor = header_end + 1
+    if cursor != len(metadata):
+        raise HandoffError("tracked recovery blob metadata batch has trailing output")
+
+    expected_output_bytes = sum(
+        len(encoded_id) + len(b" blob ") + len(str(sizes[object_id])) + 1 + sizes[object_id] + 1
+        for object_id, encoded_id in zip(object_ids, encoded_ids, strict=True)
+    )
+    output = _git_bounded_output(
+        repo_root,
+        git,
+        ("--no-replace-objects", "cat-file", "--batch"),
+        maximum_bytes=expected_output_bytes,
+        label="tracked recovery blob content batch",
+        input_bytes=request,
+    )
+    cursor = 0
+    bindings: dict[str, tuple[int, str]] = {}
+    for expected_id, encoded_id in zip(object_ids, encoded_ids, strict=True):
+        header_end = output.find(b"\n", cursor)
+        if header_end < 0:
+            raise HandoffError("tracked recovery blob content batch is truncated")
+        size = _git_batch_blob_size(output[cursor:header_end], encoded_id)
+        if size != sizes[expected_id]:
+            raise HandoffError("tracked recovery blob size changed between batch phases")
+        content_start = header_end + 1
+        content_end = content_start + size
+        if content_end >= len(output):
+            raise HandoffError("tracked recovery blob content batch is truncated")
+        if output[content_end : content_end + 1] != b"\n":
+            raise HandoffError("tracked recovery blob content batch framing is invalid")
+        blob = output[content_start:content_end]
+        if _git_blob_object_id(blob, len(expected_id)) != expected_id:
+            raise HandoffError("tracked recovery blob content does not match its object ID")
+        bindings[expected_id] = (size, sha256_bytes(blob))
+        cursor = content_end + 1
+    if cursor != len(output):
+        raise HandoffError("tracked recovery blob content batch has trailing output")
+    return bindings
+
+
 def _git_eligible_recovery_files(
     repo_root: Path,
     git: str,
@@ -1448,40 +1856,21 @@ def _git_eligible_recovery_files(
     if not objects:
         raise HandoffError("tracked recovery file inventory is empty")
 
-    sizes: dict[str, int] = {}
+    object_bindings = _git_batch_blob_bindings(
+        repo_root,
+        git,
+        tuple(dict.fromkeys(object_id for _executable, object_id in objects.values())),
+    )
     total_bytes = 0
-    for path, (_executable, object_id) in objects.items():
-        size_text = _git_metadata_text(
-            repo_root,
-            git,
-            ("cat-file", "-s", object_id),
-            f"tracked recovery blob size {path}",
-        ).strip()
-        if not size_text.isascii() or not size_text.isdecimal():
-            raise HandoffError(f"tracked recovery blob has an invalid size: {path}")
-        size = int(size_text)
-        if size > _MAX_INPUT_BYTES:
-            raise HandoffError(f"tracked recovery blob exceeds the per-file limit: {path}")
+    files: dict[str, _TrackedRecoveryFileBinding] = {}
+    for path, (executable, object_id) in objects.items():
+        size, digest = object_bindings[object_id]
         total_bytes += size
         if total_bytes > _MAX_RECOVERY_INPUT_BYTES:
             raise HandoffError("tracked recovery blobs exceed the total input limit")
-        sizes[path] = size
-
-    files: dict[str, _TrackedRecoveryFileBinding] = {}
-    for path, (executable, object_id) in objects.items():
-        size = sizes[path]
-        blob = _git_bounded_output(
-            repo_root,
-            git,
-            ("cat-file", "blob", object_id),
-            maximum_bytes=size,
-            label=f"tracked recovery blob {path}",
-        )
-        if len(blob) != size:
-            raise HandoffError(f"tracked recovery blob size changed during verification: {path}")
         files[path] = _TrackedRecoveryFileBinding(
             executable=executable,
-            sha256=sha256_bytes(blob),
+            sha256=digest,
             size=size,
         )
     return files
@@ -2550,6 +2939,7 @@ def _render(repo_root: Path) -> bytes:
         event_type=MemoryEventType.FINDING,
         status=MemoryStatus.RECORDED,
     )
+    _verify_v28_scope_correction_transition(repo_root, records, by_id, handoff_record)
     _reject_corrected_records(
         (handoff_record, checkpoint_record, source_record, engine_record), records
     )

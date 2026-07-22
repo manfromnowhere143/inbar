@@ -192,10 +192,10 @@ _REQUIRED_BOOTSTRAP_CLAIM_STATUSES = {
 # can preserve every claim while substituting a cited artifact, so HEAD membership alone is not an
 # adequate semantic review boundary.
 _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
-    "CONTINUITY.md": ("5807b6201dc605560178ca965f4d3cc9c96b85c481763a329c8f81a70e9d7852"),
+    "CONTINUITY.md": ("a698fcc3f45831f0d3603a06b0d9a0fe6220771b127b27a42c0644c8c5b5508c"),
     "PREREGISTRATION.md": ("fd0d8dbb30042cfcd786bc438b069c88efd919b2aea14e6cf897fd1dac0ce2ac"),
     "README.md": "e1d801acd9d25a131193890825d5c959ebd66965406b06bc15a582fef4edc41e",
-    "docs/ARCHITECTURE.md": ("f504b1c1cbadcc048cdda03691a2efd24a3361c62743aa16b08045209208d9f8"),
+    "docs/ARCHITECTURE.md": ("13c71d409ae351f98df137684d053feabebfd51c434d634a5f68488e5aa74798"),
     "docs/CLAIM_BOUNDARIES.md": (
         "dc0105efc9be2fe458142f1709f3fd2552ffed7fc7f1300d6690f3e710244765"
     ),
@@ -277,7 +277,7 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "b17ac2b3e61ba1c43ca51870b3c0f22c0c15ada0c0503628c6c38f50715ec729"
     ),
     "src/fieldtrue/handoff.py": (
-        "5290155f445098ee174e8dead20aa812c023b75fad9025bf091d5a10388d02fd"
+        "af74c82f4fadb0c0f4d1d1a87cf6e59477f4c64460b6fffbb7781389e62aba97"
     ),
     "src/fieldtrue/schemas.py": (
         "71aeb674fd4272a057bcaabfbda14409d0a10535adc8b97d6d40bc750e16f40e"
@@ -304,10 +304,10 @@ _REQUIRED_BOOTSTRAP_EVIDENCE_DIGESTS = {
         "6c2367204d266b9a6d55f2083a1845816917425a26089daee1ced06172c986fc"
     ),
     "tests/unit/test_handoff.py": (
-        "f99e8edeaf74d3a24ff4bc51a9674b4edd79f14e3a1c5877993f95546009c427"
+        "9aafe1b63cb8432dbbfb105584120e65d30143ebcf27431b051146541016a83f"
     ),
     "tests/unit/test_mission.py": (
-        "f366e097ca75ccdf8df5d212bc9c5d52b02756607b7377a6047e4c6271dda11e"
+        "da4564157413ab4ff2969e5228622e280bd47ff09524d5315305da02832aaa8a"
     ),
     "tests/unit/test_release_contract.py": (
         "e8d6d726eed62f1c4eb004f33ca22813d4ac0be96d7ec153157f7624ade208d1"
@@ -807,7 +807,21 @@ def _verify_credibility_gate_control_registry(repo_root: Path) -> tuple[bool, st
                     False,
                     f"Current credibility-control test changed during verification: {relative}.",
                 )
-    except (GitTrustError, OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+    except subprocess.TimeoutExpired:
+        return (
+            False,
+            "Current credibility-control registry verification timed out; "
+            "credibility trust was not established.",
+        )
+    except GitTrustError as error:
+        if isinstance(error.__cause__, subprocess.TimeoutExpired):
+            return (
+                False,
+                "Current credibility-control registry verification timed out; "
+                "credibility trust was not established.",
+            )
+        return False, "Current credibility-control registry cannot be reconstructed."
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
         return False, "Current credibility-control registry cannot be reconstructed."
     return (
         True,
@@ -1251,6 +1265,12 @@ def _verify_gate_control_registry(repo_root: Path, path: Path) -> tuple[bool, st
                 != registry_bytes
             ):
                 return False, "Gate control source or registry changed during execution."
+    except runner_trust.RunnerAcquisitionError:
+        return (
+            False,
+            "Gate control runner acquisition could not be completed; "
+            "runner trust was not established.",
+        )
     except (OSError, subprocess.SubprocessError) as error:
         return False, f"Gate control execution failed to run: {type(error).__name__}."
     result = {

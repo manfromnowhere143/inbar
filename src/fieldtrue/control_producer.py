@@ -58,9 +58,11 @@ from fieldtrue.control_authority import (
     _run_git,
 )
 from fieldtrue.control_protocol import (
+    CONTROL_PRODUCER_FAILURE_CODE,
     CONTROL_PRODUCER_KEY_PATH,
     CONTROL_PRODUCER_PLATFORM_ENVIRONMENT,
     CONTROL_PRODUCER_RECEIPT_PATH,
+    CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE,
     CONTROL_PRODUCER_SNAPSHOT_PATHS,
     MAX_CONTROL_PRODUCER_REQUEST_BYTES,
     ControlAuthorityError,
@@ -72,6 +74,7 @@ from fieldtrue.runner_trust import (
     PINNED_PYTHON_ARTIFACTS,
     RUNNER_PYTHON_FULL_VERSION,
     AuthenticatedRunner,
+    RunnerAcquisitionError,
     RunnerTrustError,
 )
 
@@ -815,12 +818,20 @@ def producer_child_main() -> int:
             control_count=22,
         )
         status = 0
+    except RunnerAcquisitionError:
+        response = ControlProducerResponse(
+            request_id=request.request_id,
+            request_sha256=request_sha256,
+            status="rejected",
+            failure_code=CONTROL_PRODUCER_RUNNER_ACQUISITION_FAILURE_CODE,
+        )
+        status = 1
     except Exception:
         response = ControlProducerResponse(
             request_id=request.request_id,
             request_sha256=request_sha256,
             status="rejected",
-            failure_code="producer-rejected",
+            failure_code=CONTROL_PRODUCER_FAILURE_CODE,
         )
         status = 1
     try:

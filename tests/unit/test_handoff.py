@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import os
@@ -28,6 +29,7 @@ from fieldtrue.domain import (
 from fieldtrue.handoff import HandoffError, check_handoff, render_handoff, write_handoff
 from fieldtrue.memory import (
     AccessClass,
+    EpistemicPhase,
     LabelAccess,
     MemoryEvidenceRef,
     MemoryStatus,
@@ -79,6 +81,650 @@ def _git(repo: Path, *arguments: str) -> str:
         env=handoff_module.git_environment(),
         text=True,
     ).stdout.strip()
+
+
+def _v28_scope_pretransition_records() -> tuple[ResearchMemoryRecord, ...]:
+    """Return the exact ledger prefix frozen immediately before the v30 transition."""
+
+    records = load_memory_records(_project_root() / handoff_module._MEMORY_PATH)
+    cutoff = handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SEQUENCE
+    prefix = records[: cutoff + 1]
+    assert len(prefix) == cutoff + 1
+    assert tuple(record.sequence for record in prefix) == tuple(range(cutoff + 1))
+    assert prefix[-1].event_id == handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID
+    assert all(record.event_id != handoff_module.V28_SCOPE_CORRECTION_EVENT_ID for record in prefix)
+    return prefix
+
+
+def _v28_scope_transition_fixture(tmp_path: Path) -> SimpleNamespace:
+    repo = tmp_path / "v28-scope-transition"
+    subprocess.run(  # noqa: S603 - fixed Git and local test repository source
+        [
+            str(handoff_module.TRUSTED_GIT_PATH),
+            "clone",
+            "--quiet",
+            "--no-hardlinks",
+            str(_project_root()),
+            str(repo),
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        env={**handoff_module.git_environment(), "GIT_ALLOW_PROTOCOL": "file"},
+    )
+    _git(repo, "config", "user.name", "Inbar V28 Correction Test")
+    _git(repo, "config", "user.email", "v28-correction@example.invalid")
+    for uri, _media_type, _role in handoff_module.V28_SCOPE_CORRECTION_EVIDENCE:
+        destination = repo / uri
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((_project_root() / uri).read_bytes())
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "--quiet", "--allow-empty", "-m", "correction evidence subject")
+    implementation_commit = _git(repo, "rev-parse", "HEAD")
+
+    existing = _v28_scope_pretransition_records()
+    by_id = {record.event_id: record for record in existing}
+    target = by_id[handoff_module.V28_SCOPE_CORRECTION_TARGET_EVENT_ID]
+    predecessor = by_id[handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID]
+    source_template = by_id["iter001-current-public-source-route-verdict-v29"]
+    resource_template = by_id["inbar-core-validation-resource-observation-v29"]
+    checkpoint_template = by_id["inbar-core-validation-checkpoint-v29"]
+    correction_template = next(
+        record for record in existing if record.event_type.value == "correction"
+    )
+
+    evidence = tuple(
+        MemoryEvidenceRef(
+            role=role,
+            uri=uri,
+            sha256=sha256_bytes((repo / uri).read_bytes()),
+            git_commit=implementation_commit,
+            media_type=media_type,
+            access=AccessClass.INTERNAL,
+            label_access=LabelAccess.NONE,
+        )
+        for uri, media_type, role in handoff_module.V28_SCOPE_CORRECTION_EVIDENCE
+    )
+    source = source_template.model_copy(
+        update={
+            "sequence": predecessor.sequence + 1,
+            "event_id": handoff_module.V28_SCOPE_CORRECTION_SOURCE_EVENT_ID,
+            "source_commit": implementation_commit,
+        }
+    )
+    correction = correction_template.model_copy(
+        update={
+            "sequence": source.sequence + 1,
+            "event_id": handoff_module.V28_SCOPE_CORRECTION_EVENT_ID,
+            "stage": "evidence-correction",
+            "status": MemoryStatus.RECORDED,
+            "summary": handoff_module.V28_SCOPE_CORRECTION_SUMMARY,
+            "payload": {
+                "old": handoff_module.V28_SCOPE_CORRECTION_OLD,
+                "corrected": handoff_module.V28_SCOPE_CORRECTION_CORRECTED,
+                "authority_effect": "none",
+            },
+            "evidence": evidence,
+            "links": {},
+            "source_commit": implementation_commit,
+            "corrects_event_id": target.event_id,
+            "actor": predecessor.actor,
+            "schema_version": "daniel.research-memory.v2",
+            "mission_id": "inbar",
+            "access": AccessClass.INTERNAL,
+            "epistemic_phase": EpistemicPhase.RETROSPECTIVE,
+            "cost_usd": "0",
+            "manual_minutes": 0.0,
+            "recurrence_key": None,
+            "engine_requirement": None,
+            "occurred_at": source.recorded_at,
+            "recorded_at": source.recorded_at,
+        }
+    )
+    resource = resource_template.model_copy(
+        update={
+            "sequence": correction.sequence + 1,
+            "event_id": handoff_module.V28_SCOPE_CORRECTION_RESOURCE_EVENT_ID,
+            "links": {"source_verdict": source.event_id},
+        }
+    )
+    source_evidence = MemoryEvidenceRef(
+        role="source",
+        uri=evidence[0].uri,
+        sha256=evidence[0].sha256,
+        git_commit=implementation_commit,
+        media_type=evidence[0].media_type,
+        access=AccessClass.INTERNAL,
+        label_access=LabelAccess.NONE,
+    )
+    validation_receipt = dict(checkpoint_template.payload["validation_receipt"])
+    validation_receipt.update(
+        {
+            "path": (
+                f"evidence/validation/{handoff_module.V28_SCOPE_CORRECTION_RECEIPT_ID}/receipt.json"
+            ),
+            "receipt_id": handoff_module.V28_SCOPE_CORRECTION_RECEIPT_ID,
+        }
+    )
+    checkpoint = checkpoint_template.model_copy(
+        update={
+            "sequence": resource.sequence + 1,
+            "event_id": handoff_module.V28_SCOPE_CORRECTION_CHECKPOINT_EVENT_ID,
+            "source_commit": implementation_commit,
+            "payload": {
+                **checkpoint_template.payload,
+                "implementation_commit": implementation_commit,
+                "validation_receipt": validation_receipt,
+            },
+            "evidence": (source_evidence, checkpoint_template.evidence[1]),
+            "links": {
+                "resource_observation": resource.event_id,
+                "source_verdict": source.event_id,
+            },
+        }
+    )
+    handoff_evidence = MemoryEvidenceRef(
+        role="source",
+        uri=evidence[1].uri,
+        sha256=evidence[1].sha256,
+        git_commit=implementation_commit,
+        media_type=evidence[1].media_type,
+        access=AccessClass.INTERNAL,
+        label_access=LabelAccess.NONE,
+    )
+    successor = predecessor.model_copy(
+        update={
+            "sequence": checkpoint.sequence + 1,
+            "event_id": handoff_module.V28_SCOPE_CORRECTION_HANDOFF_EVENT_ID,
+            "source_commit": implementation_commit,
+            "evidence": (handoff_evidence,),
+            "links": {
+                "checkpoint": checkpoint.event_id,
+                "engine_boundary": handoff_module._ENGINE_BOUNDARY_EVENT_ID,
+                "source_verdict": source.event_id,
+            },
+        }
+    )
+    records = (*existing, source, correction, resource, checkpoint, successor)
+    return SimpleNamespace(
+        repo=repo,
+        records=records,
+        implementation_commit=implementation_commit,
+        target_id=target.event_id,
+        source_id=source.event_id,
+        correction_id=correction.event_id,
+        resource_id=resource.event_id,
+        checkpoint_id=checkpoint.event_id,
+        successor_id=successor.event_id,
+    )
+
+
+def _git_object_bytes(repo: Path, commit: str, path: str) -> bytes:
+    return subprocess.run(  # noqa: S603 - fixed Git with test-owned object and path values
+        [str(handoff_module.TRUSTED_GIT_PATH), "show", f"{commit}:{path}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        env=handoff_module.git_environment(),
+    ).stdout
+
+
+def _rebind_transition_implementation(fixture: SimpleNamespace, commit: str) -> None:
+    def rebound_evidence(evidence: MemoryEvidenceRef) -> MemoryEvidenceRef:
+        return evidence.model_copy(
+            update={
+                "git_commit": commit,
+                "sha256": sha256_bytes(_git_object_bytes(fixture.repo, commit, evidence.uri)),
+            }
+        )
+
+    records: list[ResearchMemoryRecord] = []
+    for record in fixture.records:
+        if record.event_id == fixture.source_id:
+            record = record.model_copy(update={"source_commit": commit})
+        elif record.event_id == fixture.correction_id:
+            record = record.model_copy(
+                update={
+                    "source_commit": commit,
+                    "evidence": tuple(rebound_evidence(item) for item in record.evidence),
+                }
+            )
+        elif record.event_id == fixture.checkpoint_id:
+            record = record.model_copy(
+                update={
+                    "source_commit": commit,
+                    "payload": {**record.payload, "implementation_commit": commit},
+                    "evidence": (rebound_evidence(record.evidence[0]), *record.evidence[1:]),
+                }
+            )
+        elif record.event_id == fixture.successor_id:
+            record = record.model_copy(
+                update={
+                    "source_commit": commit,
+                    "evidence": (rebound_evidence(record.evidence[0]),),
+                }
+            )
+        records.append(record)
+    fixture.records = tuple(records)
+
+
+def _verify_v28_scope_transition(fixture: SimpleNamespace) -> None:
+    by_id = {record.event_id: record for record in fixture.records}
+    handoff_module._verify_v28_scope_correction_transition(
+        fixture.repo,
+        fixture.records,
+        by_id,
+        by_id[fixture.successor_id],
+    )
+
+
+def _replace_transition_record(
+    fixture: SimpleNamespace,
+    selected_event_id: str,
+    **updates: object,
+) -> None:
+    fixture.records = tuple(
+        record.model_copy(update=updates) if record.event_id == selected_event_id else record
+        for record in fixture.records
+    )
+
+
+def test_v28_scope_correction_verifier_allows_the_exact_pretransition_state() -> None:
+    records = _v28_scope_pretransition_records()
+    by_id = {record.event_id: record for record in records}
+    predecessor = by_id[handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID]
+
+    assert predecessor.event_id == "inbar-core-validation-handoff-v29"
+    assert predecessor.event_hash == handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_HASH
+    assert (
+        predecessor.source_commit
+        == handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SOURCE_COMMIT
+    )
+    assert predecessor.sequence == handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_SEQUENCE
+    assert handoff_module.V28_SCOPE_CORRECTION_EVENT_ID not in by_id
+
+    handoff_module._verify_v28_scope_correction_transition(
+        _project_root(),
+        records,
+        by_id,
+        predecessor,
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("event_hash", "0" * 64),
+        ("source_commit", "0" * 40),
+        ("sequence", 260),
+    ],
+)
+def test_v28_scope_correction_verifier_rejects_historical_v29_predecessor_drift(
+    field: str,
+    value: object,
+) -> None:
+    records = _v28_scope_pretransition_records()
+    predecessor_id = handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_HANDOFF_ID
+    mutated = tuple(
+        record.model_copy(update={field: value}) if record.event_id == predecessor_id else record
+        for record in records
+    )
+    by_id = {record.event_id: record for record in mutated}
+
+    with pytest.raises(HandoffError, match="predecessor handoff differs"):
+        handoff_module._verify_v28_scope_correction_transition(
+            _project_root(),
+            mutated,
+            by_id,
+            by_id[predecessor_id],
+        )
+
+
+def test_v28_scope_correction_verifier_rejects_a_prospective_id_collision() -> None:
+    records = _v28_scope_pretransition_records()
+    predecessor = records[-1]
+    collision = predecessor.model_copy(
+        update={
+            "corrects_event_id": None,
+            "event_id": handoff_module.V28_SCOPE_CORRECTION_EVENT_ID,
+            "sequence": predecessor.sequence + 1,
+        }
+    )
+    collided = (*records, collision)
+    by_id = {record.event_id: record for record in collided}
+
+    with pytest.raises(HandoffError, match="event ID collides"):
+        handoff_module._verify_v28_scope_correction_transition(
+            _project_root(),
+            collided,
+            by_id,
+            predecessor,
+        )
+
+
+def test_v28_scope_correction_verifier_accepts_the_exact_transition(tmp_path: Path) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+
+    _verify_v28_scope_transition(fixture)
+
+
+@pytest.mark.parametrize(
+    ("fixture_id_field", "wrong_id"),
+    [
+        ("source_id", "fixture-wrong-v30-source"),
+        ("resource_id", "fixture-wrong-v30-resource"),
+        ("checkpoint_id", "fixture-wrong-v30-checkpoint"),
+        ("successor_id", "fixture-wrong-v30-handoff"),
+    ],
+)
+def test_v28_scope_correction_verifier_rejects_wrong_v30_topology_ids(
+    tmp_path: Path,
+    fixture_id_field: str,
+    wrong_id: str,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    selected_id = getattr(fixture, fixture_id_field)
+    _replace_transition_record(fixture, selected_id, event_id=wrong_id)
+    setattr(fixture, fixture_id_field, wrong_id)
+
+    with pytest.raises(HandoffError):
+        _verify_v28_scope_transition(fixture)
+
+
+def test_v28_scope_correction_verifier_rejects_a_coherent_wrong_v30_receipt_id(
+    tmp_path: Path,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    checkpoint = next(
+        record for record in fixture.records if record.event_id == fixture.checkpoint_id
+    )
+    validation_receipt = dict(checkpoint.payload["validation_receipt"])
+    validation_receipt.update(
+        {
+            "path": "evidence/validation/fixture-wrong-v30/receipt.json",
+            "receipt_id": "fixture-wrong-v30",
+        }
+    )
+    _replace_transition_record(
+        fixture,
+        fixture.checkpoint_id,
+        payload={**checkpoint.payload, "validation_receipt": validation_receipt},
+    )
+
+    with pytest.raises(HandoffError, match="retained v28 scope correction differs"):
+        _verify_v28_scope_transition(fixture)
+
+
+def test_v28_scope_correction_verifier_rejects_a_skipped_first_successor(
+    tmp_path: Path,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    fixture.records = tuple(
+        record for record in fixture.records if record.event_id != fixture.correction_id
+    )
+
+    with pytest.raises(HandoffError, match="first post-v29 handoff requires exactly one"):
+        _verify_v28_scope_transition(fixture)
+
+
+def test_v28_scope_correction_verifier_rejects_the_predecessor_as_implementation(
+    tmp_path: Path,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    _rebind_transition_implementation(
+        fixture,
+        handoff_module.V28_SCOPE_CORRECTION_PREDECESSOR_FINAL_COMMIT,
+    )
+
+    with pytest.raises(HandoffError, match="outside the frozen predecessor lineage"):
+        _verify_v28_scope_transition(fixture)
+
+
+def test_v28_scope_correction_verifier_rejects_disconnected_coherent_evidence(
+    tmp_path: Path,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    tree = _git(fixture.repo, "rev-parse", f"{fixture.implementation_commit}^{{tree}}")
+    disconnected = _git(fixture.repo, "commit-tree", tree, "-m", "disconnected evidence")
+    _rebind_transition_implementation(fixture, disconnected)
+
+    with pytest.raises(HandoffError, match="outside the frozen predecessor lineage"):
+        _verify_v28_scope_transition(fixture)
+
+
+def test_v28_scope_correction_verifier_rejects_coherent_evidence_substitution(
+    tmp_path: Path,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    substituted_path = fixture.repo / handoff_module.V28_SCOPE_CORRECTION_EVIDENCE[0][0]
+    substituted_path.write_bytes(substituted_path.read_bytes() + b"\n# coherent substitution\n")
+    _git(fixture.repo, "add", substituted_path.relative_to(fixture.repo).as_posix())
+    _git(fixture.repo, "commit", "--quiet", "-m", "substitute coherent evidence")
+    substituted = _git(fixture.repo, "rev-parse", "HEAD")
+    _rebind_transition_implementation(fixture, substituted)
+
+    with pytest.raises(HandoffError, match="scope-correction evidence differs"):
+        _verify_v28_scope_transition(fixture)
+
+
+def test_v28_scope_correction_verifier_rejects_a_versioned_tail_without_the_target(
+    tmp_path: Path,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    fixture.records = tuple(
+        record for record in fixture.records if record.event_id != fixture.target_id
+    )
+
+    with pytest.raises(
+        HandoffError,
+        match="versioned handoff is missing the frozen v28 transition target",
+    ):
+        _verify_v28_scope_transition(fixture)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "omitted",
+        "duplicate",
+        "wrong_target",
+        "event_id",
+        "target_hash",
+        "target_source",
+        "target_sequence",
+        "payload",
+        "source_commit",
+        "summary",
+        "evidence_path",
+        "evidence_hash",
+        "evidence_set",
+        "order",
+        "intervening_event",
+        "schema_identity",
+        "access",
+        "epistemic_phase",
+        "cost_usd",
+        "manual_minutes",
+        "recurrence_key",
+        "engine_requirement",
+        "timestamp",
+        "actor_kind",
+        "actor_drift",
+    ],
+)
+def test_v28_scope_correction_verifier_rejects_every_transition_drift(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    fixture = _v28_scope_transition_fixture(tmp_path)
+    correction = next(
+        record for record in fixture.records if record.event_id == fixture.correction_id
+    )
+    if mutation == "omitted":
+        fixture.records = tuple(
+            record for record in fixture.records if record.event_id != fixture.correction_id
+        )
+    elif mutation == "duplicate":
+        fixture.records = (
+            *fixture.records,
+            correction.model_copy(
+                update={
+                    "event_id": "fixture-duplicate-v28-scope-correction",
+                    "sequence": fixture.records[-1].sequence + 1,
+                }
+            ),
+        )
+    elif mutation == "wrong_target":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            corrects_event_id="inbar-core-validation-checkpoint-v27",
+        )
+    elif mutation == "event_id":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            event_id="fixture-wrong-v28-scope-correction-id",
+        )
+    elif mutation == "target_hash":
+        _replace_transition_record(fixture, fixture.target_id, event_hash="0" * 64)
+    elif mutation == "target_source":
+        _replace_transition_record(fixture, fixture.target_id, source_commit="0" * 40)
+    elif mutation == "target_sequence":
+        target = next(record for record in fixture.records if record.event_id == fixture.target_id)
+        _replace_transition_record(
+            fixture,
+            fixture.target_id,
+            sequence=target.sequence - 1,
+        )
+    elif mutation == "payload":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            payload={**correction.payload, "corrected": "A fabricated correction."},
+        )
+    elif mutation == "source_commit":
+        _replace_transition_record(fixture, fixture.correction_id, source_commit="0" * 40)
+    elif mutation == "summary":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            summary="A different retained correction.",
+        )
+    elif mutation == "evidence_set":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            evidence=correction.evidence[:-1],
+        )
+    elif mutation == "order":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            sequence=correction.sequence - 1,
+        )
+    elif mutation == "intervening_event":
+        source = next(record for record in fixture.records if record.event_id == fixture.source_id)
+        intervening = source.model_copy(
+            update={
+                "event_id": "fixture-intervening-event",
+                "sequence": source.sequence + 1,
+            }
+        )
+        shifted = {
+            fixture.correction_id,
+            fixture.resource_id,
+            fixture.checkpoint_id,
+            fixture.successor_id,
+        }
+        records: list[ResearchMemoryRecord] = []
+        for record in fixture.records:
+            records.append(
+                record.model_copy(update={"sequence": record.sequence + 1})
+                if record.event_id in shifted
+                else record
+            )
+            if record.event_id == fixture.source_id:
+                records.append(intervening)
+        fixture.records = tuple(records)
+    elif mutation == "schema_identity":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            schema_version="daniel.research-memory.v1",
+            mission_id="fieldtrue",
+        )
+    elif mutation == "access":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            access=AccessClass.PUBLIC,
+        )
+    elif mutation == "epistemic_phase":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            epistemic_phase=EpistemicPhase.PROSPECTIVE,
+        )
+    elif mutation == "cost_usd":
+        _replace_transition_record(fixture, fixture.correction_id, cost_usd="9.5")
+    elif mutation == "manual_minutes":
+        _replace_transition_record(fixture, fixture.correction_id, manual_minutes=12.0)
+    elif mutation == "recurrence_key":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            recurrence_key="fixture-recurrence",
+        )
+    elif mutation == "engine_requirement":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            engine_requirement="A fabricated engine requirement.",
+        )
+    elif mutation == "timestamp":
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            recorded_at=correction.recorded_at + timedelta(seconds=1),
+        )
+    elif mutation == "actor_kind":
+        actor = correction.actor.model_copy(update={"kind": "human"})
+        fixture.records = tuple(
+            record.model_copy(update={"actor": actor})
+            if record.event_id
+            in {
+                fixture.source_id,
+                fixture.correction_id,
+                fixture.resource_id,
+                fixture.checkpoint_id,
+                fixture.successor_id,
+            }
+            else record
+            for record in fixture.records
+        )
+    elif mutation == "actor_drift":
+        source = next(record for record in fixture.records if record.event_id == fixture.source_id)
+        _replace_transition_record(
+            fixture,
+            fixture.source_id,
+            actor=source.actor.model_copy(update={"actor_id": "fixture-other-agent"}),
+        )
+    else:
+        evidence_update = (
+            {"uri": "src/fieldtrue/control_protocol.py"}
+            if mutation == "evidence_path"
+            else {"sha256": "0" * 64}
+        )
+        evidence = correction.evidence[0].model_copy(update=evidence_update)
+        _replace_transition_record(
+            fixture,
+            fixture.correction_id,
+            evidence=(evidence, *correction.evidence[1:]),
+        )
+
+    with pytest.raises(HandoffError, match=r"v28|v30|post-v29"):
+        _verify_v28_scope_transition(fixture)
 
 
 @pytest.fixture(scope="module")
@@ -293,6 +939,11 @@ def _install_verified_dependencies(
             "alpha.schema.json": b'{"title":"alpha"}\n',
             "beta.schema.json": b'{"title":"beta"}\n',
         },
+    )
+    monkeypatch.setattr(
+        handoff_module,
+        "_verify_v28_scope_correction_transition",
+        lambda *_args: None,
     )
     if schema_errors is not None:
         monkeypatch.setattr(
@@ -1383,6 +2034,258 @@ def test_recovery_materialization_rejects_ignored_and_untracked_regular_files(
             head,
             dirty_tracked_manifest,
         )
+
+
+def test_git_batch_blob_bindings_verify_exact_binary_frames(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_blob = b"first\x00blob\n"
+    second_blob = b"\xffsecond blob"
+    first_frame = b"blob " + str(len(first_blob)).encode("ascii") + b"\x00" + first_blob
+    second_frame = b"blob " + str(len(second_blob)).encode("ascii") + b"\x00" + second_blob
+    first_id = hashlib.sha1(first_frame, usedforsecurity=False).hexdigest()
+    second_id = hashlib.sha256(second_frame).hexdigest()
+    metadata = (f"{first_id} blob {len(first_blob)}\n{second_id} blob {len(second_blob)}\n").encode(
+        "ascii"
+    )
+    content = (
+        f"{first_id} blob {len(first_blob)}\n".encode("ascii")
+        + first_blob
+        + b"\n"
+        + f"{second_id} blob {len(second_blob)}\n".encode("ascii")
+        + second_blob
+        + b"\n"
+    )
+    calls: list[dict[str, object]] = []
+
+    def bounded_output(
+        _repo_root: Path,
+        _git: str,
+        arguments: tuple[str, ...],
+        *,
+        maximum_bytes: int,
+        label: str,
+        input_bytes: bytes | None = None,
+    ) -> bytes:
+        calls.append(
+            {
+                "arguments": arguments,
+                "maximum_bytes": maximum_bytes,
+                "label": label,
+                "input_bytes": input_bytes,
+            }
+        )
+        return metadata if arguments[-1] == "--batch-check" else content
+
+    monkeypatch.setattr(handoff_module, "_git_bounded_output", bounded_output)
+
+    assert handoff_module._git_batch_blob_bindings(
+        tmp_path,
+        "/trusted/git",
+        (first_id, second_id),
+    ) == {
+        first_id: (len(first_blob), sha256_bytes(first_blob)),
+        second_id: (len(second_blob), sha256_bytes(second_blob)),
+    }
+    request = f"{first_id}\n{second_id}\n".encode("ascii")
+    assert calls == [
+        {
+            "arguments": ("--no-replace-objects", "cat-file", "--batch-check"),
+            "maximum_bytes": handoff_module._MAX_GIT_METADATA_BYTES,
+            "label": "tracked recovery blob metadata batch",
+            "input_bytes": request,
+        },
+        {
+            "arguments": ("--no-replace-objects", "cat-file", "--batch"),
+            "maximum_bytes": len(content),
+            "label": "tracked recovery blob content batch",
+            "input_bytes": request,
+        },
+    ]
+
+
+def test_git_bounded_output_streams_input_and_enforces_live_output_cap(tmp_path: Path) -> None:
+    program = "import sys;sys.stdout.buffer.write(sys.stdin.buffer.read()[::-1])"
+    assert (
+        handoff_module._git_bounded_output(
+            tmp_path,
+            sys.executable,
+            ("-c", program),
+            maximum_bytes=4,
+            label="bounded subprocess fixture",
+            input_bytes=b"a\x00bc",
+        )
+        == b"cb\x00a"
+    )
+
+    with pytest.raises(HandoffError, match="exceeds its verification bound"):
+        handoff_module._git_bounded_output(
+            tmp_path,
+            sys.executable,
+            (
+                "-c",
+                "import os,threading;os.write(1,b'1234');threading.Event().wait()",
+            ),
+            maximum_bytes=3,
+            label="bounded subprocess fixture",
+        )
+    with pytest.raises(HandoffError, match="invalid verification bound"):
+        handoff_module._git_bounded_output(
+            tmp_path,
+            sys.executable,
+            ("-c", "raise SystemExit(0)"),
+            maximum_bytes=-1,
+            label="bounded subprocess fixture",
+        )
+
+
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("missing", "header is invalid"),
+        ("wrong-object", "header is invalid"),
+        ("non-blob", "header is invalid"),
+        ("noncanonical-size", "size is invalid"),
+        ("oversized", "per-file limit"),
+        ("metadata-truncated", "metadata batch is truncated"),
+        ("content-wrong-object", "header is invalid"),
+        ("size-changed", "size changed"),
+        ("truncated", "content batch is truncated"),
+        ("bad-frame", "framing is invalid"),
+        ("body-mismatch", "does not match its object ID"),
+        ("trailing", "trailing output"),
+    ],
+)
+def test_git_batch_blob_bindings_reject_malformed_output(
+    failure: str,
+    message: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    object_id = "c1b0730e0133447badcfd47fd144e254807b06e1"
+    valid_metadata = f"{object_id} blob 1\n".encode("ascii")
+    outputs = {
+        "missing": (f"{object_id} missing\n".encode("ascii"), b""),
+        "wrong-object": (f"{'2' * 40} blob 1\n".encode("ascii"), b""),
+        "non-blob": (f"{object_id} tree 1\n".encode("ascii"), b""),
+        "noncanonical-size": (f"{object_id} blob 01\n".encode("ascii"), b""),
+        "oversized": (
+            f"{object_id} blob {handoff_module._MAX_INPUT_BYTES + 1}\n".encode("ascii"),
+            b"",
+        ),
+        "metadata-truncated": (f"{object_id} blob 1".encode("ascii"), b""),
+        "content-wrong-object": (
+            valid_metadata,
+            f"{'2' * 40} blob 1\nx\n".encode("ascii"),
+        ),
+        "size-changed": (
+            valid_metadata,
+            f"{object_id} blob 2\nxx\n".encode("ascii"),
+        ),
+        "truncated": (
+            f"{object_id} blob 2\n".encode("ascii"),
+            f"{object_id} blob 2\nx".encode("ascii"),
+        ),
+        "bad-frame": (valid_metadata, f"{object_id} blob 1\nx!".encode("ascii")),
+        "body-mismatch": (valid_metadata, f"{object_id} blob 1\ny\n".encode("ascii")),
+        "trailing": (
+            valid_metadata,
+            f"{object_id} blob 1\nx\nextra".encode("ascii"),
+        ),
+    }
+
+    def bounded_output(
+        _repo_root: Path,
+        _git: str,
+        arguments: tuple[str, ...],
+        **_kwargs: object,
+    ) -> bytes:
+        metadata, content = outputs[failure]
+        return metadata if arguments[-1] == "--batch-check" else content
+
+    monkeypatch.setattr(handoff_module, "_git_bounded_output", bounded_output)
+
+    with pytest.raises(HandoffError, match=message):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", (object_id,))
+
+
+def test_git_blob_object_id_matches_git_sha1_and_sha256() -> None:
+    assert handoff_module._git_blob_object_id(b"", 40) == "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    assert (
+        handoff_module._git_blob_object_id(b"", 64)
+        == "473a0f4c3be8a93681a267e3b1e9a7dcda1185436fe141f7749120a303721813"
+    )
+    with pytest.raises(HandoffError, match="object ID length is invalid"):
+        handoff_module._git_blob_object_id(b"", 32)
+
+
+def test_git_batch_blob_bindings_reject_ambiguous_requests(tmp_path: Path) -> None:
+    object_id = "1" * 40
+
+    with pytest.raises(HandoffError, match="empty or ambiguous"):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", ())
+    with pytest.raises(HandoffError, match="empty or ambiguous"):
+        handoff_module._git_batch_blob_bindings(
+            tmp_path,
+            "/trusted/git",
+            (object_id, object_id),
+        )
+    with pytest.raises(HandoffError, match="invalid object ID"):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", ("g" * 40,))
+
+
+def test_git_recovery_binding_counts_duplicate_blob_paths_toward_total_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    object_id = "1" * 40
+    inventory = (
+        f"100644 blob {object_id}\tfirst.txt".encode("ascii")
+        + b"\x00"
+        + f"100644 blob {object_id}\tsecond.txt".encode("ascii")
+        + b"\x00"
+    )
+    monkeypatch.setattr(
+        handoff_module,
+        "_git_bounded_output",
+        lambda *_args, **_kwargs: inventory,
+    )
+    monkeypatch.setattr(
+        handoff_module,
+        "_git_batch_blob_bindings",
+        lambda *_args, **_kwargs: {object_id: (2, sha256_bytes(b"xx"))},
+    )
+    monkeypatch.setattr(handoff_module, "_MAX_RECOVERY_INPUT_BYTES", 3)
+
+    with pytest.raises(HandoffError, match="blobs exceed the total input limit"):
+        handoff_module._git_eligible_recovery_files(tmp_path, "/trusted/git", "2" * 40)
+
+
+def test_git_batch_blob_bindings_enforce_request_and_total_bounds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_id = "1" * 40
+    second_id = "2" * 40
+    metadata = f"{first_id} blob 2\n{second_id} blob 2\n".encode("ascii")
+    monkeypatch.setattr(
+        handoff_module,
+        "_git_bounded_output",
+        lambda *_args, **_kwargs: metadata,
+    )
+    monkeypatch.setattr(handoff_module, "_MAX_RECOVERY_INPUT_BYTES", 3)
+
+    with pytest.raises(HandoffError, match="batch exceeds the total input limit"):
+        handoff_module._git_batch_blob_bindings(
+            tmp_path,
+            "/trusted/git",
+            (first_id, second_id),
+        )
+
+    monkeypatch.setattr(handoff_module, "_MAX_GIT_METADATA_BYTES", len(first_id))
+    with pytest.raises(HandoffError, match="request exceeds its verification bound"):
+        handoff_module._git_batch_blob_bindings(tmp_path, "/trusted/git", (first_id,))
 
 
 def test_validation_lineage_path_inventory_disables_rename_detection(
