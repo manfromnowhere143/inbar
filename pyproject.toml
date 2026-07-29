@@ -23,7 +23,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "certifi>=2026.6.17,<2027",
+  "certifi>=2026.7.22,<2027",
   "networkx>=3.4,<4",
   "numpy>=2.0,<3",
   "packaging>=26.2,<27",
@@ -34,21 +34,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-data = ["pyarrow>=19,<24"]
+data = ["pyarrow>=25.0.0,<26"]
 gpu = ["torch>=2.7,<3"]
 
 [dependency-groups]
 dev = [
-  "hypothesis>=6.120,<7",
-  "mypy>=1.14,<2",
+  "hypothesis>=6.163.0,<7",
+  "mypy>=2.3.0,<3",
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
-  "ruff>=0.9,<1",
+  "ruff>=0.16.0,<1",
 ]
 release = [
   "build>=1.3,<2",
   "check-wheel-contents>=0.6,<1",
-  "twine>=6.2,<7",
+  "twine>=7.0.0,<8",
 ]
 security = ["pip-audit>=2.9,<3"]
 
